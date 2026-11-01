@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Automotive Logistics Control Tower</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<!-- icon sprite (stroke icons, colour via CSS `color`) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-bars" viewBox="0 0 24 24"><path d="M3 21V12M8 21V6M13 21V10M18 21V3M2 21h20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></symbol>
+    <symbol id="i-car" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><path d="M3 15l1.6-5.2A2 2 0 016.5 8.4h11a2 2 0 011.9 1.4L21 15v3.5H3z"/><path d="M5 12h14M6.5 18.5v1.5M17.5 18.5v1.5"/><circle cx="7.5" cy="15.2" r=".8" fill="currentColor"/><circle cx="16.5" cy="15.2" r=".8" fill="currentColor"/></g></symbol>
+    <symbol id="i-warn" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M12 3L22 20H2z"/><path d="M12 10v5M12 17.6v.4"/></g></symbol>
+    <symbol id="i-truck" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><path d="M2 6h12v10H2zM14 9h4l4 4v3h-8z"/><circle cx="6.5" cy="17.5" r="1.8" fill="#0a1428"/><circle cx="17.5" cy="17.5" r="1.8" fill="#0a1428"/></g></symbol>
+    <symbol id="i-forklift" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><path d="M3 18V8h6l2 4v6M6 8V4h3M15 3v16M15 17h6M15 12h6"/><circle cx="5.5" cy="19" r="1.6"/><circle cx="10" cy="19" r="1.6"/></g></symbol>
+    <symbol id="i-target" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="11" cy="13" r="8"/><circle cx="11" cy="13" r="4.2"/><path d="M11 13l9-9M16 4h4v4"/></g></symbol>
+    <symbol id="i-stop" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 2h8l6 6v8l-6 6H8l-6-6V8z"/><path d="M12 7v6M12 16.5v.5"/></g></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></g></symbol>
+    <symbol id="i-db" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7"><ellipse cx="12" cy="5.5" rx="8" ry="3"/><path d="M4 5.5v13c0 1.7 3.6 3 8 3s8-1.3 8-3v-13M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></g></symbol>
+    <symbol id="i-press" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M5 3h14v5H5zM9 8v7h6V8M3 21h18M6 17h12v4H6z"/></g></symbol>
+    <symbol id="i-weld" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2"/><path d="M6 17v-5l6-5 4 3-4 3M16 10l4-4M3 21h18M19 14l2 2M21 12l-2 1"/></g></symbol>
+    <symbol id="i-paint" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6v5H9zM12 8v4l-3 3v5h6v-5l-3-3M5 16l-2 1M5 20l-2-1M19 16l2 1M19 20l2-1"/></g></symbol>
+    <symbol id="i-engine" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h8l2 3h3v6h-3l-2 3H7l-2-2v-3H3v-4h2V9zM9 7V4h4v3M10 12h4"/></g></symbol>
+    <symbol id="i-bumper" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2 11c0-2 2-3 5-3h10c3 0 5 1 5 3v3c0 1-1 2-2 2H4c-1 0-2-1-2-2zM6 12h12M4 19h16"/></g></symbol>
+    <symbol id="i-stack" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M2 21V10h8v11M14 21V5h8v16M2 15.5h8M14 11h8M14 16h8M2 21h20"/></g></symbol>
+    <symbol id="i-harness" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="7" cy="12" r="4"/><circle cx="7" cy="12" r="1" /><path d="M11 12c4 0 4-5 8-5M11 12c4 0 4 5 8 5M19 5v4M19 15v4"/></g></symbol>
+    <symbol id="i-seat" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3c2 0 3 1 3 3l-1 7h7c2 0 3 1 3 3v3H8M8 3L6 14v7M6 21h14"/></g></symbol>
+    <symbol id="i-latch" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M4 8h10l2 3h4v5H4zM8 16v4h8v-4"/><circle cx="9" cy="12" r="1.4"/></g></symbol>
+    <symbol id="i-mount" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 3v6M12 15v6M3 12h6M15 12h6M5.6 5.6l3.2 3.2M15.2 15.2l3.2 3.2M5.6 18.4l3.2-3.2M15.2 8.8l3.2-3.2"/></g></symbol>
+    <symbol id="i-box" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M12 2l9 5v10l-9 5-9-5V7zM3 7l9 5 9-5M12 12v10"/></g></symbol>
+    <symbol id="i-amr" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13h18v5H3zM6 13V9h8v4M8 6h4M19 13V8"/><circle cx="7" cy="19" r="1.6" fill="#0a1428"/><circle cx="17" cy="19" r="1.6" fill="#0a1428"/></g></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="9" cy="9" r="3.4"/><path d="M9 2v1.5M9 14.5V16M2 9h1.5M14.5 9H16M4 4l1 1M13 4l-1 1M4 14l1-1"/><path d="M10 21h9a3 3 0 000-6 4 4 0 00-7.6-1"/></g></symbol>
+    <symbol id="i-cal" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="M8 14h2M12 14h2M16 14h2M8 17.5h2M12 17.5h2" stroke-width="2"/></g></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M8 8l8 8M16 8l-8 8"/></g></symbol>
+    <symbol id="i-gate" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21V8l9-5 9 5v13M7 21v-8h10v8"/></g></symbol>
+    <symbol id="i-batt" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="2" y="7" width="17" height="10" rx="2"/><path d="M21.5 10.5v3"/></g></symbol>
+  </defs>
+</svg>
+
+<div id="stage">
+  <header id="hdr"></header>
+  <section id="kpis"></section>
+  <nav id="tabs"></nav>
+  <section id="main">
+    <div class="panel" id="p-map">
+      <div class="ptitle"><h2>PLANT LAYOUT &amp; MATERIAL BUFFERS</h2>
+        <div class="legend" id="map-legend"></div></div>
+      <svg id="map" viewBox="0 0 1152 384" preserveAspectRatio="xMidYMid meet">
+        <defs>
+          <marker id="ah-blue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#29b6ff"/></marker>
+          <marker id="ah-green" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#22e07a"/></marker>
+          <marker id="ah-amber" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ffc83d"/></marker>
+          <marker id="ah-red" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ff4d4d"/></marker>
+          <pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse"><path d="M24 0H0V24" fill="none" stroke="#12284a" stroke-width=".6"/></pattern>
+        </defs>
+        <rect width="1152" height="384" fill="#07142a"/>
+        <rect width="1152" height="384" fill="url(#grid)"/>
+        <g id="roads"></g>
+        <g id="flows"></g>
+        <g id="nodes"></g>
+      </svg>
+    </div>
+    <div class="panel risk" id="p-risk"></div>
+  </section>
+  <section id="rowA">
+    <div class="panel" id="p-inbound"></div>
+    <div class="panel" id="p-transfers"></div>
+    <div class="panel" id="p-lineside"></div>
+  </section>
+  <section id="rowB">
+    <div class="panel" id="p-quality"></div>
+    <div class="panel" id="p-amr"></div>
+  </section>
+  <footer id="foot"></footer>
+</div>
+
+<div id="modal" hidden></div>
+<div id="tip" hidden></div>
+
+<script src="sim.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
