@@ -233,6 +233,59 @@ function check(S, path, raw) {
 /** domain a path belongs to (for the "domain is set to Simulated" check) */
 const domainOf = (S, path) => resolve(S, path).d.domain;
 
+/* ---------- source posts: many values, one call, all-or-nothing ---------- */
+/** { build: {actual: 766}, "shops/press/buf": 82, parts: { P1: { stock: 28 } } }  ->  [{path, v}] */
+function flatten(obj, prefix, out) {
+  out = out || []; prefix = prefix || '';
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) throw new ValueError('a source post must be a JSON object of values (arrays are not supported; use a keyed object, e.g. {"parts": {"P1": {"stock": 28}}})');
+  for (const k of Object.keys(obj)) {
+    const p = prefix ? prefix + '/' + k : k, v = obj[k];
+    if (v !== null && typeof v === 'object' && !Array.isArray(v)) flatten(v, p, out);
+    else if (Array.isArray(v)) throw new ValueError(p + ': arrays are not supported in a source post');
+    else out.push({ path: p, v });
+  }
+  return out;
+}
+/** does a source that owns `prefixes` (e.g. ["build","shops/press","kpi/jis"]) may write `path`? ("*" matches any one segment) */
+function owns(prefixes, path) {
+  const ps = String(path).split('/');
+  return (prefixes || []).some((pre) => { const q = String(pre).replace(/^\/+|\/+$/g, '').split('/'); return q.length <= ps.length && q.every((s, i) => s === '*' || s.toLowerCase() === ps[i].toLowerCase()); });
+}
+/** a prefix is valid when it is the start of at least one registered path */
+function prefixValid(pre) {
+  const q = String(pre).replace(/^\/+|\/+$/g, '').split('/');
+  return !!q[0] && R.some((d) => { const ps = d.path.split('/'); return q.length <= ps.length && q.every((s, i) => s === '*' || /^\{.+\}$/.test(ps[i]) || s.toLowerCase() === ps[i].toLowerCase()); });
+}
+const rank = (it) => (/\/(total|plan|docks)$/.test(it.path) ? 0 : 1);     // totals before the values that must not exceed them
+/** Apply many values atomically: either all are applied (and each domain is marked live once) or the state is left exactly as it was. */
+function applyMany(S, items) {
+  const snap = JSON.stringify(S);
+  S._batch = new Set();
+  try {
+    const done = items.slice().sort((a, b) => rank(a) - rank(b)).map((it) => apply(S, it.path, it.v));
+    const doms = Array.from(S._batch); delete S._batch;
+    doms.forEach((d) => Ing.touch(S, d));
+    return done;
+  } catch (e) {
+    delete S._batch;
+    const old = JSON.parse(snap);
+    for (const k of Object.keys(S)) delete S[k];
+    Object.assign(S, old);
+    throw e;
+  }
+}
+/** validate everything first and report ALL problems, not just the first */
+function validateMany(S, items, allowed) {
+  const errs = [];
+  for (const it of items) {
+    try {
+      const dom = check(S, it.path, it.v);
+      if (allowed && !allowed(it.path, dom)) throw new ValueError('this source does not own this value (see its "owns" list on the Interfaces page)', 403);
+    } catch (e) { errs.push({ path: it.path, error: e.message, status: e.status || 400 }); }
+  }
+  return errs;
+}
+
 function rangeText(d) {
   if (d.type === 'enum') return d.enum.join(' | ');
   if (d.type === 'boolean') return '0 | 1';
@@ -261,4 +314,4 @@ function catalog(S, base) {
   return { base, count: inputs.length, inputs, derived: DERIVED.map((x) => ({ value: x[0], how: x[1] })) };
 }
 
-module.exports = { catalog, apply, read, check, resolve, domainOf, parseBody, coerce, ValueError, REGISTRY: R, DERIVED, slug };
+module.exports = { catalog, apply, applyMany, validateMany, flatten, owns, prefixValid, read, check, resolve, domainOf, parseBody, coerce, ValueError, REGISTRY: R, DERIVED, slug };

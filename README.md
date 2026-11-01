@@ -49,6 +49,8 @@ Security: the config API is **localhost-only** unless `ADMIN_TOKEN` is set (then
 URLs you type, so never expose it unauthenticated. Secrets typed into the page are stored in `adapters.config.json` (mode 600, git-ignored) and are never
 sent back to the browser; prefer `${ENV_VAR}` references. Push ingest is separately protected by `INGEST_TOKEN`.
 
+**One POST per source system (recommended):** define `mes`, `wms`, `fleet`… under **Interfaces → Sources** (own token, the values it owns); each posts many values at once to `POST /api/source/<name>`, applied all-or-nothing, with per-source health. The Payload template button writes the exact JSON (with units and examples) for what a source owns.
+
 **One endpoint per value:** every pushable number has its own path, e.g. `POST /api/value/build/actual` with body `766` (see the **Data points** page, `#/datapoints`, or `GET /api/values`: unit, valid range, example, current value). Calculated numbers are listed there too and cannot be pushed.
 
 Other ways in: `POST /api/ingest/<domain>` (see `docs/DATA-CONTRACT.md`), or edit `adapters.config.json` by hand (`adapters.config.example.json`).

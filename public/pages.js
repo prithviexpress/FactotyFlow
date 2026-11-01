@@ -228,6 +228,15 @@
     });
     return frame('sources', 'Data Sources', 'Which parts of this dashboard are driven by real feeds',
       cards([card('Mode', S.demo ? 'DEMO' : S.mixed ? 'MIXED' : 'LIVE', S.demo ? 'low' : S.mixed ? 'watch' : 'ok'), card('Live domains', live + ' / ' + DOMAINS.length), card('Stale feeds', stale, stale ? 'low' : 'ok')]) +
+      sect('Source systems (one POST per system)', (() => {
+        const names = Object.keys(S.sources || {});
+        if (!names.length) return '<p class="note">No source systems defined yet. Add one under <a data-href="#/settings" style="color:#9bd1ff;cursor:pointer">Interfaces \u2192 Sources</a>: each gets its own token and endpoint <code>POST /api/source/&lt;name&gt;</code>.</p>';
+        return tbl(['Source', 'Endpoint', 'Owns', 'Last post', 'Posts', 'Values / post', 'Rejected', 'State', 'Last error'], names.map((n) => {
+          const r = S.sources[n], st = !r.last ? chip('mut', 'NO POSTS YET') : r.stale ? chip('low', 'STALE') : chip('ok', 'FRESH');
+          return '<tr><td><b>' + n + '</b><small>' + (r.label || '') + '</small></td><td><code>POST /api/source/' + n + '</code></td><td>' + ((r.owns || []).join(', ') || '\u2014') + '</td><td>' + (r.last ? r.age + ' s ago' : '\u2014') + '</td>' +
+            '<td>' + (r.count || 0) + '</td><td>' + (r.paths || '\u2014') + '</td><td class="' + (r.rejected ? 'watch' : '') + '">' + (r.rejected || 0) + '</td><td>' + st + '</td><td class="' + (r.error ? 'low' : 'mut') + '">' + (r.error ? String(r.error).split('\n')[0] : '') + '</td></tr>';
+        }));
+      })()) +
       sect('Domains', tbl(['Domain', 'Source', 'Last update', 'Messages', 'Freshness', 'Last error'], rows)) +
       sect('Send data', '<p class="note">Push: <code>POST /api/ingest/&lt;domain&gt;</code> (JSON, <code>Authorization: Bearer $INGEST_TOKEN</code>), or <code>POST /api/ingest/batch</code> with <code>[{domain, payload}]</code>. ' +
         'Endpoints are entered per data point on the <a data-href="#/settings" style="color:#9bd1ff;cursor:pointer">Interfaces page</a>. Payload shapes: <code>docs/DATA-CONTRACT.md</code>. ' +

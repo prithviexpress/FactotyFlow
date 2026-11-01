@@ -68,9 +68,57 @@
       '<div class="ptg">' + TERM_FIELDS.map((t) => '<label>' + t[1] + (t[2] ? '<small>' + esc(t[2]) + '</small>' : '') + '<input data-term="' + t[0] + '" value="' + esc(p.terms[t[0]]) + '"></label>').join('') + '</div></div></div>';
   }
 
+  /* ---------- sources: one POST per source system ---------- */
+  let catalog = null;
+  async function getCatalog() { if (!catalog) { const r = await fetch('/api/values'); catalog = await r.json(); } return catalog; }
+  const prefixMatches = (pre, pattern) => { const q = pre.replace(/^\/+|\/+$/g, '').split('/'), ps = pattern.split('/'); return q.length <= ps.length && q.every((s, i) => s === '*' || /^\{.+\}$/.test(ps[i]) || s.toLowerCase() === ps[i].toLowerCase()); };
+  function sourceRow(name, s) {
+    const chips = st.meta.domains.map((d) => d.id).concat(['weather']).map((id) => '<button type="button" class="chipb" data-act="srcchip" data-chip="' + id + '">+ ' + id + '</button>').join('');
+    return '<div class="srow" data-src="' + esc(name) + '"><div class="sh"><b>' + esc(name) + '</b><input data-s="label" placeholder="Label, e.g. MES (Siemens Opcenter)" value="' + esc(s.label || '') + '">' +
+      '<span class="sstat" data-sstat="' + esc(name) + '"></span><button class="tbtn" data-act="srcdel">Remove</button></div>' +
+      '<div class="sg"><label>Token <small>sent as <code>Authorization: Bearer \u2026</code>; \u2265 16 chars or <code>${ENV_VAR}</code>. Shown once on Generate, masked after saving.</small>' +
+      '<span class="tokrow"><input data-s="token" type="password" value="' + esc(s.token || '') + '"><button class="tbtn" data-act="srcgen">Generate</button></span></label>' +
+      '<label>Owns <small>values this system may write: path prefixes, comma or line separated (e.g. <code>build</code>, <code>kpi/jis</code>, <code>parts</code>). Anything else is rejected with 403.</small>' +
+      '<textarea data-s="owns" rows="2" spellcheck="false">' + esc((s.owns || []).join(', ')) + '</textarea><div class="chips">' + chips + '</div></label>' +
+      '<label>Stale after <small>seconds without a post (0 = global)</small><input data-s="staleSec" type="number" min="0" value="' + esc(s.staleSec || 0) + '"></label></div>' +
+      '<div class="surl">POST <code>' + esc(location.origin) + '/api/source/' + esc(name) + '</code> <button class="tbtn" data-act="srctpl">Payload template \u25be</button></div><div class="stpl" hidden></div></div>';
+  }
+  function sourcesHTML() {
+    const src = st.config.sources || {};
+    return '<div class="ifbar"><div class="ifb srcb"><h3>Sources <small>one POST per source system \u2014 own token, only the values it owns, applied all-or-nothing</small></h3>' +
+      '<div id="srows">' + Object.keys(src).map((n) => sourceRow(n, src[n])).join('') + '</div>' +
+      '<div class="ifrow addsrc"><input id="src-new" placeholder="new source name, e.g. mes, wms, fleet, gate" maxlength="24"><button class="tbtn" data-act="srcadd">+ Add source</button></div></div></div>';
+  }
+  async function showTemplate(row) {
+    const box = row.querySelector('.stpl');
+    if (!box.hidden) { box.hidden = true; return; }
+    const owns = row.querySelector('[data-s="owns"]').value.split(/[\s,]+/).filter(Boolean);
+    if (!owns.length) { box.hidden = false; box.innerHTML = '<p class="note">List what this source owns first.</p>'; return; }
+    const cat = await getCatalog(), obj = {}, rows = [];
+    cat.inputs.filter((d) => owns.some((p) => prefixMatches(p, d.path))).forEach((d) => {
+      const id = d.entities && d.entities.length ? d.entities[0].id : (d.entity ? 'ID' : null), path = id ? d.path.replace(/\{.+?\}/, id) : d.path;
+      let cur = obj; const segs = path.split('/');
+      segs.forEach((s, i) => { if (i === segs.length - 1) cur[s] = d.example; else cur = cur[s] = cur[s] || {}; });
+      rows.push('<tr><td><code>' + esc(path) + '</code></td><td>' + (d.type === 'number' ? '(' + esc(d.unit) + ')' : esc(d.unit)) + '</td><td>' + esc(d.example) + '</td><td class="mut">' + esc(d.range) + '</td></tr>');
+    });
+    const name = row.dataset.src, json = JSON.stringify(obj, null, 2);
+    box.hidden = false;
+    box.innerHTML = '<p class="note">' + rows.length + ' values. Send only what changed, or everything; one post = one consistent snapshot.</p>' +
+      '<pre>curl -X POST ' + esc(location.origin) + '/api/source/' + esc(name) + ' \\\n  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \\\n  -d \'' + esc(JSON.stringify(obj)) + '\'</pre><pre>' + esc(json) + '</pre>' +
+      '<table class="dt"><thead><tr><th>Path (nested keys above = path segments)</th><th>Unit</th><th>Example</th><th>Valid range</th></tr></thead><tbody>' + rows.join('') + '</tbody></table>';
+  }
+  function readSources() {
+    const out = {};
+    root.querySelectorAll('.srow').forEach((r) => {
+      const g = (k) => r.querySelector('[data-s="' + k + '"]').value;
+      out[r.dataset.src] = { label: g('label').trim(), token: g('token'), owns: g('owns').split(/[\s,]+/).filter(Boolean), staleSec: Number(g('staleSec')) || 0 };
+    });
+    return out;
+  }
+
   function formHTML() {
     const c = st.config, m = c.mqtt;
-    return plantHTML() + '<div class="ifbar"><div class="ifb">' +
+    return plantHTML() + sourcesHTML() + '<div class="ifbar"><div class="ifb">' +
       '<h3>MQTT broker <small>used by every row set to MQTT' + (st.mqttInstalled ? '' : ' — <span class="low">mqtt package not installed on server: run <code>npm i mqtt</code></span>') + '</small></h3>' +
       '<div class="ifrow"><input data-b="url" placeholder="mqtt://broker:1883" value="' + esc(m.url) + '"><input data-b="username" placeholder="username or ${MQTT_USER}" value="' + esc(m.username) + '">' +
       '<input data-b="password" type="password" placeholder="password or ${MQTT_PASS}" value="' + esc(m.password) + '"><select data-b="qos"><option value="0"' + (+m.qos === 0 ? ' selected' : '') + '>QoS 0</option><option value="1"' + (+m.qos === 1 ? ' selected' : '') + '>QoS 1</option></select></div></div>' +
@@ -106,7 +154,7 @@
     const terms = {};
     root.querySelectorAll('[data-term]').forEach((i) => { terms[i.dataset.term] = i.value.trim(); });
     const jvs = root.querySelector('[data-p="jvs"]').value.split(',').map((x) => x.trim()).filter(Boolean);
-    return { staleSec: Number(root.querySelector('[data-b="staleSec"]').value) || 60, mqtt: readBroker(), plant: { jvs, terms }, domains };
+    return { staleSec: Number(root.querySelector('[data-b="staleSec"]').value) || 60, sources: readSources(), mqtt: readBroker(), plant: { jvs, terms }, domains };
   }
 
   const msg = (t, cls) => { const m = root.querySelector('#if-msg'); if (m) { m.textContent = t; m.className = 'smsg ' + (cls || ''); } };
@@ -163,6 +211,25 @@
       if (act === 'save') save();
       else if (act === 'reload') load().then(() => msg('Changes discarded', ''));
       else if (act === 'unlock') { sessionStorage.setItem('ff_admin', root.querySelector('#if-token').value); load(); }
+      else if (act === 'srcadd') {
+        const n = root.querySelector('#src-new').value.trim().toLowerCase();
+        if (!/^[a-z0-9_-]{1,24}$/.test(n)) return msg('Source name: 1\u201324 characters, a-z 0-9 - _', 'low');
+        if (root.querySelector('.srow[data-src="' + n + '"]')) return msg('Source "' + n + '" already exists', 'low');
+        root.querySelector('#srows').insertAdjacentHTML('beforeend', sourceRow(n, { label: '', token: '', owns: [], staleSec: 0 }));
+        root.querySelector('#src-new').value = ''; msg('Unsaved changes', 'watch'); dirty = true;
+      }
+      else if (act === 'srcdel') { b.closest('.srow').remove(); msg('Unsaved changes', 'watch'); }
+      else if (act === 'srcgen') {
+        const a = new Uint8Array(24); crypto.getRandomValues(a);
+        const i = b.closest('.srow').querySelector('[data-s="token"]'); i.type = 'text'; i.value = Array.from(a, (x) => x.toString(16).padStart(2, '0')).join('');
+        msg('Token generated \u2014 copy it now; after saving it is masked and cannot be shown again', 'watch');
+      }
+      else if (act === 'srcchip') {
+        const t = b.closest('.srow').querySelector('[data-s="owns"]'), id = b.dataset.chip, cur = t.value.split(/[\s,]+/).filter(Boolean);
+        if (cur.indexOf(id) < 0) t.value = cur.concat(id).join(', ');
+        msg('Unsaved changes', 'watch');
+      }
+      else if (act === 'srctpl') showTemplate(b.closest('.srow'));
       else if (act === 'more') { const d = b.closest('.ifr').querySelector('.ifd'); d.hidden = !d.hidden; }
       else if (act === 'test') testRow(b.closest('.ifr').dataset.id, b);
     });
@@ -180,6 +247,12 @@
   function update(state) {
     S = state;
     if (!root || !st) return;
+    root.querySelectorAll('[data-sstat]').forEach((el) => {
+      const r = (state.sources || {})[el.dataset.sstat];
+      if (!r || !r.last) { el.className = 'sstat'; el.textContent = r && r.error ? 'rejected: ' + String(r.error).split('\n')[0] : 'no posts yet'; return; }
+      el.className = 'sstat ' + (r.error ? 'low' : r.stale ? 'watch' : 'ok');
+      el.textContent = (r.stale ? 'STALE \u2014 ' : '') + 'last post ' + r.age + ' s ago \u00b7 ' + r.count + ' posts \u00b7 ' + (r.paths || 0) + ' values/post' + (r.error ? ' \u00b7 last rejected: ' + String(r.error).split('\n')[0] : '');
+    });
     st.meta.domains.forEach((i) => {
       const el = root.querySelector('[data-st="' + i.id + '"]'); if (!el) return;
       const saved = st.config.domains[i.id].mode, live = state.live && state.live[i.id], src = (state.src || {})[i.id] || {};

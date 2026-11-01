@@ -235,6 +235,7 @@ function ingest(S, domain, payload) {
 }
 /** Mark a domain as live (fed by a real source) and record the update time. */
 function touch(S, base) {
+  if (S._batch) { S._batch.add(base); return; }       // inside an atomic post: counted once per domain when the post completes
   S.live[base] = true;
   const rec = S.src[base] || (S.src[base] = { count: 0 });
   rec.last = Date.now(); rec.count++; rec.error = null; rec.status = 'fresh'; rec.via = rec.via || 'push';
@@ -253,6 +254,7 @@ function health(S, staleSec) {
     r.status = !r.last || r.age > staleSec ? 'stale' : 'fresh';
     if (r.status === 'stale') stale.push(d);
   }
+  for (const n in (S.sources || {})) { const r = S.sources[n]; r.age = r.last ? Math.round((now - r.last) / 1000) : null; r.stale = !r.last || r.age > (r.staleSec || staleSec); }
   const live = Object.keys(S.live).filter((d) => S.live[d] && d !== 'weather');
   S.demo = live.length === 0;
   S.mixed = live.length > 0 && live.length < DOMAINS.length;

@@ -31,7 +31,7 @@ const IDS = DOMAIN_INFO.map((d) => d.id);
 function defaults() {
   const domains = {};
   for (const d of IDS) domains[d] = blank();
-  return { staleSec: 60, mqtt: { url: '', username: '', password: '', qos: 0 }, plant: { jvs: Sim.DEFAULT_JVS.slice(), terms: Object.assign({}, Sim.DEFAULT_TERMS) }, domains };
+  return { staleSec: 60, sources: {}, mqtt: { url: '', username: '', password: '', qos: 0 }, plant: { jvs: Sim.DEFAULT_JVS.slice(), terms: Object.assign({}, Sim.DEFAULT_TERMS) }, domains };
 }
 function blank() {
   return { mode: 'auto', url: '', method: 'GET', intervalSec: 15, headers: {}, topic: '', idIndex: null, mapper: 'identity', root: '', fields: {}, item: false };
@@ -42,6 +42,12 @@ function normalize(raw) {
   const cfg = defaults();
   raw = raw || {};
   if (raw.staleSec) cfg.staleSec = Number(raw.staleSec) || 60;
+  if (raw.sources && typeof raw.sources === 'object') {
+    for (const n of Object.keys(raw.sources)) {
+      const s = raw.sources[n] || {};
+      cfg.sources[n] = { label: String(s.label || n), token: String(s.token || ''), owns: (Array.isArray(s.owns) ? s.owns : String(s.owns || '').split(/[\s,]+/)).map((x) => String(x).trim()).filter(Boolean), staleSec: s.staleSec ? Number(s.staleSec) : 0 };
+    }
+  }
   if (raw.plant) {
     if (Array.isArray(raw.plant.jvs)) cfg.plant.jvs = raw.plant.jvs.map((x) => String(x).trim());
     if (raw.plant.terms && typeof raw.plant.terms === 'object') for (const k of Object.keys(Sim.DEFAULT_TERMS)) if (raw.plant.terms[k] !== undefined) cfg.plant.terms[k] = String(raw.plant.terms[k]).trim();
@@ -69,6 +75,18 @@ function validate(cfg) {
   if (jvs.some((n) => !n || n.length > 24)) errs.push('JV names must be 1\u201324 characters');
   if (new Set(jvs.map((n) => n.toLowerCase())).size !== jvs.length) errs.push('JV names must be unique');
   for (const k of Object.keys(cfg.plant.terms)) if (!cfg.plant.terms[k] || cfg.plant.terms[k].length > 32) errs.push('terminology "' + k + '" must be 1\u201332 characters');
+  const Vals = require('./values');
+  const tokens = [];
+  for (const n of Object.keys(cfg.sources)) {
+    const s = cfg.sources[n];
+    if (!/^[a-z0-9_-]{1,24}$/.test(n)) errs.push('source "' + n + '": name must be 1\u201324 characters of a-z, 0-9, - or _');
+    if (!s.owns.length) errs.push('source "' + n + '": list at least one value it owns (e.g. build, kpi/jis)');
+    for (const pre of s.owns) if (!Vals.prefixValid(pre)) errs.push('source "' + n + '": "' + pre + '" matches no data point (see the Data points page)');
+    if (!/^\$\{\w+\}$/.test(s.token) && s.token.length < 16) errs.push('source "' + n + '": token must be at least 16 characters (or a ${ENV_VAR} reference)');
+    if (s.token) tokens.push(s.token);
+    if (s.staleSec && !(s.staleSec >= 5)) errs.push('source "' + n + '": stale-after must be at least 5 s');
+  }
+  if (new Set(tokens).size !== tokens.length) errs.push('two sources share the same token');
   let needBroker = false;
   for (const id of IDS) {
     const d = cfg.domains[id];
@@ -92,6 +110,7 @@ const isEnvRef = (v) => /^\$\{\w+\}$/.test(String(v));
 function mask(cfg) {
   const c = JSON.parse(JSON.stringify(cfg));
   if (c.mqtt.password && !isEnvRef(c.mqtt.password)) c.mqtt.password = MASK;
+  for (const n of Object.keys(c.sources)) if (c.sources[n].token && !isEnvRef(c.sources[n].token)) c.sources[n].token = MASK;
   for (const id of IDS) for (const k of Object.keys(c.domains[id].headers || {})) if (!isEnvRef(c.domains[id].headers[k])) c.domains[id].headers[k] = MASK;
   return c;
 }
@@ -99,6 +118,7 @@ function mask(cfg) {
 function unmask(incoming, stored) {
   const c = normalize(incoming);
   if (c.mqtt.password === MASK) c.mqtt.password = stored.mqtt.password;
+  for (const n of Object.keys(c.sources)) if (c.sources[n].token === MASK) c.sources[n].token = (stored.sources[n] && stored.sources[n].token) || '';
   for (const id of IDS) {
     const h = c.domains[id].headers || {};
     for (const k of Object.keys(h)) if (h[k] === MASK) { const old = stored.domains[id].headers && stored.domains[id].headers[k]; if (old === undefined) delete h[k]; else h[k] = old; }

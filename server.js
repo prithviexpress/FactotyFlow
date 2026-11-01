@@ -12,6 +12,7 @@
  */
 const http = require('http');
 const fs = require('fs');
+const crypto = require('crypto');
 const path = require('path');
 const Sim = require('./public/sim.js');
 const Ing = require('./adapters/ingest.js');
@@ -41,6 +42,12 @@ function createApp(opts) {
   const markErr = (domain, msg) => Ing.markError(state, domain, msg);
   const manager = createManager({ config: cfg, getState: () => state, ingest: doIngest, markError: markErr, log });
   manager.apply(cfg);
+  const syncSources = () => {
+    const cs = manager.config.sources;
+    for (const n of Object.keys(state.sources)) if (!cs[n]) delete state.sources[n];
+    for (const n of Object.keys(cs)) { const r = state.sources[n] || (state.sources[n] = { count: 0, rejected: 0 }); r.label = cs[n].label; r.staleSec = cs[n].staleSec || 0; r.owns = cs[n].owns; }
+  };
+  syncSources();
   stops.push(() => manager.stop());
   const wantsLive = () => Cfg.IDS.some((id) => ['rest', 'mqtt'].includes(manager.config.domains[id].mode));
 
@@ -68,6 +75,7 @@ function createApp(opts) {
       return;
     }
     if (url.pathname === '/api/state') return send(res, 200, state);
+    if (req.method === 'POST' && (m0 = url.pathname.match(/^\/api\/source\/([A-Za-z0-9_-]+)$/))) return sourcePost(req, res, m0[1]);
     if (req.method === 'GET' && url.pathname === '/api/values') return send(res, 200, Object.assign(V.catalog(state, 'http://' + (req.headers.host || 'localhost')), { tokenRequired: !!token }));
     if (req.method === 'GET' && (m0 = url.pathname.match(/^\/api\/value\/(.+)$/))) {
       try { return send(res, 200, V.read(state, m0[1])); } catch (e) { return send(res, e.status || 400, { error: e.message }); }
@@ -87,13 +95,13 @@ function createApp(opts) {
             } catch (e) { errs.push({ path: it.path, error: e.message, status: e.status || 400 }); }
           }
           if (errs.length) return send(res, errs[0].status, { error: errs.map((e) => e.path + ': ' + e.error).join('\n'), errors: errs });
-          const done = items.map((it) => V.apply(state, it.path, it.v));
+          const done = V.applyMany(state, items);
           send(res, 200, items.length === 1 && url.pathname !== '/api/values' ? Object.assign({ ok: true }, done[0]) : { ok: true, applied: done });
         } catch (e) { send(res, e.status || 400, { error: e.message }); }
       });
     }
     if (url.pathname === '/api/inventory') return send(res, 200, Sim.inventoryView(state));
-    if (url.pathname === '/api/health') return send(res, 200, { demo: state.demo, mixed: state.mixed, stale: state.stale || [], sources: state.src });
+    if (url.pathname === '/api/health') return send(res, 200, { demo: state.demo, mixed: state.mixed, stale: state.stale || [], sources: state.src, posters: state.sources });
     let m;
     if (req.method === 'POST' && (m = url.pathname.match(/^\/api\/ingest\/([\w.]+)$/))) {
       if (token && req.headers.authorization !== 'Bearer ' + token) return send(res, 401, { error: 'unauthorized' });
@@ -146,6 +154,7 @@ function createApp(opts) {
           if (errs.length) return send(res, 400, { error: errs.join('\n'), errors: errs });
           if (configFile) Cfg.save(configFile, next);
           manager.apply(next);
+          syncSources();
           log('config saved: ' + Cfg.IDS.filter((i) => ['rest', 'mqtt'].includes(next.domains[i].mode)).join(', '));
           send(res, 200, configView());
         } catch (e) { send(res, 400, { error: e.message }); }
@@ -159,6 +168,32 @@ function createApp(opts) {
       });
     }
     send(res, 404, { error: 'not found' });
+  }
+  // One post per source system: own token, may only write the values it owns, applied all-or-nothing.
+  const resolveTok = (t) => String(t || '').replace(/\$\{(\w+)\}/g, (_, k) => process.env[k] || '');
+  const safeEq = (a, b) => { const x = Buffer.from(String(a)), y = Buffer.from(String(b)); return x.length === y.length && crypto.timingSafeEqual(x, y); };
+  function sourcePost(req, res, name) {
+    const src = manager.config.sources[name];
+    if (!src) return send(res, 404, { error: 'unknown source "' + name + '". Create it on the Interfaces page (Sources).' });
+    const tok = resolveTok(src.token);
+    if (!tok) return send(res, 401, { error: 'source "' + name + '" has no token configured' });
+    const given = (req.headers.authorization || '').replace(/^Bearer /, '');
+    if (!safeEq(given, tok)) return send(res, 401, { error: 'unauthorized' });
+    return readRaw(req, (body) => {
+      const rec = state.sources[name] || (state.sources[name] = { count: 0, rejected: 0 });
+      rec.label = src.label; rec.staleSec = src.staleSec || 0;
+      const fail = (code, msg, errors) => { rec.error = msg.slice(0, 300); rec.rejected++; rec.lastReject = Date.now(); send(res, code, { error: msg, errors }); };
+      try {
+        const items = V.flatten(V.parseBody(body));
+        if (!items.length) return fail(400, 'empty post: send at least one value');
+        const errs = V.validateMany(state, items, (p) => V.owns(src.owns, p));
+        for (const it of items) { if (errs.some((e) => e.path === it.path)) continue; const cd = manager.config.domains[V.domainOf(state, it.path)]; if (cd && cd.mode === 'sim') errs.push({ path: it.path, error: 'domain is set to Simulated on the Interfaces page', status: 409 }); }
+        if (errs.length) return fail(errs.some((e) => e.status === 403) ? 403 : errs[0].status, errs.map((e) => e.path + ': ' + e.error).join('\n') + '\n(nothing was applied)', errs);
+        const done = V.applyMany(state, items);
+        rec.last = Date.now(); rec.count++; rec.paths = done.length; rec.error = null;
+        send(res, 200, { ok: true, source: name, applied: done.length });
+      } catch (e) { fail(e.status || 400, e.message); }
+    });
   }
   function readRaw(req, cb) {
     let body = '';

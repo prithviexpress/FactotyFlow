@@ -185,7 +185,7 @@
       parts: makeParts(clock),
       hist: { t: [], g2d: [], turn: [], rej: [], spf: [] },
       sampleAcc: 0, rejMark: 16,
-      live: {}, src: {}, trucks: [], setup: null, jvSites: [],
+      live: {}, src: {}, sources: {}, trucks: [], setup: null, jvSites: [],
       events: []
     };
     setPlant(S, {});

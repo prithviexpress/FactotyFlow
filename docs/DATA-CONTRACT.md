@@ -1,5 +1,20 @@
 # Data contract
 
+**Best for real systems: one POST per source system** (`POST /api/source/<name>`). Define sources on the Interfaces page (name, token, which values it *owns*);
+each post carries many values as one JSON object, nested keys are path segments (or use `"kpi/jis": 98.4` directly):
+
+```bash
+curl -X POST http://host:8080/api/source/mes -H "Authorization: Bearer $MES_TOKEN" -H "Content-Type: application/json" \
+  -d '{"build":{"plan":920,"actual":766,"rate":1.9}, "kpi":{"jis":98.4}, "shops":{"press":{"buf":82},"bumper":{"buf":42}}, "line":{"stopped":0}}'
+curl -X POST http://host:8080/api/source/wms -H "Authorization: Bearer $WMS_TOKEN" -H "Content-Type: application/json" \
+  -d '{"parts":{"P-BMP-F":{"stock":28,"rate":1.27,"inbound":{"qty":160,"eta":25}}}, "lineside":{"bumper-b-h-lh":{"usable":42}}}'
+```
+* **All-or-nothing:** every value is validated first (unit, range, ownership); if any fails, nothing is applied and the response lists *all* problems. Applied posts are one consistent snapshot, counted once per domain.
+* **Ownership:** a source may only write the prefixes it owns (`build`, `kpi/jis`, `shops/*/buf` …); anything else → `403`. A source's token does not work for other sources.
+* **Health:** the Data sources page and `GET /api/health` (`posters`) show last post, posts, values per post, rejected count and last error per source; a source silent longer than its *stale after* (default the global `staleSec`) is flagged STALE.
+* Send only what changed, or everything; there is no required cadence.
+* Arrays are not accepted in a source post (use keyed objects: `{"parts":{"P1":{…}}}`); use `/api/ingest/<domain>` for list-style bulk loads.
+
 **Simplest way in: one endpoint per value.** `POST /api/value/<path>` with the number as the body (`766`, or `{"value":766}`):
 
 ```bash
