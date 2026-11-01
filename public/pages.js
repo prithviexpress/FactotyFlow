@@ -25,7 +25,7 @@
       H.spark(key, arr, Object.assign({ h: 150, unit: o.unit }, o)) + H.xlabels(t) + '</div>';
   }
 
-  const NAV = [['#/parts', 'Parts'], ['#/inventory', 'Inventory hrs'], ['#/inbound', 'Inbound'], ['#/transfers', 'Transfers'], ['#/lineside', 'Line side'], ['#/amr', 'AMR'], ['#/quality', 'Quality'], ['#/events', 'Events'], ['#/sources', 'Data sources'], ['#/settings', '\u2699 Interfaces']];
+  const NAV = [['#/parts', 'Parts'], ['#/inventory', 'Inventory hrs'], ['#/inbound', 'Inbound'], ['#/transfers', 'Transfers'], ['#/lineside', 'Line side'], ['#/amr', 'AMR'], ['#/quality', 'Quality'], ['#/events', 'Events'], ['#/sources', 'Data sources'], ['#/datapoints', 'Data points'], ['#/settings', '\u2699 Interfaces']];
   function frame(route, title, sub, body) {
     const here = '#/' + route;
     return '<div class="pg"><div class="pgh"><a class="back" data-href="#/">‹ Control Tower</a><div class="ttl"><h2>' + title + '</h2>' + (sub ? '<span>' + sub + '</span>' : '') + '</div></div>' +

@@ -18,6 +18,7 @@ const Ing = require('./adapters/ingest.js');
 const Cfg = require('./adapters/config.js');
 const { createManager } = require('./adapters/manager.js');
 const mappers = require('./adapters/mappers.js');
+const V = require('./adapters/values.js');
 
 const ROOT = path.join(__dirname, 'public');
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.json': 'application/json' };
@@ -59,6 +60,7 @@ function createApp(opts) {
 
   const server = http.createServer((req, res) => {
     const url = new URL(req.url, 'http://x');
+    let m0;
     if (url.pathname === '/events') {
       res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
       res.write('data: ' + JSON.stringify(state) + '\n\n');
@@ -66,6 +68,30 @@ function createApp(opts) {
       return;
     }
     if (url.pathname === '/api/state') return send(res, 200, state);
+    if (req.method === 'GET' && url.pathname === '/api/values') return send(res, 200, Object.assign(V.catalog(state, 'http://' + (req.headers.host || 'localhost')), { tokenRequired: !!token }));
+    if (req.method === 'GET' && (m0 = url.pathname.match(/^\/api\/value\/(.+)$/))) {
+      try { return send(res, 200, V.read(state, m0[1])); } catch (e) { return send(res, e.status || 400, { error: e.message }); }
+    }
+    if (req.method === 'POST' && (url.pathname === '/api/values' || /^\/api\/value\/.+$/.test(url.pathname))) {
+      if (token && req.headers.authorization !== 'Bearer ' + token) return send(res, 401, { error: 'unauthorized' });
+      return readRaw(req, (body) => {
+        try {
+          const items = url.pathname === '/api/values'
+            ? Object.entries(asMap(V.parseBody(body))).map(([path, v]) => ({ path, v }))
+            : [{ path: decodeURI(url.pathname.slice('/api/value/'.length)), v: V.parseBody(body) }];
+          const errs = [];
+          for (const it of items) {                              // validate everything first so a batch is all-or-nothing
+            try {
+              const dom = V.check(state, it.path, it.v), cd = manager.config.domains[dom];
+              if (cd && cd.mode === 'sim') throw new V.ValueError('"' + dom + '" is set to Simulated on the Interfaces page; change its mode to accept data', 409);
+            } catch (e) { errs.push({ path: it.path, error: e.message, status: e.status || 400 }); }
+          }
+          if (errs.length) return send(res, errs[0].status, { error: errs.map((e) => e.path + ': ' + e.error).join('\n'), errors: errs });
+          const done = items.map((it) => V.apply(state, it.path, it.v));
+          send(res, 200, items.length === 1 && url.pathname !== '/api/values' ? Object.assign({ ok: true }, done[0]) : { ok: true, applied: done });
+        } catch (e) { send(res, e.status || 400, { error: e.message }); }
+      });
+    }
     if (url.pathname === '/api/inventory') return send(res, 200, Sim.inventoryView(state));
     if (url.pathname === '/api/health') return send(res, 200, { demo: state.demo, mixed: state.mixed, stale: state.stale || [], sources: state.src });
     let m;
@@ -133,6 +159,15 @@ function createApp(opts) {
       });
     }
     send(res, 404, { error: 'not found' });
+  }
+  function readRaw(req, cb) {
+    let body = '';
+    req.on('data', (c) => { body += c; if (body.length > 1e6) req.destroy(); });
+    req.on('end', () => cb(body));
+  }
+  function asMap(p) {
+    if (!p || typeof p !== 'object' || Array.isArray(p)) throw new V.ValueError('batch body must be an object: {"build/actual": 766, "shops/press/buf": 82}');
+    return p;
   }
   function asBatch(p) {
     if (!Array.isArray(p)) throw new Ing.IngestError('batch must be an array of {domain, payload}');

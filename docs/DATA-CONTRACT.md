@@ -1,5 +1,19 @@
 # Data contract
 
+**Simplest way in: one endpoint per value.** `POST /api/value/<path>` with the number as the body (`766`, or `{"value":766}`):
+
+```bash
+curl -X POST http://host:8080/api/value/build/actual      -H "Authorization: Bearer $INGEST_TOKEN" -d 766        # (vehicles)
+curl -X POST http://host:8080/api/value/shops/press/buf   -H "Authorization: Bearer $INGEST_TOKEN" -d 82         # (%)
+curl -X POST http://host:8080/api/values -H "Authorization: Bearer $INGEST_TOKEN" -d '{"build/actual":766,"yard/arrived":26}'   # many, all-or-nothing
+curl http://host:8080/api/value/build/actual                                                                      # read back
+```
+Every pushable value (67 paths: unit, valid range, example, current value, live/sim status) is listed on the **Data points** page
+and in `GET /api/values`. Values are validated: wrong unit/type, out of range, or not a whole number → `400` with the allowed range; an unknown id → `404` with the valid ids;
+a domain set to *Simulated* on the Interfaces page → `409`. Paths with `{x}` take an id (a shop, JV name, part number, AMR unit …); unknown part / truck / AMR / line-side ids are created on first push.
+The dashboard also shows calculated numbers (coverage, hours, percentages, counts…): those are **not** pushable; `GET /api/values` lists them with their formulas.
+The per-domain JSON endpoints below remain available for bulk loads.
+
 The dashboard renders one state object. Real data reaches it through **domains**. A domain flips from
 *simulated* to *live* on its first valid message (see **Data sources** page in the UI). Send JSON to
 `POST /api/ingest/<domain>` (or `/api/ingest/batch` with `[{domain, payload}]`), or let the REST/MQTT

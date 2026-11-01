@@ -45,11 +45,15 @@ function normPart(p, old) {
   };
   // optional per-position stock (pcs): { bay, lineside } ('dock' is accepted as an alias of 'bay'). usable stock = bay + lineside
   if (p.inv && typeof p.inv === 'object') {
-    out.inv = { bay: Math.max(0, num(p.inv.bay !== undefined ? p.inv.bay : p.inv.dock, 0)), lineside: Math.max(0, num(p.inv.lineside, 0)) };
+    const oi = old.inv || {};
+    out.inv = { bay: Math.max(0, num(p.inv.bay !== undefined ? p.inv.bay : p.inv.dock, oi.bay || 0)), lineside: Math.max(0, num(p.inv.lineside, oi.lineside || 0)) };
     if (p.stock === undefined) out.stock = out.inv.bay + out.inv.lineside;
   } else out.inv = p.stock !== undefined ? null : (old.inv || null);
   if (p.pending === null) out.pending = null;
-  else if (p.pending) out.pending = { ref: str(p.pending.ref, '—'), eta: etaMinutes(p.pending), qty: num(p.pending.qty, 0) };
+  else if (p.pending) {                          // partial update keeps the fields not sent
+    const op = old.pending || {};
+    out.pending = { ref: str(p.pending.ref, op.ref || '—'), eta: p.pending.eta !== undefined || p.pending.etaAt ? etaMinutes(p.pending) : (op.eta !== undefined ? op.eta : 30), qty: num(p.pending.qty, op.qty || 0) };
+  }
   return out;
 }
 
@@ -108,7 +112,14 @@ const APPLY = {
   'trucks.item'(S, p) {
     for (const x of Array.isArray(p) ? p : [p]) {
       const t = normTruck(x), i = S.trucks.findIndex((q) => q.id === t.id);
-      if (i >= 0) S.trucks[i] = t; else S.trucks.push(t);
+      if (i >= 0) {                                // partial update keeps the fields not sent
+        const sent = (...ks) => ks.some((k) => x[k] !== undefined);
+        const o = S.trucks[i];
+        if (!sent('supplier', 'sup')) t.sup = o.sup; if (!sent('material', 'mat')) t.mat = o.mat; if (!sent('status')) t.status = o.status;
+        if (!sent('dock')) t.dock = o.dock; if (!sent('schedAt', 'sched')) t.sched = o.sched; if (!sent('arrivedAt')) t.arrivedAt = o.arrivedAt;
+        if (!sent('dockedAt')) t.dockedAt = o.dockedAt; if (!sent('doneAt')) t.doneAt = o.doneAt;
+        S.trucks[i] = t;
+      } else S.trucks.push(t);
     }
     if (S.trucks.length > 200) S.trucks.splice(0, S.trucks.length - 200);
   },
@@ -195,11 +206,15 @@ function fleet(F, p) {
   if (p.planned !== undefined) F.planned = need(p.planned, 'planned');
   if (p.misc !== undefined) F.misc = need(p.misc, 'misc');
   if (p.chargers !== undefined) F.chargers = need(p.chargers, 'chargers');
-  F.util = p.utilizationPct !== undefined ? clamp(need(p.utilizationPct, 'utilizationPct'), 0, 100) / 100 : fleetStats(F).util;
+  if (p.utilizationPct !== undefined) F.util = clamp(need(p.utilizationPct, 'utilizationPct'), 0, 100) / 100;
+  else if (Array.isArray(p.units)) F.util = fleetStats(F).util;
 }
 function unit(F, p) {
   for (const u of Array.isArray(p) ? p : [p]) {
-    const n = normUnit(u, F), i = F.amrs.findIndex((a) => a.id === n.id);
+    asObj(u, 'unit');
+    const i = F.amrs.findIndex((a) => a.id === String(u.id)), o = i >= 0 ? F.amrs[i] : null;
+    const merged = o ? Object.assign({ battery: o.b, state: o.s, taskMin: o.t, route: F.routes[o.r] && F.routes[o.r].name }, u) : u;   // partial update keeps unsent fields
+    const n = normUnit(merged, F);
     if (i >= 0) F.amrs[i] = n; else F.amrs.push(n);
   }
   F.util = fleetStats(F).util;
@@ -216,6 +231,10 @@ function ingest(S, domain, payload) {
   }
   fn(S, payload);
   if (domain === 'event') return;
+  touch(S, base);
+}
+/** Mark a domain as live (fed by a real source) and record the update time. */
+function touch(S, base) {
   S.live[base] = true;
   const rec = S.src[base] || (S.src[base] = { count: 0 });
   rec.last = Date.now(); rec.count++; rec.error = null; rec.status = 'fresh'; rec.via = rec.via || 'push';
@@ -234,11 +253,11 @@ function health(S, staleSec) {
     r.status = !r.last || r.age > staleSec ? 'stale' : 'fresh';
     if (r.status === 'stale') stale.push(d);
   }
-  const live = Object.keys(S.live).filter((d) => S.live[d]);
+  const live = Object.keys(S.live).filter((d) => S.live[d] && d !== 'weather');
   S.demo = live.length === 0;
   S.mixed = live.length > 0 && live.length < DOMAINS.length;
   S.stale = stale;
   return S;
 }
 
-module.exports = { ingest, health, markError, IngestError, DOMAINS, APPLY };
+module.exports = { ingest, touch, health, markError, IngestError, DOMAINS, APPLY };

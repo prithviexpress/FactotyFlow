@@ -371,10 +371,12 @@
   function render() {
     if (!S) return;
     const r = route();
-    if (r === 'settings') {                       // form page: mounted once, only status dots update (never re-rendered, or typing would be lost)
+    const FORM = { settings: window.FFSettings, datapoints: window.FFDatapoints };
+    if (lastRoute && FORM[lastRoute] && lastRoute !== r && FORM[lastRoute].unmount) FORM[lastRoute].unmount();
+    if (FORM[r]) {                                // form pages: mounted once, only status cells update (never re-rendered, or typing would be lost)
       $('#stage').classList.add('paged'); renderHeader();
-      if (lastRoute !== 'settings') { cache.delete($('#page')); $('#page').scrollTop = 0; lastRoute = 'settings'; window.FFSettings.mount($('#page'), S, { server: SERVER }); }
-      else window.FFSettings.update(S);
+      if (lastRoute !== r) { cache.delete($('#page')); $('#page').scrollTop = 0; lastRoute = r; FORM[r].mount($('#page'), S, { server: SERVER }); }
+      else FORM[r].update(S);
       renderFoot(); return;
     }
     const page = r ? window.FFPages.render(r, S, H, ui) : null;

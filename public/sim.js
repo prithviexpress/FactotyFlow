@@ -370,7 +370,7 @@
     const m = simSec / 60;           // sim minutes
     if (m <= 0) return S;
     S.clock += m;
-    S.weather = clamp(S.weather + (R() - 0.5) * 0.02 * m, 24, 33);
+    if (!(S.live && S.live.weather)) S.weather = clamp(S.weather + (R() - 0.5) * 0.02 * m, 24, 33);
     for (const k in S.mods) S.mods[k] = Math.max(0, S.mods[k] - m);
     const running = !S.line.stopped;
     const L = S.live || {};
