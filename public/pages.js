@@ -5,11 +5,12 @@
   const SHOP_LABEL = { press: 'Press', weld: 'Weld', paint: 'Paint', engine: 'Engine', bumper: 'Bumper', assembly: 'Assembly' };
   const DOMAINS = [
     ['build', 'Build counters (plan / actual)'], ['line', 'Line status & stops'], ['shops', 'Shop & store buffers'], ['parts', 'Parts stock, rate, inbound'],
-    ['yard', 'Yard / dock counters'], ['trucks', 'Inbound truck list'], ['transfers', 'In-plant transfer jobs'], ['lineside', 'Line-side stock'],
-    ['amr', 'Indoor AMR fleet'], ['jv', 'Adjacent JV AMR fleet'], ['quality', 'Rejections / quarantine / SPF'], ['kpi', 'JIS & stock accuracy'],
-    ['finished', 'Finished vehicles & shipment'], ['deliveries', 'Internal delivery totals']
+    ['yard', 'Truck parking / bay counters'], ['trucks', 'Inbound truck list'], ['transfers', 'In-plant transfer jobs'], ['lineside', 'Line-side stock'],
+    ['amr', 'Indoor AMR fleet'], ['jv', 'JV AMR fleet'], ['jvstock', 'JV buffer stock'], ['quality', 'Rejections / quarantine / SPF'], ['kpi', 'JIS (just-in-sequence) & stock accuracy'],
+    ['finished', 'Motorpool stock & shipment'], ['deliveries', 'Internal delivery totals']
   ];
 
+  const TM = (S, k) => ((S.setup && S.setup.terms) || Sim.DEFAULT_TERMS)[k] || Sim.DEFAULT_TERMS[k];
   const chip = (st, t) => '<span class="chip ' + st + '">' + t + '</span>';
   const card = (l, v, cls, sub) => '<div class="dc"><small>' + l + '</small><b class="' + (cls || '') + '">' + v + '</b>' + (sub ? '<i>' + sub + '</i>' : '') + '</div>';
   const cards = (arr) => '<div class="dcs">' + arr.join('') + '</div>';
@@ -57,51 +58,50 @@
 
   /* ---------- inventory hours by position ---------- */
   const fh = (h) => (h === null || h === undefined ? '\u2014' : (h < 10 ? h.toFixed(1) : String(Math.round(h))) + ' h');
-  const POS_COLS = ['inbound', 'dock', 'stores', 'supermarket', 'lineside'];
+  const POS_COLS = ['inbound', 'bay', 'lineside'];
   function invRows(S, ui) {
     const V = Sim.inventoryView(S), f = ui.pshop || 'all', sort = ui.invSort || 'total';
     const rows = V.rows.filter((r) => f === 'all' || r.shop === f);
-    const key = (r) => (sort === 'name' ? r.name : r.h[sort] === null || r.h[sort] === undefined ? 1e9 : r.h[sort]);
+    const key = (r) => (r.h[sort] === null || r.h[sort] === undefined ? 1e9 : r.h[sort]);
     rows.sort((a, b) => (sort === 'name' ? a.name.localeCompare(b.name) : key(a) - key(b)));
     return { V, rows, f, sort };
   }
   function inventory(S, H, ui) {
-    const { V, rows, f, sort } = invRows(S, ui), T = V.targets;
-    const posLbl = { inbound: 'Inbound', dock: 'Docks', stores: 'Stores', supermarket: 'Supermkt', lineside: 'Line-side' };
+    const { V, rows, f, sort } = invRows(S, ui), T = V.targets, bays = TM(S, 'bays');
     const cell = (r, k) => {
       const h = r.h[k];
-      if (h === null || h === undefined) return '<td class="hc none" data-tip="' + (k !== 'inbound' && !r.detail ? 'The feed gives no per-position split for this part' : 'nothing at this position') + '">\u2014</td>';
+      if (h === null || h === undefined) return '<td class="hc none" data-tip="' + (k !== 'inbound' && !r.detail ? 'The feed gives no per-position split for this part' : 'nothing at this position') + '">—</td>';
       const st = Sim.hourStatus(h, T[k]);
-      return '<td class="hc ' + st + '" data-tip="' + H.f0(r.pcs[k]) + ' pcs \u00f7 ' + (r.rate * 60).toFixed(0) + ' pcs/h">' + fh(h) + '</td>';
+      return '<td class="hc ' + st + '" data-tip="' + H.f0(r.pcs[k]) + ' pcs ÷ ' + (r.rate * 60).toFixed(0) + ' pcs/h">' + fh(h) + '</td>';
     };
-    const strip = V.positions.map((p) => '<div class="pos ' + p.status + '"><small>' + p.label + '</small><b>' + (p.median === null ? '\u2014' : fh(p.median)) + '</b>' +
-      '<i>median' + (p.target !== null ? ' \u00b7 target \u2265 ' + p.target + ' h' : '') + '</i>' +
-      '<em>' + (p.min ? 'lowest ' + fh(p.min.h) + ' \u2014 ' + p.min.name : 'no data') + (p.target !== null && p.count ? '<br>' + p.below + ' of ' + p.count + ' parts below target' : '') + '</em></div>').join('<span class="pa">\u203a</span>');
-    const wip = V.wip.map((w) => '<div class="pos ' + w.status + '"><small>' + w.label + '</small><b>' + fh(w.hours) + '</b><i>' + H.f0(w.units) + ' / ' + w.cap + ' vehicle sets \u00b7 ' + H.f0(w.buf) + '%</i><em>target \u2265 ' + w.target + ' h</em></div>').join('') +
-      '<div class="pos none"><small>Finished vehicles</small><b>' + fh(V.finished.hours) + '</b><i>' + H.f0(V.finished.units || 0) + ' vehicles \u00f7 ' + (V.finished.shipRate || 0).toFixed(1) + ' / min shipping</i><em>awaiting dispatch</em></div>';
-    const sorts = [['total', 'Total'], ['lineside', 'Line-side'], ['supermarket', 'Supermkt'], ['stores', 'Stores'], ['dock', 'Docks'], ['inbound', 'Inbound'], ['name', 'Name']]
-      .map((s) => '<button data-invsort="' + s[0] + '" class="' + (sort === s[0] ? 'on' : '') + '">' + s[1] + '</button>').join('');
+    const strip = V.positions.map((p) => '<div class="pos ' + p.status + '"><small>' + p.label + '</small><b>' + (p.median === null ? '—' : fh(p.median)) + '</b>' +
+      '<i>median' + (p.target !== null ? ' · target ≥ ' + p.target + ' h' : '') + '</i>' +
+      '<em>' + (p.min ? 'lowest ' + fh(p.min.h) + ' — ' + p.min.name : 'no data') + (p.target !== null && p.count ? '<br>' + p.below + ' of ' + p.count + ' parts below target' : '') + '</em></div>').join('<span class="pa">›</span>');
+    const wip = V.wip.map((w) => '<div class="pos ' + w.status + '"><small>' + w.label + '</small><b>' + fh(w.hours) + '</b><i>' + H.f0(w.units) + ' / ' + w.cap + ' vehicle sets · ' + H.f0(w.buf) + '%</i><em>target ≥ ' + w.target + ' h</em></div>').join('') +
+      '<div class="pos none"><small>' + V.finished.label + '</small><b>' + fh(V.finished.hours) + '</b><i>' + H.f0(V.finished.units || 0) + ' vehicles ÷ ' + (V.finished.shipRate || 0).toFixed(1) + ' / min dispatch</i><em>awaiting dispatch</em></div>';
+    const sorts = [['total', 'Total'], ['lineside', 'Line-side'], ['bay', bays], ['inbound', 'Inbound'], ['name', 'Name']]
+      .map((x) => '<button data-invsort="' + x[0] + '" class="' + (sort === x[0] ? 'on' : '') + '">' + x[1] + '</button>').join('');
     const chips = ['all'].concat(Object.keys(SHOP_LABEL)).map((k) => '<button data-pshop="' + k + '" class="' + (f === k ? 'on' : '') + '">' + (k === 'all' ? 'All shops' : SHOP_LABEL[k]) + '</button>').join('');
     const sm = V.summary;
-    const body = tbl(['Part', 'Shop', 'Rate / h', 'Inbound', 'Docks', 'Stores', 'Supermkt', 'Line-side', 'Total usable'], rows.map((r) => {
+    const body = tbl(['Part', 'Shop', 'Rate / h', 'Inbound', bays, 'Line-side', 'Total usable'], rows.map((r) => {
       const tst = r.h.total === null ? 'none' : Sim.partStatus(r.h.total * 60);
-      return '<tr><td><b>' + r.name + '</b><small>' + r.id + ' \u00b7 ' + r.loc + '</small></td><td>' + SHOP_LABEL[r.shop] + '</td><td>' + H.f0(r.rate * 60) + '</td>' +
-        POS_COLS.map((k) => cell(r, k)).join('') + '<td class="hc tot ' + tst + '" data-tip="' + H.f0(r.pcs.total) + ' pcs usable (stores + supermarket + line-side)">' + fh(r.h.total) + '</td></tr>';
+      return '<tr><td><b>' + r.name + '</b><small>' + r.id + ' · ' + r.loc + '</small></td><td>' + SHOP_LABEL[r.shop] + '</td><td>' + H.f0(r.rate * 60) + '</td>' +
+        POS_COLS.map((k) => cell(r, k)).join('') + '<td class="hc tot ' + tst + '" data-tip="' + H.f0(r.pcs.total) + ' pcs usable (' + bays.toLowerCase() + ' + line-side)">' + fh(r.h.total) + '</td></tr>';
     }));
-    return frame('inventory', 'Hours of Inventory by Position', 'Stock \u00f7 consumption rate at every point along the flow',
+    return frame('inventory', 'Hours of Inventory by Position', 'Stock ÷ consumption rate at every point along the flow',
       cards([card('Parts tracked', sm.count), card('Median usable', fh(sm.median), ''), card('Lowest part', fh(sm.min), sm.min !== null && sm.min < 1 ? 'low' : sm.min < 2 ? 'watch' : 'ok'),
         card('Under 1 h', sm.under1h, sm.under1h ? 'low' : 'ok'), card('Under 4 h', sm.under4h, sm.under4h ? 'watch' : 'ok')]) +
-      sect('Material flow \u2014 median hours per position', '<div class="posrow">' + strip + '</div>') +
-      sect('Shop WIP buffers & finished goods', '<div class="posrow">' + wip + '</div>') +
-      '<div class="filters">' + chips + '<span class="fsep"></span><span class="mut" style="font-size:12px">Sort</span>' + sorts + '<button class="csv" data-act="invcsv">\u2913 CSV</button></div>' +
-      sect('Parts \u00d7 positions (' + rows.length + ')', body +
-        '<p class="note">Hours = pcs at the position \u00f7 consumption per hour. Colour = against target (' + T.stores + ' h stores \u00b7 ' + T.supermarket + ' h supermarket \u00b7 ' + T.lineside + ' h line-side): green at/above, amber \u2265 50%, red below. ' +
-        '"Usable" = stores + supermarket + line-side (docks count once put away). Shop WIP hours = buffer vehicle-sets \u00f7 line rate (' + (S.build.rate * 60).toFixed(0) + ' veh/h). Parts whose feed gives no per-position split show only the total.</p>'));
+      sect('Material flow — median hours per position', '<div class="posrow">' + strip + '</div>') +
+      sect('Shop & JV buffers, ' + V.finished.label.toLowerCase(), '<div class="posrow">' + wip + '</div>') +
+      '<div class="filters">' + chips + '<span class="fsep"></span><span class="mut" style="font-size:12px">Sort</span>' + sorts + '<button class="csv" data-act="invcsv">⤓ CSV</button></div>' +
+      sect('Parts × positions (' + rows.length + ')', body +
+        '<p class="note">Hours = pcs at the position ÷ consumption per hour. Colour = against target (line-side ≥ ' + T.lineside + ' h): green at/above, amber ≥ 50%, red below. ' +
+        'Usable = ' + bays.toLowerCase() + ' + line-side. Shop and JV buffer hours = buffer vehicle-sets ÷ line rate (' + (S.build.rate * 60).toFixed(0) + ' veh/h; targets ≥ ' + T.wip + ' h shops, ≥ ' + T.jv + ' h JVs). Parts whose feed gives no per-position split show only the total.</p>'));
   }
 
   /* ---------- inbound ---------- */
   function inbound(S, H) {
-    const y = S.yard, order = { docked: 0, arrived: 1, scheduled: 2, received: 3 };
+    const y = S.yard, bay = TM(S, 'bay'), bays = TM(S, 'bays'), atBay = TM(S, 'atBay'), order = { docked: 0, arrived: 1, scheduled: 2, received: 3 };
     const trucks = S.trucks.slice().sort((a, b) => order[a.status] - order[b.status] || (a.status === 'received' ? (b.doneAt || 0) - (a.doneAt || 0) : (a.sched || 0) - (b.sched || 0)));
     const recvShown = trucks.filter((t) => t.status === 'received').slice(0, 8);
     const rows = trucks.filter((t) => t.status !== 'received').concat(recvShown).map((t) => {
@@ -109,20 +109,20 @@
       const late = t.arrivedAt !== null && t.sched !== null && t.arrivedAt - t.sched > 20 ? '<small class="watch">late +' + H.f0(t.arrivedAt - t.sched) + ' min</small>' : '';
       const dwell = t.arrivedAt !== null && t.status !== 'received' && t.status !== 'scheduled' ? H.f0(S.clock - t.arrivedAt) + ' min' : t.doneAt && t.arrivedAt ? H.f0(t.doneAt - t.arrivedAt) + ' min' : '—';
       const overdue = t.status === 'scheduled' && t.sched !== null && S.clock - t.sched > 15 ? '<small class="low">overdue ' + H.f0(S.clock - t.sched) + ' min</small>' : '';
-      return '<tr><td><b>' + t.id + '</b></td><td>' + t.sup + '</td><td>' + t.mat + '</td><td><span class="chip ' + st + '">' + t.status.toUpperCase() + '</span></td><td>' + (t.dock || '—') + '</td>' +
+      return '<tr><td><b>' + t.id + '</b></td><td>' + t.sup + '</td><td>' + t.mat + '</td><td><span class="chip ' + st + '">' + (t.status === 'docked' ? atBay : t.status).toUpperCase() + '</span></td><td>' + (t.dock || '—') + '</td>' +
         '<td>' + clk(t.sched) + overdue + '</td><td>' + clk(t.arrivedAt) + late + '</td><td>' + dwell + '</td></tr>';
     });
     const occ = new Set(S.trucks.filter((t) => t.status === 'docked' && t.dock).map((t) => t.dock));
     let grid = '';
-    for (let i = 1; i <= y.docks; i++) grid += '<span class="dk ' + (occ.has(i) ? 'busy' : '') + '" data-tip="Dock ' + i + (occ.has(i) ? ' — occupied' : ' — free') + '">' + i + '</span>';
-    return frame('inbound', 'Inbound Truck Flow', 'Gate → dock → received · today',
-      cards([card('Expected', y.expected), card('Arrived', y.arrived, '', H.f0((y.arrived / y.expected) * 100) + '%'), card('Docked', y.docked, '', H.f0((y.docked / y.expected) * 100) + '%'),
+    for (let i = 1; i <= y.docks; i++) grid += '<span class="dk ' + (occ.has(i) ? 'busy' : '') + '" data-tip="' + bay + ' ' + i + (occ.has(i) ? ' — occupied' : ' — free') + '">' + i + '</span>';
+    return frame('inbound', 'Inbound Truck Flow — ' + TM(S, 'parking'), 'Gate → ' + bay.toLowerCase() + ' → received · today',
+      cards([card('Expected', y.expected), card('Arrived', y.arrived, '', H.f0((y.arrived / y.expected) * 100) + '%'), card(atBay, y.docked, '', H.f0((y.docked / y.expected) * 100) + '%'),
         card('Received', y.received, 'ok', H.f0((y.received / y.expected) * 100) + '%'), card('At plant now', Math.max(0, y.arrived - y.received), 'cy'),
-        card('Gate → dock (avg)', H.f0(y.g2d) + ' min', y.g2d > 45 ? 'watch' : ''), card('Truck turnaround (avg)', H.f0(y.turn) + ' min', y.turn > 90 ? 'watch' : '')]) +
-      '<div class="two">' + sect('Gate to dock time', big(H, 'g2d', S.hist.g2d, S.hist.t, { color: '#29b6ff', unit: ' min' })) +
+        card('Gate → ' + bay.toLowerCase() + ' (avg)', H.f0(y.g2d) + ' min', y.g2d > 45 ? 'watch' : ''), card('Truck turnaround (avg)', H.f0(y.turn) + ' min', y.turn > 90 ? 'watch' : '')]) +
+      '<div class="two">' + sect('Gate to ' + bay.toLowerCase() + ' time', big(H, 'g2d', S.hist.g2d, S.hist.t, { color: '#29b6ff', unit: ' min' })) +
       sect('Truck turnaround time', big(H, 'turn', S.hist.turn, S.hist.t, { color: '#29b6ff', unit: ' min' })) + '</div>' +
-      sect('Dock occupancy — ' + y.occupied + ' / ' + y.docks, '<div class="dockgrid">' + grid + '</div>') +
-      sect('Trucks (' + S.trucks.length + ')', tbl(['Truck', 'Supplier', 'Material', 'Status', 'Dock', 'Scheduled', 'Arrived', 'Dwell'], rows)));
+      sect(bay + ' occupancy — ' + y.occupied + ' / ' + y.docks, '<div class="dockgrid">' + grid + '</div>') +
+      sect('Trucks (' + S.trucks.length + ')', tbl(['Truck', 'Supplier', 'Material', 'Status', bay, 'Scheduled', 'Arrived', 'Dwell'], rows)));
   }
 
   /* ---------- transfers ---------- */
@@ -184,7 +184,7 @@
     const q = S.quality, spfSt = q.spf >= 95 ? 'ok' : q.spf >= 90 ? 'watch' : 'low';
     return frame('quality', 'Quality, Single-Piece Flow & Rejections', 'Today',
       cards([card('Rejected parts', q.rejected, 'low', H.f1((q.rejected / Math.max(1, S.build.actual)) * 100) + '% of build'), card('Quarantined', q.quarantined, 'watch', 'under investigation'),
-        card('SPF adherence', H.f0(q.spf) + '%', spfSt, 'target 95%'), card('JIS accuracy (2 h)', H.f1(S.kpi.jis) + '%', S.kpi.jis >= 98 ? 'ok' : 'watch'), card('Stock accuracy', H.f1(S.kpi.stockAcc) + '%', S.kpi.stockAcc >= 98 ? 'ok' : 'watch')]) +
+        card('SPF adherence', H.f0(q.spf) + '%', spfSt, 'target 95%'), card(TM(S, 'jis') + ' (2 h)', H.f1(S.kpi.jis) + '%', S.kpi.jis >= 98 ? 'ok' : 'watch'), card('Stock accuracy', H.f1(S.kpi.stockAcc) + '%', S.kpi.stockAcc >= 98 ? 'ok' : 'watch')]) +
       '<div class="two">' + sect('Rejections per 5 min', big(H, 'rej', S.hist.rej, S.hist.t, { color: '#ff4d4d', unit: ' pcs' })) +
       sect('Single-piece flow adherence', big(H, 'spf', S.hist.spf, S.hist.t, { color: H.COL[spfSt], unit: '%', min: 60, max: 100, target: 95, grid: [60, 80, 100] })) + '</div>');
   }

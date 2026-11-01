@@ -23,6 +23,7 @@
   const f0 = (n) => Math.round(n);
   const f1 = (n) => n.toFixed(1);
   const tipA = (t) => ' data-tip="' + String(t).replace(/"/g, '&quot;') + '"';
+  const T = (k) => ((S && S.setup && S.setup.terms) || Sim.DEFAULT_TERMS)[k] || Sim.DEFAULT_TERMS[k];
   const statusLabel = { ok: 'OK', watch: 'WATCH', low: 'LOW' };
   const jvLabel = { ok: 'On time', watch: 'Watch', low: 'Late' };
   const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -100,11 +101,11 @@
         { href: '#/inbound', tip: 'Trucks arrived at gate and not yet received.' }),
       kpi('forklift', COL.cy, 'INTERNAL DELIVERIES', 'ON TIME', '<span class="' + kcls(delPct, 92, 85) + '">' + f0(delPct) + '%</span>', '<div class="sub">(' + del.onTime + ' / ' + del.total + ')</div>',
         { href: '#/transfers', tip: 'Cumulative on-time internal deliveries this shift.' }),
-      kpi('target', COL.cy, 'JIS ACCURACY', '(last 2 hrs)', '<span class="' + jc + '">' + f1(S.kpi.jis) + '%</span>', '', { href: '#/quality', tip: 'Just-in-sequence delivery accuracy over the last 2 hours.' }),
+      kpi('target', COL.cy, T('jis').toUpperCase(), '(last 2 hrs)', '<span class="' + jc + '">' + f1(S.kpi.jis) + '%</span>', '', { href: '#/quality', tip: T('jis') + ' over the last 2 hours. JIS = Just-In-Sequence: parts delivered in the exact order of the vehicles on the line (not merely on time).' }),
       kpi('stop', COL.low, 'LOGISTICS LINE STOPS', '(today)', '<span class="' + (S.line.stops ? 'low' : 'ok') + '">' + pad2(S.line.stops) + '</span>',
         S.line.stopped ? '<div class="sub low">' + S.line.reason + '</div>' : '',
         { alert: S.line.stopped, href: '#/events', tip: S.line.stopped ? 'LINE STOPPED — ' + S.line.reason : 'Line stops caused by logistics (shortages) today. Stopped time: ' + f1(S.line.stoppedMin) + ' min' }),
-      kpi('clock', COL.cy, 'DOCK TURNAROUND', '(avg. truck)', f0(y.g2d) + '<small>min</small>', '', { href: '#/inbound', tip: 'Average gate-to-dock time per truck.' }),
+      kpi('clock', COL.cy, T('bay').toUpperCase() + ' TURNAROUND', '(avg. truck)', f0(y.g2d) + '<small>min</small>', '', { href: '#/inbound', tip: 'Average gate-to-' + T('bay').toLowerCase() + ' time per truck.' }),
       kpi('db', COL.cy, 'STOCK ACCURACY', '(cycle count)', '<span class="' + sc + '">' + f1(S.kpi.stockAcc) + '%</span>', '', { href: '#/lineside', tip: 'Cycle-count accuracy of system vs physical stock.' })
     ].join('');
     setHTML($('#kpis'), html);
@@ -123,8 +124,9 @@
     const sel = shop && ui.shop === shop;
     const dim = shop && ui.shop !== 'all' && ui.shop !== shop;
     const dot = st ? '<circle cx="' + (x + w - 10) + '" cy="' + (y + 10) + '" r="4.5" fill="' + COL[st] + '" class="' + (st === 'low' ? 'dot-low' : '') + '"/>' : '';
-    const href = { gate: '#/inbound', docks: '#/inbound', stores: '#/inventory', kitting: '#/inventory', jvs: '#/amr', finished: '#/shop/assembly', ship: '#/shop/assembly' }[id] || '';
-    return '<g class="nd' + (sel ? ' sel' : '') + (dim ? ' dim' : '') + '" data-node="' + id + '" data-href="' + href + '" data-shop="' + (shop || '') + '">' +
+    const href = { gate: '#/inbound', docks: '#/inbound', finished: '#/inventory', ship: '#/shop/assembly' }[id] || (/^jv\d/.test(id) ? '#/amr' : '');
+    const fleetAttr = /^jv\d/.test(id) ? ' data-fleet="jv"' : '';
+    return '<g class="nd' + (sel ? ' sel' : '') + (dim ? ' dim' : '') + '" data-node="' + id + '" data-href="' + href + '"' + fleetAttr + ' data-shop="' + (shop || '') + '">' +
       '<rect class="box" x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="7"/>' + dot + inner + '</g>';
   }
   const tx = (x, y, s, cls, extra) => '<text x="' + x + '" y="' + y + '" class="' + (cls || '') + '" ' + (extra || '') + '>' + s + '</text>';
@@ -139,34 +141,39 @@
       bar(x + 10, y + h - 11, w - 20, buf, COL[st]), shopKey);
   }
 
+  // JV nodes share the top row right of the bays; their number/names come from the plant setup (Interfaces page)
+  function jvLayout() {
+    const n = S.jvSites.length, gap = 8, w = Math.floor((655 - (n - 1) * gap) / n);
+    return S.jvSites.map((j, i) => ({ i, x: 497 + i * (w + gap), w }));
+  }
+  const jvRoute = (name) => S.jv.routes.find((r) => (r.key || '').toLowerCase() === name.toLowerCase() || r.name.toLowerCase().indexOf(name.toLowerCase() + ' ') === 0);
+
   function mapNodes() {
     const y = S.yard, b = S.build, pct = (b.actual / b.plan) * 100;
     const IV = Sim.inventoryView(S), wipH = {}; IV.wip.forEach((w) => { wipH[w.id] = w.hours; });
-    const posMed = {}; IV.positions.forEach((p) => { posMed[p.id] = p.median; });
     const hh = (h) => (h === null || h === undefined ? '' : ' \u00b7 ' + (h < 10 ? h.toFixed(1) : Math.round(h)) + ' h');
-    const jv = S.jv.routes.map((r) => ({ key: r.name.split(' ')[1], st: Sim.routeStatus(r.ema * 100) }));
-    const worstJv = jv.some((j) => j.st === 'low') ? 'low' : jv.some((j) => j.st === 'watch') ? 'watch' : 'ok';
     const dockSt = y.occupied / y.docks > 0.92 ? 'watch' : 'ok';
     const out = [];
     out.push('<g class="nd" data-node="entrance"><rect class="box" x="0" y="193" width="72" height="46" rx="6"/>' +
       tx(36, 212, 'PLANT', 't1', 'text-anchor="middle"') + tx(36, 227, 'ENTRANCE', 't1', 'text-anchor="middle"') + '</g>');
     out.push(nd('gate', 87, 13, 195, 125, y.arrived >= y.docked + 8 ? 'watch' : 'ok',
-      mi('car', 97, 40, 40, '#8fb8ee') + tx(150, 31, 'GATE / YARD', 't1') + tx(150, 44, '(Inbound Trucks)', 't2') +
-      [['parked', y.expected], ['arrived', y.arrived], ['docked', y.docked], ['received', y.received]].map((r, i) =>
+      mi('car', 97, 40, 40, '#8fb8ee') + tx(150, 31, T('parking').toUpperCase(), 't1') + tx(150, 44, '(Gate \u2022 Inbound Trucks)', 't2') +
+      [['parked', y.expected], ['arrived', y.arrived], [T('atBay').toLowerCase(), y.docked], ['received', y.received]].map((r, i) =>
         tx(150, 66 + i * 18, r[1], 'num') + tx(178, 66 + i * 18, r[0], 'sm')).join('')));
     out.push(nd('docks', 302, 20, 175, 78, dockSt,
-      tx(314, 40, 'RECEIVING DOCKS', 't1') + mi('truck', 314, 48, 44, '#8fb8ee') +
-      tx(366, 72, y.occupied + ' / ' + y.docks, 'big') + tx(366, 88, 'Docked', 'sm')));
-    out.push(nd('stores', 540, 20, 165, 78, Sim.bufferStatus(S.shops.stores.buf),
-      tx(552, 40, 'CENTRAL STORES', 't1') + mi('stack', 552, 48, 40, '#ffc83d') +
-      tx(602, 72, f0(S.shops.stores.buf) + '%', 'big') + tx(602, 88, 'Occup.' + hh(posMed.stores), 'sm')));
-    out.push(nd('kitting', 720, 20, 162, 78, Sim.bufferStatus(S.shops.kitting.buf),
-      tx(732, 40, 'KITTING / SUPERMARKET', 't1', 'style="font-size:10.5px"') + mi('stack', 732, 48, 40, '#ffc83d') +
-      tx(782, 72, f0(S.shops.kitting.buf) + '%', 'big') + tx(782, 88, 'Fill' + hh(posMed.supermarket), 'sm')));
-    out.push(nd('jvs', 972, 8, 180, 120, worstJv,
-      tx(984, 28, 'ADJACENT JVs', 't1') + tx(984, 41, '(Supplier Buildings)', 't2') + mi('stack', 982, 58, 40, '#8fb8ee') +
-      jv.map((j, i) => tx(1034, 66 + i * 20, 'JV ' + j.key, 'num') + '<circle cx="1086" cy="' + (62 + i * 20) + '" r="4.5" fill="' + COL[j.st] + '"/>' +
-        tx(1096, 66 + i * 20, jvLabel[j.st], 'sm', 'style="fill:' + COL[j.st] + '"')).join('')));
+      tx(314, 40, 'RECEIVING ' + T('bays').toUpperCase(), 't1') + mi('truck', 314, 48, 44, '#8fb8ee') +
+      tx(366, 72, y.occupied + ' / ' + y.docks, 'big') + tx(366, 88, T('atBay'), 'sm')));
+    jvLayout().forEach((L) => {
+      const site = S.jvSites[L.i], r = jvRoute(site.name), rp = r ? r.ema * 100 : null, rst = rp === null ? 'ok' : Sim.routeStatus(rp), bst = Sim.bufferStatus(site.buf);
+      const st = rst === 'low' || bst === 'low' ? 'low' : rst === 'watch' || bst === 'watch' ? 'watch' : 'ok';
+      const narrow = L.w < 130;
+      const max = Math.max(4, Math.floor((L.w - (narrow ? 52 : 28)) / 7.2)), nm = site.name.length > max ? site.name.slice(0, max - 1) + '\u2026' : site.name;
+      out.push(nd('jv' + L.i, L.x, 20, L.w, 78, st,
+        tx(L.x + 12, 40, nm, 't1') + tx(L.x + 12, 68, f0(site.buf) + '%', 'big ' + bst) +
+        tx(L.x + 12, 86, 'Buffer' + hh(wipH['jv:' + site.name]), 'sm') +
+        (narrow && rp !== null ? tx(L.x + L.w - 10, 40, f0(rp) + '%', 'num', 'text-anchor="end" style="fill:' + COL[rst] + ';font-size:12px"') : '') +
+        (!narrow && rp !== null ? tx(L.x + L.w - 12, 62, f0(rp) + '%', 'num', 'text-anchor="end" style="fill:' + COL[rst] + '"') + tx(L.x + L.w - 12, 78, 'on time', 'sm', 'text-anchor="end"') : '')));
+    });
     out.push(shopNode('press', 'press', 140, 198, 134, 82, 'press', 'PRESS', 'press', hh(wipH.press)));
     out.push(shopNode('weld', 'weld', 285, 198, 144, 82, 'weld', 'WELD', 'weld', hh(wipH.weld)));
     out.push(shopNode('paint', 'paint', 442, 198, 112, 82, 'paint', 'PAINT', 'paint', hh(wipH.paint)));
@@ -180,7 +187,7 @@
       bar(654, 318, 100, pct, COL[ast]) + tx(762, 325, f0(pct) + '%', 'num ' + ast), 'assembly'));
     const fo = S.finished.onTime, fst = fo >= 90 ? 'ok' : fo >= 85 ? 'watch' : 'low';
     out.push(nd('finished', 897, 193, 130, 108, fst,
-      tx(908, 213, 'FINISHED VEHICLES', 't1', 'style="font-size:10.5px"') + tx(908, 226, '(to Shipping)', 't2') + mi('car', 906, 238, 36, '#8fb8ee') +
+      tx(908, 213, T('motorpool').toUpperCase(), 't1') + tx(908, 226, '(to dispatch)', 't2') + mi('car', 906, 238, 36, '#8fb8ee') +
       tx(950, 252, 'On-time', 'sm') + tx(950, 280, f0(fo) + '%', 'big ' + fst)));
     const so = S.finished.shipOnTime, sst = so >= 90 ? 'ok' : so >= 85 ? 'watch' : 'low';
     out.push(nd('ship', 1040, 258, 102, 95, sst,
@@ -192,17 +199,17 @@
   function mapFlows() {
     const stop = S.line.stopped ? ' stopped' : '';
     const bmp = S.transfers[1], bst = (bmp.q.reduce((a, c) => a + c, 0) / bmp.q.length) * 100 < 78 ? 'red' : 'blue';
-    const jvWorst = S.jv.routes.map((r) => Sim.routeStatus(r.ema * 100));
-    const jvc = jvWorst.includes('low') ? 'red' : jvWorst.includes('watch') ? 'amber' : 'green';
     const f = (cls, d) => '<path class="flow ' + cls + stop + '" d="' + d + '" marker-end="url(#ah-' + cls + ')"/>';
     return [
       f('blue', 'M36,193 V100 H87'), f('blue', 'M282,62 H300'), f('blue', 'M390,98 V140 H620 V258 H638'),
-      f('blue', 'M672,98 V171'), f('blue', 'M770,98 V171'),
       f('blue', 'M274,239 H283'), f('blue', 'M429,239 H440'), f('blue', 'M554,239 H638'),
       f('blue', 'M347,341 H360'), f(bst, 'M527,341 H600 V312 H638'),
-      f('blue', 'M810,247 H895'), f('blue', 'M1027,285 H1038'),
-      f(jvc, 'M972,100 H930 V150 H800 V171')
-    ].join('');
+      f('blue', 'M810,247 H895'), f('blue', 'M1027,285 H1038')
+    ].concat(jvLayout().map((L) => {            // each JV feeds the assembly line top; own lane so lines do not overlap
+      const r = jvRoute(S.jvSites[L.i].name), st = r ? Sim.routeStatus(r.ema * 100) : 'ok', n = S.jvSites.length;
+      const lane = 106 + L.i * 5, entry = n > 1 ? 660 + (L.i * 130) / (n - 1) : 725;
+      return f(st === 'low' ? 'red' : st === 'watch' ? 'amber' : 'green', 'M' + (L.x + L.w / 2) + ',98 V' + lane + ' H' + entry.toFixed(0) + ' V171');
+    })).join('');
   }
   const ROADS = '<path class="road" d="M0,291 H630"/><path class="road" d="M820,291 H1152"/>';
   function renderMapLegend() {
@@ -261,9 +268,9 @@
       '<div class="funnel">' + ico('truck') +
       '<div class="fs"' + tipA('Trucks scheduled today (grows with ad-hoc loads)') + '><small>Expected</small><b>' + y.expected + '</b></div><span class="arr">▶</span>' +
       '<div class="fs"><small>Arrived</small><b>' + y.arrived + '</b><i>(' + pc(y.arrived) + ')</i></div><span class="arr">▶</span>' +
-      '<div class="fs"><small>Docked</small><b>' + y.docked + '</b><i>(' + pc(y.docked) + ')</i></div><span class="arr">▶</span>' +
+      '<div class="fs"><small>' + T('atBay') + '</small><b>' + y.docked + '</b><i>(' + pc(y.docked) + ')</i></div><span class="arr">▶</span>' +
       '<div class="fs"><small>Received</small><b>' + y.received + '</b><i>(' + pc(y.received) + ')</i></div></div>' +
-      '<div class="minis">' + mc('clock', 'Gate to Dock Time<br>(avg.)', y.g2d, 'g2d', h.g2d, '#29b6ff') +
+      '<div class="minis">' + mc('clock', 'Gate to ' + T('bay') + ' Time<br>(avg.)', y.g2d, 'g2d', h.g2d, '#29b6ff') +
       mc('truck', 'Truck Turnaround Time (avg.)', y.turn, 'turn', h.turn, '#29b6ff') + '</div>');
   }
 
@@ -323,18 +330,18 @@
       '<div>Low Battery<b class="' + (v.low ? 'low' : 'ok') + '"><span style="font-size:12px">■</span> ' + v.low + '</b></div>' +
       '<div>Missions<b>' + v.done + ' / ' + v.planned + '</b></div></div></div>';
   }
-  function routeBlock(title, F, w) {
+  function routeBlock(title, F, w, short) {
     return '<div class="am" style="width:' + w + 'px"><table class="rl"><thead><tr><th>' + title + '</th><th></th><th></th></tr></thead><tbody>' +
       F.routes.map((r) => {
         const p = r.ema * 100;
-        return '<tr><td><span style="color:#6ec1ff">▸</span> ' + r.name + '</td><td>' + r.n + '</td><td style="color:' + COL[Sim.routeStatus(p)] + '">(' + f0(p) + '%)</td></tr>';
+        return '<tr><td><span style="color:#6ec1ff">▸</span> ' + (short ? r.name.replace(/ \u2192 Assembly$/, '') : r.name) + '</td><td>' + r.n + '</td><td style="color:' + COL[Sim.routeStatus(p)] + '">(' + f0(p) + '%)</td></tr>';
       }).join('') + '</tbody></table></div>';
   }
   function renderAmr() {
     setHTML($('#p-amr'),
       '<div class="ptitle"><h2>AMR TRANSFERS &amp; HEALTH</h2><a class="more" data-href="#/amr">Details \u203a</a></div><div class="amrrow">' +
       fleetBlock('INDOOR / IN-HOUSE', '(Plant)', 'amr', S.amr, 'in') + routeBlock('Routes (Missions Today)', S.amr, 190) +
-      fleetBlock('ADJACENT JVs', '(Off-site)', 'stack', S.jv, 'jv') + routeBlock('JV Routes (Today)', S.jv, 190) + '</div>');
+      fleetBlock('ADJACENT JVs', '(Off-site)', 'stack', S.jv, 'jv') + routeBlock('JV Routes (Today)', S.jv, 190, true) + '</div>');
   }
 
   /* ---------- footer ---------- */
@@ -348,7 +355,7 @@
       left = (SERVER ? '' : '<button data-act="pause">' + (S.paused ? '▶ Resume' : '⏸ Pause') + '</button>') +
         '<span>Sim speed</span>' + sp.map((s) => '<button data-speed="' + s + '" class="' + (S.speed === s ? 'on' : '') + '">' + s + '×</button>').join('') +
         '<span class="sep"></span><span>Inject demo scenario:</span>' +
-        [['truckDelay', 'Truck delay'], ['bumperJam', 'Bumper slowdown'], ['shortage', 'Engine mount shortage'], ['amrFault', 'AMR battery fault'], ['jvDelay', 'JV C delay']]
+        [['truckDelay', 'Truck delay'], ['bumperJam', 'Bumper slowdown'], ['shortage', 'Engine mount shortage'], ['amrFault', 'AMR battery fault'], ['jvDelay', S.setup.jvs[Math.min(2, S.setup.jvs.length - 1)] + ' delay']]
           .map((b) => '<button data-inject="' + b[0] + '">' + b[1] + '</button>').join('') +
         (SERVER ? '' : '<button data-act="reset">Reset</button>');
     } else {
@@ -391,7 +398,7 @@
   const go = (h) => { if (h === '#/') { history.pushState(null, '', location.pathname + location.search); render(); } else location.hash = h; };
   // content is re-rendered every second, so navigation uses pointerdown (click needs the same element for down+up)
   function downloadInvCsv() {
-    const { rows } = window.FFPages.invRows(S, ui), cols = ['inbound', 'dock', 'stores', 'supermarket', 'lineside', 'total'];
+    const { rows } = window.FFPages.invRows(S, ui), cols = ['inbound', 'bay', 'lineside', 'total'];
     const q = (v) => '"' + String(v).replace(/"/g, '""') + '"', n = (v) => (v === null || v === undefined ? '' : (+v).toFixed(2));
     const lines = [['part_id', 'part', 'shop', 'location', 'rate_per_min'].concat(cols.map((c) => c + '_hours'), cols.map((c) => c + '_pcs')).map(q).join(',')];
     rows.forEach((r) => lines.push([q(r.id), q(r.name), q(r.shop), q(r.loc), n(r.rate)].concat(cols.map((c) => n(r.h[c])), cols.map((c) => n(r.pcs[c]))).join(',')));
@@ -412,6 +419,7 @@
     const l = e.target.closest && e.target.closest('[data-href]');
     if (!l || !l.dataset.href) return;
     const g = l.closest('.nd');
+    if (l.dataset.fleet) ui.fleet = l.dataset.fleet;
     if (g && g.dataset.shop && ui.shop !== g.dataset.shop) return;      // first click on a shop node selects it (handled below)
     go(l.dataset.href);
   });

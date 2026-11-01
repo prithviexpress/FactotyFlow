@@ -5,9 +5,9 @@
  * (see `L = S.live` guards in public/sim.js). Domains with no feed keep simulating (MIXED mode).
  * Payload shapes are documented in docs/DATA-CONTRACT.md.
  */
-const DOMAINS = ['build', 'line', 'shops', 'parts', 'yard', 'trucks', 'transfers', 'lineside', 'amr', 'jv', 'quality', 'kpi', 'finished', 'deliveries'];
+const DOMAINS = ['build', 'line', 'shops', 'parts', 'yard', 'trucks', 'transfers', 'lineside', 'amr', 'jv', 'jvstock', 'quality', 'kpi', 'finished', 'deliveries'];
 const SHOP_KEYS = ['press', 'weld', 'paint', 'engine', 'bumper', 'assembly'];
-const BUFFER_KEYS = ['press', 'weld', 'paint', 'engine', 'bumper', 'stores', 'kitting'];
+const BUFFER_KEYS = ['press', 'weld', 'paint', 'engine', 'bumper'];
 
 class IngestError extends Error { constructor(m) { super(m); this.status = 400; } }
 
@@ -43,10 +43,10 @@ function normPart(p, old) {
     rate: Math.max(0, num(p.rate, old.rate !== undefined ? old.rate : 0)),
     icon: str(p.icon, old.icon || 'box'), pending: old.pending || null
   };
-  // optional per-position stock (pcs): { dock, stores, supermarket, lineside }. usable stock = stores + supermarket + lineside
+  // optional per-position stock (pcs): { bay, lineside } ('dock' is accepted as an alias of 'bay'). usable stock = bay + lineside
   if (p.inv && typeof p.inv === 'object') {
-    out.inv = { dock: Math.max(0, num(p.inv.dock, 0)), stores: Math.max(0, num(p.inv.stores, 0)), supermarket: Math.max(0, num(p.inv.supermarket, 0)), lineside: Math.max(0, num(p.inv.lineside, 0)) };
-    if (p.stock === undefined) out.stock = out.inv.stores + out.inv.supermarket + out.inv.lineside;
+    out.inv = { bay: Math.max(0, num(p.inv.bay !== undefined ? p.inv.bay : p.inv.dock, 0)), lineside: Math.max(0, num(p.inv.lineside, 0)) };
+    if (p.stock === undefined) out.stock = out.inv.bay + out.inv.lineside;
   } else out.inv = p.stock !== undefined ? null : (old.inv || null);
   if (p.pending === null) out.pending = null;
   else if (p.pending) out.pending = { ref: str(p.pending.ref, '—'), eta: etaMinutes(p.pending), qty: num(p.pending.qty, 0) };
@@ -138,6 +138,17 @@ const APPLY = {
   jv(S, p) { fleet(S.jv, p); },
   'amr.unit'(S, p) { unit(S.amr, p); },
   'jv.unit'(S, p) { unit(S.jv, p); },
+  jvstock(S, p) {
+    asObj(p, 'jvstock');
+    const names = S.jvSites.map((j) => j.name);
+    for (const k of Object.keys(p)) {
+      const site = S.jvSites.find((j) => j.name.toLowerCase() === k.toLowerCase());
+      if (!site) throw new IngestError('unknown JV "' + k + '" (configured JVs: ' + names.join(', ') + ')');
+      const o = p[k] !== null && typeof p[k] === 'object' ? p[k] : { buf: p[k] };
+      site.buf = clamp(need(o.buf, k + '.buf'), 0, 100);
+      for (const f of ['units', 'hours', 'cap']) { if (o[f] !== undefined) site[f] = need(o[f], k + '.' + f); else if (f !== 'cap') delete site[f]; }
+    }
+  },
   quality(S, p) {
     asObj(p, 'quality');
     for (const k of ['rejected', 'quarantined', 'spf']) if (p[k] !== undefined) S.quality[k] = need(p[k], k);

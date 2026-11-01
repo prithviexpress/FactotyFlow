@@ -43,7 +43,7 @@ test('Interfaces API: save -> poll -> live; test endpoint; sim mode hands domain
   const call = (m, p, b) => fetch(base + p, { method: m, headers: { 'Content-Type': 'application/json' }, body: b ? JSON.stringify(b) : undefined });
 
   let v = await (await call('GET', '/api/config')).json();
-  assert.equal(v.meta.domains.length, 14);
+  assert.equal(v.meta.domains.length, 15);
   const row = { mode: 'rest', url: vurl + '/ok', intervalSec: 1, headers: { Authorization: 'Bearer vendor-secret' }, root: 'data', fields: { plan: 'shiftPlan', actual: 'built' } };
 
   // dry-run
@@ -92,5 +92,20 @@ test('Interfaces API is admin-gated when ADMIN_TOKEN is set', async () => {
   assert.equal((await fetch(base + '/api/config')).status, 401);
   assert.equal((await fetch(base + '/api/config', { headers: { Authorization: 'Bearer adm' } })).status, 200);
   assert.equal((await fetch(base + '/api/config/test', { method: 'POST', body: '{}' })).status, 401);
+  await app.close();
+});
+
+test('plant setup is validated, saved and applied to the live state', async () => {
+  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'ff-')), 'cfg.json');
+  const app = createApp({ configFile: file, tickMs: 50, log() {} });
+  const base = 'http://127.0.0.1:' + (await app.listen(0));
+  const put = (b) => fetch(base + '/api/config', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ config: b }) });
+  assert.equal((await put({ plant: { jvs: ['X', 'x'] } })).status, 400);                  // duplicate
+  assert.equal((await put({ plant: { jvs: [] } })).status, 400);
+  const r = await put({ plant: { jvs: ['Seats Co', 'Cockpit Co'], terms: { bay: 'Bay', jis: 'JIT adherence' } } });
+  assert.equal(r.status, 200);
+  assert.deepEqual(app.state.setup.jvs, ['Seats Co', 'Cockpit Co']);
+  assert.equal(app.state.setup.terms.jis, 'JIT adherence');
+  assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')).plant.jvs, ['Seats Co', 'Cockpit Co']);
   await app.close();
 });

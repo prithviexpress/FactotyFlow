@@ -58,9 +58,19 @@
       '<div class="tres"></div></div></div>';
   }
 
+  const TERM_FIELDS = [['bay', 'Bay (singular)', 'what you call a receiving dock'], ['bays', 'Bays (plural)', ''], ['atBay', 'Status: truck at bay', 'e.g. "At bay"'],
+    ['motorpool', 'Finished-vehicle yard', 'e.g. Motorpool'], ['parking', 'Truck waiting area', 'e.g. Truck parking'], ['jis', 'JIS KPI label', 'JIS = Just-In-Sequence (parts in vehicle order). Use "JIT adherence" only if you measure time windows, not sequence']];
+  function plantHTML() {
+    const p = st.config.plant;
+    return '<div class="ifbar"><div class="ifb plantb"><h3>Plant setup <small>names used across the dashboard</small></h3>' +
+      '<label class="pj">JV names <small>comma-separated, 1\u20136. Each becomes a node on the plant map, a buffer-hours entry, and a JV AMR route (JV \u2192 Assembly).</small>' +
+      '<input data-p="jvs" value="' + esc((p.jvs || []).join(', ')) + '" placeholder="JV1, JV2, JV3, JV4"></label>' +
+      '<div class="ptg">' + TERM_FIELDS.map((t) => '<label>' + t[1] + (t[2] ? '<small>' + esc(t[2]) + '</small>' : '') + '<input data-term="' + t[0] + '" value="' + esc(p.terms[t[0]]) + '"></label>').join('') + '</div></div></div>';
+  }
+
   function formHTML() {
     const c = st.config, m = c.mqtt;
-    return '<div class="ifbar"><div class="ifb">' +
+    return plantHTML() + '<div class="ifbar"><div class="ifb">' +
       '<h3>MQTT broker <small>used by every row set to MQTT' + (st.mqttInstalled ? '' : ' — <span class="low">mqtt package not installed on server: run <code>npm i mqtt</code></span>') + '</small></h3>' +
       '<div class="ifrow"><input data-b="url" placeholder="mqtt://broker:1883" value="' + esc(m.url) + '"><input data-b="username" placeholder="username or ${MQTT_USER}" value="' + esc(m.username) + '">' +
       '<input data-b="password" type="password" placeholder="password or ${MQTT_PASS}" value="' + esc(m.password) + '"><select data-b="qos"><option value="0"' + (+m.qos === 0 ? ' selected' : '') + '>QoS 0</option><option value="1"' + (+m.qos === 1 ? ' selected' : '') + '>QoS 1</option></select></div></div>' +
@@ -93,7 +103,10 @@
   function readAll() {
     const domains = {};
     st.meta.domains.forEach((i) => { domains[i.id] = readRow(i.id); });
-    return { staleSec: Number(root.querySelector('[data-b="staleSec"]').value) || 60, mqtt: readBroker(), domains };
+    const terms = {};
+    root.querySelectorAll('[data-term]').forEach((i) => { terms[i.dataset.term] = i.value.trim(); });
+    const jvs = root.querySelector('[data-p="jvs"]').value.split(',').map((x) => x.trim()).filter(Boolean);
+    return { staleSec: Number(root.querySelector('[data-b="staleSec"]').value) || 60, mqtt: readBroker(), plant: { jvs, terms }, domains };
   }
 
   const msg = (t, cls) => { const m = root.querySelector('#if-msg'); if (m) { m.textContent = t; m.className = 'smsg ' + (cls || ''); } };

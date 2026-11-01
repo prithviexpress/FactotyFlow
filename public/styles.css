@@ -391,3 +391,16 @@ table.rt .pn .ic{font-size:26px}
 .fsep{width:1px;height:20px;background:var(--line);margin:0 6px;align-self:center}
 .filters{flex-wrap:wrap;align-items:center}
 .filters .csv{margin-left:auto;border-radius:5px}
+
+/* ---- plant setup block ---- */
+.plantb{min-width:0}
+.plantb label{display:block;font-size:12.5px;color:var(--ink);margin-bottom:6px}
+.plantb label small{display:block;font-size:11px;color:var(--ink3);margin:1px 0 3px;max-width:520px}
+.plantb input{width:100%}
+.ptg{display:grid;grid-template-columns:repeat(3,1fr);gap:4px 12px;margin-top:6px}
+
+.rl td{line-height:1.08;font-size:10.5px}
+.rl td:first-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:125px}
+.sec b{font-size:14px;white-space:nowrap}.sec>div{white-space:nowrap}
+.am .sec{gap:4px}
+.rl td{font-size:10px;line-height:1.05}.rl th{font-size:9.5px}

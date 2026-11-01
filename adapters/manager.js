@@ -68,6 +68,7 @@ function createManager(o) {
   function apply(next) {
     const prev = cfg; cfg = next; stop();
     const S = o.getState();
+    Sim.setPlant(S, next.plant);
     const polled = (x) => x === 'rest' || x === 'mqtt';
     for (const id of Cfg.IDS) {
       const was = prev.domains[id].mode, now = next.domains[id].mode;
