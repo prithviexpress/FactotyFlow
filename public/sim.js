@@ -428,6 +428,21 @@
     return S;
   }
 
+  /* ---------- hand a domain back to the simulator (fresh simulated data) ---------- */
+  const DOMAIN_KEYS = {
+    build: ['build'], line: ['line'], shops: ['shops'], parts: ['parts'], yard: ['yard', 'trucks'], trucks: ['trucks'],
+    transfers: ['transfers'], lineside: ['lineside'], amr: ['amr'], jv: ['jv'], quality: ['quality'], kpi: ['kpi'],
+    finished: ['finished'], deliveries: ['deliveries']
+  };
+  function resetDomain(S, domain) {
+    const keys = DOMAIN_KEYS[domain];
+    if (!keys) return;
+    const fresh = createState();
+    for (const k of keys) S[k] = JSON.parse(JSON.stringify(fresh[k]));
+    if (domain === 'shops') S.hist.shops = fresh.hist.shops;
+    delete S.live[domain]; delete S.src[domain];
+  }
+
   /* ---------- scenario injections (for demos) ---------- */
   function inject(S, name) {
     switch (name) {
@@ -463,7 +478,7 @@
   }
 
   return {
-    createState, step, inject, coverage, partStatus, bufferStatus, linesideStatus, routeStatus,
+    createState, step, inject, resetDomain, coverage, partStatus, bufferStatus, linesideStatus, routeStatus,
     nextAction, fleetView, fmtClock, makeTrucks, SHOP_NAMES, RISK_MIN
   };
 });

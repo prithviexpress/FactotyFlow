@@ -1,20 +1,12 @@
 {
-  "_comment": "Copy to adapters.config.json (or set ADAPTERS_CONFIG). ${VAR} is replaced from environment variables. Push ingest (POST /api/ingest/:domain) needs no config.",
+  "_comment": "Normally you edit this on the Interfaces page (#/settings); the server writes adapters.config.json for you. ${VAR} values are read from environment variables and are the only header/password values shown back in the UI.",
   "staleSec": 60,
-  "rest": {
-    "pollers": [
-      { "domain": "parts", "url": "https://wms.example.com/api/stock", "intervalSec": 15, "mapper": "wms-stock", "headers": { "Authorization": "Bearer ${WMS_TOKEN}" } },
-      { "domain": "build", "url": "https://mes.example.com/api/shift/build", "intervalSec": 10, "headers": { "Authorization": "Bearer ${MES_TOKEN}" } }
-    ]
-  },
-  "mqtt": {
-    "url": "mqtt://broker.example.com:1883",
-    "username": "${MQTT_USER}",
-    "password": "${MQTT_PASS}",
-    "subscriptions": [
-      { "topic": "uagv/v2/+/+/state", "domain": "amr.unit", "mapper": "vda5050-state" },
-      { "topic": "plant01/yard/summary", "domain": "yard" },
-      { "topic": "plant01/line/status", "domain": "line" }
-    ]
+  "mqtt": { "url": "mqtt://broker.example.com:1883", "username": "${MQTT_USER}", "password": "${MQTT_PASS}", "qos": 0 },
+  "domains": {
+    "parts": { "mode": "rest", "url": "https://wms.example.com/api/stock", "intervalSec": 15, "headers": { "Authorization": "Bearer ${WMS_TOKEN}" }, "mapper": "wms-stock" },
+    "build": { "mode": "rest", "url": "https://mes.example.com/api/shift/build", "intervalSec": 10, "root": "data", "fields": { "plan": "shiftPlan", "actual": "built" } },
+    "amr": { "mode": "mqtt", "topic": "uagv/v2/+/+/state", "item": true, "mapper": "vda5050-state" },
+    "line": { "mode": "mqtt", "topic": "plant01/line/status" },
+    "quality": { "mode": "push" }
   }
 }

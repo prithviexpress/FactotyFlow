@@ -1,2 +1,4 @@
 node_modules/
 *.log
+adapters.config.json
+adapters.config.json.tmp

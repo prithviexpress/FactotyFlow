@@ -10,7 +10,7 @@ node server.js            # http://localhost:8080  (server streams state over SS
 # or just open public/index.html — the browser runs the same simulation locally
 ```
 
-* `?source=server` — render the server's SSE stream instead of the in-browser sim
+* served by `node server.js` the page uses the server automatically; `?source=local` forces the in-browser sim
 * `?speed=120` — start at a given sim speed (sim-seconds per real second; default 30)
 
 ## What's live
@@ -33,28 +33,27 @@ Every panel, KPI tile and several map nodes link to a page (`#/parts`, `#/inboun
 `#/quality`, `#/shop/<press|weld|paint|engine|bumper|assembly>`, `#/events`, `#/sources`). `Esc` goes back.
 Click a shop on the map to filter the risk table; click it again to open its page.
 
-## Connecting real data
+## Connecting real data — the Interfaces page
 
-Three ways in, all feeding the same ingest layer (`adapters/ingest.js`, contract in `docs/DATA-CONTRACT.md`):
+Run `node server.js`, open `http://localhost:8080` (the page auto-detects the server) and go to **⚙ Interfaces** (`#/settings`).
+Every data point on the dashboard is one row:
 
-| Path | Use for | Setup |
-|---|---|---|
-| **Push** `POST /api/ingest/<domain>` | MES / WMS / middleware that can call a webhook | set `INGEST_TOKEN`, send JSON |
-| **REST poller** | systems of record that only offer a GET API | `adapters.config.json` → `rest.pollers` |
-| **MQTT subscriber** | AMR fleet (e.g. VDA 5050), gate/yard events, PLC gateways | `npm i` (mqtt is an optional dependency), `adapters.config.json` → `mqtt` |
+1. choose a source: **Simulated**, **Push (webhook)**, **REST poll** or **MQTT subscribe**;
+2. enter the endpoint (URL + interval + headers, or MQTT topic). If your vendor's JSON differs from the dashboard's, set a *root path* and a
+   *field map* (e.g. `{"id":"material","stock":"onHand","rate":{"path":"hourlyUsage","div":60}}`) or pick a named mapper;
+3. **Test** calls the real endpoint (or waits for an MQTT message) and shows the raw response, the mapped result, and whether the dashboard accepts it;
+4. **Save & apply** writes `adapters.config.json` and hot-reloads the feeds. Status chips show LIVE / STALE / ERROR per row; rows set back to Simulated get fresh demo data.
 
-```bash
-cp adapters.config.example.json adapters.config.json   # edit URLs / topics, secrets via ${ENV_VARS}
-INGEST_TOKEN=change-me node server.js
-curl -X POST localhost:8080/api/ingest/build -H 'Authorization: Bearer change-me' -d '{"plan":920,"actual":412}'
-```
+Security: the config API is **localhost-only** unless `ADMIN_TOKEN` is set (then send it as a bearer token; the page asks for it). It makes the server fetch
+URLs you type, so never expose it unauthenticated. Secrets typed into the page are stored in `adapters.config.json` (mode 600, git-ignored) and are never
+sent back to the browser; prefer `${ENV_VAR}` references. Push ingest is separately protected by `INGEST_TOKEN`.
 
-Vendor payloads are translated by named **mappers** in `adapters/mappers.js` (`wms-stock` and `vda5050-state` are examples
-to adapt, not tested against a real system). In live/mixed mode the clock is real time, simulation speed is locked to 1x and the
-demo scenario buttons are disabled. Domains without a feed stay simulated (header shows MIXED DATA); a silent feed is flagged STALE.
+Other ways in: `POST /api/ingest/<domain>` (see `docs/DATA-CONTRACT.md`), or edit `adapters.config.json` by hand (`adapters.config.example.json`).
+Browser-only mode (opening `public/index.html` as a file, or `?source=local`) is always simulated and cannot store endpoints.
 
-Browser-only mode (no server) is always simulated; `?source=server` is required to see pushed data.
+In live/mixed mode the clock is real time, simulation speed is locked to 1x and the demo buttons are disabled; a silent feed is flagged STALE.
+`wms-stock` and `vda5050-state` mappers are examples to adapt, not tested against a real system.
 
 ## Tests
 
-`npm test` — ingest validation, auth, stale detection, topic matching, and an end-to-end run against an in-process MQTT broker (aedes).
+`npm test` — ingest validation, auth, stale detection, field mapping, the Interfaces API (save → poll → live, test, mask, hand-back-to-sim, admin gate) and an end-to-end run against an in-process MQTT broker (aedes).

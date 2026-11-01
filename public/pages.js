@@ -24,7 +24,7 @@
       H.spark(key, arr, Object.assign({ h: 150, unit: o.unit }, o)) + H.xlabels(t) + '</div>';
   }
 
-  const NAV = [['#/parts', 'Parts'], ['#/inbound', 'Inbound'], ['#/transfers', 'Transfers'], ['#/lineside', 'Line side'], ['#/amr', 'AMR'], ['#/quality', 'Quality'], ['#/events', 'Events'], ['#/sources', 'Data sources']];
+  const NAV = [['#/parts', 'Parts'], ['#/inbound', 'Inbound'], ['#/transfers', 'Transfers'], ['#/lineside', 'Line side'], ['#/amr', 'AMR'], ['#/quality', 'Quality'], ['#/events', 'Events'], ['#/sources', 'Data sources'], ['#/settings', '\u2699 Interfaces']];
   function frame(route, title, sub, body) {
     const here = '#/' + route;
     return '<div class="pg"><div class="pgh"><a class="back" data-href="#/">‹ Control Tower</a><div class="ttl"><h2>' + title + '</h2>' + (sub ? '<span>' + sub + '</span>' : '') + '</div></div>' +
@@ -186,11 +186,12 @@
       cards([card('Mode', S.demo ? 'DEMO' : S.mixed ? 'MIXED' : 'LIVE', S.demo ? 'low' : S.mixed ? 'watch' : 'ok'), card('Live domains', live + ' / ' + DOMAINS.length), card('Stale feeds', stale, stale ? 'low' : 'ok')]) +
       sect('Domains', tbl(['Domain', 'Source', 'Last update', 'Messages', 'Freshness', 'Last error'], rows)) +
       sect('Send data', '<p class="note">Push: <code>POST /api/ingest/&lt;domain&gt;</code> (JSON, <code>Authorization: Bearer $INGEST_TOKEN</code>), or <code>POST /api/ingest/batch</code> with <code>[{domain, payload}]</code>. ' +
-        'Pollers (REST) and subscribers (MQTT) are configured in <code>adapters.config.json</code>. Payload shapes: <code>docs/DATA-CONTRACT.md</code>. ' +
+        'Endpoints are entered per data point on the <a data-href="#/settings" style="color:#9bd1ff;cursor:pointer">Interfaces page</a>. Payload shapes: <code>docs/DATA-CONTRACT.md</code>. ' +
         'A domain flips from SIMULATED to LIVE on its first valid message; a feed older than <code>staleSec</code> (default 60) is flagged STALE and keeps its last value.</p>'));
   }
 
   window.FFPages = {
+    frame,
     render(route, S, H, ui) {
       const seg = route.split('/');
       switch (seg[0]) {

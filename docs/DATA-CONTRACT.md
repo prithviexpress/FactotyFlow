@@ -3,7 +3,7 @@
 The dashboard renders one state object. Real data reaches it through **domains**. A domain flips from
 *simulated* to *live* on its first valid message (see **Data sources** page in the UI). Send JSON to
 `POST /api/ingest/<domain>` (or `/api/ingest/batch` with `[{domain, payload}]`), or let the REST/MQTT
-adapters do it. Invalid payloads return `400 {error}` and change nothing.
+adapters do it (configured per data point on the Interfaces page). Invalid payloads return `400 {error}` and change nothing.
 
 Time values: `eta` = minutes from now, or `etaAt` = ISO-8601 timestamp (converted for you).
 `shop` is one of `press | weld | paint | engine | bumper | assembly`.

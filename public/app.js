@@ -4,7 +4,7 @@
   const Sim = window.FactorySim;
   const $ = (s) => document.querySelector(s);
   const params = new URLSearchParams(location.search);
-  const SERVER = params.get('source') === 'server';
+  let SERVER = false;   // true when state comes from the Node server (auto-detected, see detectServer())
   const COL = { ok: '#22e07a', watch: '#ffc83d', low: '#ff4d4d', cy: '#29b6ff' };
   const SHOPS = ['press', 'weld', 'paint', 'engine', 'bumper', 'assembly'];
   const ui = { shop: 'all', modal: false };
@@ -67,6 +67,7 @@
       '<span class="logo">' + ico('bars') + '</span><h1>AUTOMOTIVE LOGISTICS CONTROL TOWER</h1>' +
       '<div class="meta"><span>' + S.plant + '</span><i></i><span>Shift ' + shift + '</span><i></i><span>' + Sim.fmtClock(S.clock) + ' IST</span><i></i></div>' +
       badge + '<span class="sp"></span>' +
+      '<a class="more cfg" data-href="#/settings"' + tipA('Configure where each data point comes from') + '>\u2699 Interfaces</a>' +
       '<div class="env">' + ico('sun') + '<span>' + f0(S.weather) + '°C</span></div>' +
       '<div class="env">' + ico('cal') + '<span>' + date + '</span></div>');
   }
@@ -360,12 +361,18 @@
   function render() {
     if (!S) return;
     const r = route();
+    if (r === 'settings') {                       // form page: mounted once, only status dots update (never re-rendered, or typing would be lost)
+      $('#stage').classList.add('paged'); renderHeader();
+      if (lastRoute !== 'settings') { cache.delete($('#page')); $('#page').scrollTop = 0; lastRoute = 'settings'; window.FFSettings.mount($('#page'), S, { server: SERVER }); }
+      else window.FFSettings.update(S);
+      renderFoot(); return;
+    }
     const page = r ? window.FFPages.render(r, S, H, ui) : null;
     $('#stage').classList.toggle('paged', page !== null);
     renderHeader();
     if (page !== null) {
+      if (lastRoute !== r) { cache.delete($('#page')); $('#page').scrollTop = 0; lastRoute = r; }
       setHTML($('#page'), page);
-      if (lastRoute !== r) { $('#page').scrollTop = 0; lastRoute = r; }
       renderFoot();
       return;
     }
@@ -437,20 +444,30 @@
   addEventListener('resize', fit); fit();
 
   /* ---------- data source ---------- */
-  renderMapLegend();
-  if (SERVER) {
-    const es = new EventSource('/events');
-    es.onmessage = (e) => { S = JSON.parse(e.data); render(); };
-  } else {
-    S = Sim.createState();
-    const sp = +params.get('speed'); if (sp) S.speed = sp;
-    render();
-    let last = performance.now();
-    setInterval(() => {
-      const now = performance.now(), dt = Math.min(5, (now - last) / 1000); last = now;
-      Sim.step(S, dt * S.speed);
-      render();
-    }, 1000);
-    window.__S = S;
+  // Served by our Node server -> use its stream (real feeds + Interfaces page). Opened as a file / static host -> local simulation.
+  // ?source=server forces the server, ?source=local forces the in-browser simulation.
+  async function detectServer() {
+    const src = params.get('source');
+    if (src === 'server') return true;
+    if (src === 'local' || location.protocol === 'file:') return false;
+    try { const r = await fetch('/api/health', { signal: AbortSignal.timeout(1500) }); return r.ok; } catch (e) { return false; }
   }
+  renderMapLegend();
+  detectServer().then((isServer) => {
+    SERVER = isServer;
+    if (SERVER) {
+      const es = new EventSource('/events');
+      es.onmessage = (e) => { S = JSON.parse(e.data); render(); };
+    } else {
+      S = Sim.createState();
+      const sp = +params.get('speed'); if (sp) S.speed = sp;
+      render();
+      let last = performance.now();
+      setInterval(() => {
+        const now = performance.now(), dt = Math.min(5, (now - last) / 1000); last = now;
+        Sim.step(S, dt * S.speed);
+        render();
+      }, 1000);
+    }
+  });
 })();
