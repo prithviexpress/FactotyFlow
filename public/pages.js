@@ -24,7 +24,7 @@
       H.spark(key, arr, Object.assign({ h: 150, unit: o.unit }, o)) + H.xlabels(t) + '</div>';
   }
 
-  const NAV = [['#/parts', 'Parts'], ['#/inbound', 'Inbound'], ['#/transfers', 'Transfers'], ['#/lineside', 'Line side'], ['#/amr', 'AMR'], ['#/quality', 'Quality'], ['#/events', 'Events'], ['#/sources', 'Data sources'], ['#/settings', '\u2699 Interfaces']];
+  const NAV = [['#/parts', 'Parts'], ['#/inventory', 'Inventory hrs'], ['#/inbound', 'Inbound'], ['#/transfers', 'Transfers'], ['#/lineside', 'Line side'], ['#/amr', 'AMR'], ['#/quality', 'Quality'], ['#/events', 'Events'], ['#/sources', 'Data sources'], ['#/settings', '\u2699 Interfaces']];
   function frame(route, title, sub, body) {
     const here = '#/' + route;
     return '<div class="pg"><div class="pgh"><a class="back" data-href="#/">‹ Control Tower</a><div class="ttl"><h2>' + title + '</h2>' + (sub ? '<span>' + sub + '</span>' : '') + '</div></div>' +
@@ -53,6 +53,50 @@
     return frame('parts', 'Parts & Material Coverage', S.parts.length + ' tracked parts · coverage = usable stock ÷ consumption rate',
       cards([card('Critical (&lt;30 min)', b[0], b[0] ? 'low' : 'ok'), card('At risk (30–60 min)', b[1], b[1] ? 'watch' : 'ok'), card('Watch (60–120 min)', b[2], ''), card('Healthy (&gt;120 min)', b[3], 'ok')]) +
       '<div class="filters">' + chips + '</div>' + sect('Parts ranked by shortest coverage (' + list.length + ')', partsTable(S, H, list)));
+  }
+
+  /* ---------- inventory hours by position ---------- */
+  const fh = (h) => (h === null || h === undefined ? '\u2014' : (h < 10 ? h.toFixed(1) : String(Math.round(h))) + ' h');
+  const POS_COLS = ['inbound', 'dock', 'stores', 'supermarket', 'lineside'];
+  function invRows(S, ui) {
+    const V = Sim.inventoryView(S), f = ui.pshop || 'all', sort = ui.invSort || 'total';
+    const rows = V.rows.filter((r) => f === 'all' || r.shop === f);
+    const key = (r) => (sort === 'name' ? r.name : r.h[sort] === null || r.h[sort] === undefined ? 1e9 : r.h[sort]);
+    rows.sort((a, b) => (sort === 'name' ? a.name.localeCompare(b.name) : key(a) - key(b)));
+    return { V, rows, f, sort };
+  }
+  function inventory(S, H, ui) {
+    const { V, rows, f, sort } = invRows(S, ui), T = V.targets;
+    const posLbl = { inbound: 'Inbound', dock: 'Docks', stores: 'Stores', supermarket: 'Supermkt', lineside: 'Line-side' };
+    const cell = (r, k) => {
+      const h = r.h[k];
+      if (h === null || h === undefined) return '<td class="hc none" data-tip="' + (k !== 'inbound' && !r.detail ? 'The feed gives no per-position split for this part' : 'nothing at this position') + '">\u2014</td>';
+      const st = Sim.hourStatus(h, T[k]);
+      return '<td class="hc ' + st + '" data-tip="' + H.f0(r.pcs[k]) + ' pcs \u00f7 ' + (r.rate * 60).toFixed(0) + ' pcs/h">' + fh(h) + '</td>';
+    };
+    const strip = V.positions.map((p) => '<div class="pos ' + p.status + '"><small>' + p.label + '</small><b>' + (p.median === null ? '\u2014' : fh(p.median)) + '</b>' +
+      '<i>median' + (p.target !== null ? ' \u00b7 target \u2265 ' + p.target + ' h' : '') + '</i>' +
+      '<em>' + (p.min ? 'lowest ' + fh(p.min.h) + ' \u2014 ' + p.min.name : 'no data') + (p.target !== null && p.count ? '<br>' + p.below + ' of ' + p.count + ' parts below target' : '') + '</em></div>').join('<span class="pa">\u203a</span>');
+    const wip = V.wip.map((w) => '<div class="pos ' + w.status + '"><small>' + w.label + '</small><b>' + fh(w.hours) + '</b><i>' + H.f0(w.units) + ' / ' + w.cap + ' vehicle sets \u00b7 ' + H.f0(w.buf) + '%</i><em>target \u2265 ' + w.target + ' h</em></div>').join('') +
+      '<div class="pos none"><small>Finished vehicles</small><b>' + fh(V.finished.hours) + '</b><i>' + H.f0(V.finished.units || 0) + ' vehicles \u00f7 ' + (V.finished.shipRate || 0).toFixed(1) + ' / min shipping</i><em>awaiting dispatch</em></div>';
+    const sorts = [['total', 'Total'], ['lineside', 'Line-side'], ['supermarket', 'Supermkt'], ['stores', 'Stores'], ['dock', 'Docks'], ['inbound', 'Inbound'], ['name', 'Name']]
+      .map((s) => '<button data-invsort="' + s[0] + '" class="' + (sort === s[0] ? 'on' : '') + '">' + s[1] + '</button>').join('');
+    const chips = ['all'].concat(Object.keys(SHOP_LABEL)).map((k) => '<button data-pshop="' + k + '" class="' + (f === k ? 'on' : '') + '">' + (k === 'all' ? 'All shops' : SHOP_LABEL[k]) + '</button>').join('');
+    const sm = V.summary;
+    const body = tbl(['Part', 'Shop', 'Rate / h', 'Inbound', 'Docks', 'Stores', 'Supermkt', 'Line-side', 'Total usable'], rows.map((r) => {
+      const tst = r.h.total === null ? 'none' : Sim.partStatus(r.h.total * 60);
+      return '<tr><td><b>' + r.name + '</b><small>' + r.id + ' \u00b7 ' + r.loc + '</small></td><td>' + SHOP_LABEL[r.shop] + '</td><td>' + H.f0(r.rate * 60) + '</td>' +
+        POS_COLS.map((k) => cell(r, k)).join('') + '<td class="hc tot ' + tst + '" data-tip="' + H.f0(r.pcs.total) + ' pcs usable (stores + supermarket + line-side)">' + fh(r.h.total) + '</td></tr>';
+    }));
+    return frame('inventory', 'Hours of Inventory by Position', 'Stock \u00f7 consumption rate at every point along the flow',
+      cards([card('Parts tracked', sm.count), card('Median usable', fh(sm.median), ''), card('Lowest part', fh(sm.min), sm.min !== null && sm.min < 1 ? 'low' : sm.min < 2 ? 'watch' : 'ok'),
+        card('Under 1 h', sm.under1h, sm.under1h ? 'low' : 'ok'), card('Under 4 h', sm.under4h, sm.under4h ? 'watch' : 'ok')]) +
+      sect('Material flow \u2014 median hours per position', '<div class="posrow">' + strip + '</div>') +
+      sect('Shop WIP buffers & finished goods', '<div class="posrow">' + wip + '</div>') +
+      '<div class="filters">' + chips + '<span class="fsep"></span><span class="mut" style="font-size:12px">Sort</span>' + sorts + '<button class="csv" data-act="invcsv">\u2913 CSV</button></div>' +
+      sect('Parts \u00d7 positions (' + rows.length + ')', body +
+        '<p class="note">Hours = pcs at the position \u00f7 consumption per hour. Colour = against target (' + T.stores + ' h stores \u00b7 ' + T.supermarket + ' h supermarket \u00b7 ' + T.lineside + ' h line-side): green at/above, amber \u2265 50%, red below. ' +
+        '"Usable" = stores + supermarket + line-side (docks count once put away). Shop WIP hours = buffer vehicle-sets \u00f7 line rate (' + (S.build.rate * 60).toFixed(0) + ' veh/h). Parts whose feed gives no per-position split show only the total.</p>'));
   }
 
   /* ---------- inbound ---------- */
@@ -191,11 +235,12 @@
   }
 
   window.FFPages = {
-    frame,
+    frame, invRows,
     render(route, S, H, ui) {
       const seg = route.split('/');
       switch (seg[0]) {
         case 'parts': return parts(S, H, ui);
+        case 'inventory': return inventory(S, H, ui);
         case 'inbound': return inbound(S, H);
         case 'transfers': return transfers(S, H);
         case 'lineside': return lineside(S, H);

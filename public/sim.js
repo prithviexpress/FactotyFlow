@@ -148,7 +148,7 @@
         expected: 34, arrived: 26, docked: 21, received: 18, occupied: 21, docks: 28,
         g2d: 32, turn: 68
       },
-      finished: { onTime: 92, shipOnTime: 92 },
+      finished: { onTime: 92, shipOnTime: 92, units: 176, shipRate: 1.8 },
       kpi: { jis: 98.4, stockAcc: 97.8 },
       deliveries: { total: 375, onTime: 345 },
       transfers: [
@@ -196,6 +196,9 @@
     S.hist.spf = seedSeries(91, 2, HIST);
     S.hist.rej = seedSeries(1.6, 1.4, HIST).map((v) => Math.max(0, +v.toFixed(1)));
     S.lineside.forEach((l) => { l.max = Math.round(l.safety * 1.3); });
+    const CAP = { press: 300, weld: 240, paint: 200, engine: 180, bumper: 160 };
+    for (const k in CAP) S.shops[k].cap = CAP[k];
+    S.parts.forEach(initInv);
     S.hist.shops = {};
     for (const k in S.shops) S.hist.shops[k] = seedSeries(S.shops[k].target, 3, HIST);
     makeTrucks(S);
@@ -235,10 +238,79 @@
       const rate = rnd(0.3, 1.9);
       parts.push({
         id: 'P-' + String(100 + i), name: e[0], loc: 'ASY-' + String(rint(1, 24)).padStart(2, '0'), shop: e[1],
-        stock: Math.round(rate * rnd(95, 380)), rate: +rate.toFixed(2), icon: 'box', pending: null
+        stock: Math.round(rate * rnd(240, 900)), rate: +rate.toFixed(2), icon: 'box', pending: null
       });
     });
     return parts;
+  }
+
+  /* ---------- inventory by position ---------- */
+  // Usable stock = central stores + supermarket + line-side. 'dock' = unloaded but not yet put away; 'inbound' = pending truck qty.
+  const usable = (p) => (p.inv ? p.inv.stores + p.inv.supermarket + p.inv.lineside : p.stock);
+  function initInv(p) {
+    const ls = rnd(0.15, 0.35), sm = rnd(0.2, 0.35);
+    p.split = [ls, sm, 1 - ls - sm];                       // target share of usable stock: line-side, supermarket, stores
+    p.inv = { dock: 0, lineside: p.stock * ls, supermarket: p.stock * sm, stores: p.stock * (1 - ls - sm) };
+  }
+  function consumeInv(p, m) {
+    let need = p.rate * m;
+    for (const k of ['lineside', 'supermarket', 'stores']) { const t = Math.min(need, p.inv[k]); p.inv[k] -= t; need -= t; }
+  }
+  function flowInv(p, m) {
+    const v = p.inv, total = v.lineside + v.supermarket + v.stores;
+    const move = (from, to, share) => {                    // pull a position back towards its target share of the total
+      const gap = share * total - v[to];
+      if (gap > 0) { const t = Math.min(gap * clamp(m * 0.35, 0, 1), v[from]); v[from] -= t; v[to] += t; }
+    };
+    move('supermarket', 'lineside', p.split[0]);
+    move('stores', 'supermarket', p.split[1]);
+    if (v.dock > 0) { const t = Math.min(v.dock, Math.max(1, v.dock) * clamp(m * 0.12, 0, 1) + 0.0001); v.dock -= t; v.stores += t; }   // put-away
+    if (v.dock < 0.01) { v.stores += v.dock; v.dock = 0; }
+  }
+  function scaleInv(p, total) {
+    const cur = usable(p) || 1, f = total / cur;
+    for (const k of ['lineside', 'supermarket', 'stores']) p.inv[k] *= f;
+    p.stock = usable(p);
+  }
+  const hrs = (pcs, rate) => (rate > 0 && pcs !== null && pcs !== undefined ? pcs / rate / 60 : null);
+  const TARGET_H = { inbound: null, dock: null, stores: 3, supermarket: 1.5, lineside: 0.75, wip: 1, finished: null };
+  const hourStatus = (h, target) => (h === null || target === null || target === undefined ? 'none' : h >= target ? 'ok' : h >= target * 0.5 ? 'watch' : 'low');
+  const POSITIONS = [
+    { id: 'inbound', label: 'Inbound (en route)', short: 'Inbound' }, { id: 'dock', label: 'Receiving docks', short: 'Dock' },
+    { id: 'stores', label: 'Central stores', short: 'Stores' }, { id: 'supermarket', label: 'Kitting / supermarket', short: 'Supermkt' },
+    { id: 'lineside', label: 'Line-side', short: 'Line-side' }
+  ];
+  const median = (a) => { if (!a.length) return null; const b = a.slice().sort((x, y) => x - y), n = b.length; return n % 2 ? b[(n - 1) / 2] : (b[n / 2 - 1] + b[n / 2]) / 2; };
+
+  /** Hours of inventory (stock / consumption rate) at every position along the flow. */
+  function inventoryView(S) {
+    const rows = S.parts.map((p) => {
+      const h = { total: hrs(p.stock, p.rate) }, pcs = { total: p.stock };
+      if (p.inv) {
+        pcs.dock = p.inv.dock; pcs.stores = p.inv.stores; pcs.supermarket = p.inv.supermarket; pcs.lineside = p.inv.lineside;
+        for (const k of ['dock', 'stores', 'supermarket', 'lineside']) h[k] = hrs(p.inv[k], p.rate);
+      }
+      pcs.inbound = p.pending ? p.pending.qty : null; h.inbound = p.pending ? hrs(p.pending.qty, p.rate) : null;
+      return { id: p.id, name: p.name, shop: p.shop, loc: p.loc, rate: p.rate, h, pcs, detail: !!p.inv };
+    });
+    const positions = POSITIONS.map((pos) => {
+      const vals = rows.filter((r) => r.h[pos.id] !== null && r.h[pos.id] !== undefined && (pos.id === 'inbound' || r.detail));
+      const t = TARGET_H[pos.id], med = median(vals.map((r) => r.h[pos.id]));
+      let min = null; vals.forEach((r) => { if (!min || r.h[pos.id] < min.h) min = { h: r.h[pos.id], name: r.name }; });
+      return Object.assign({}, pos, { target: t, median: med, min, count: vals.length, below: t === null ? 0 : vals.filter((r) => r.h[pos.id] < t).length, status: hourStatus(med, t) });
+    });
+    const tot = rows.map((r) => r.h.total).filter((v) => v !== null);
+    const rate = S.build.rate * 60;
+    const wip = Object.keys(S.shops).filter((k) => S.shops[k].cap).map((k) => {
+      const s = S.shops[k], units = s.units !== undefined ? s.units : (s.buf / 100) * s.cap;
+      const h = s.hours !== undefined ? s.hours : rate > 0 ? units / rate : null;
+      return { id: k, label: SHOP_NAMES[k] + ' buffer', buf: s.buf, units, cap: s.cap, hours: h, target: TARGET_H.wip, status: hourStatus(h, TARGET_H.wip) };
+    });
+    const f = S.finished, fh = f.units !== undefined && f.shipRate > 0 ? f.units / (f.shipRate * 60) : null;
+    return {
+      rows, positions, wip, finished: { units: f.units, hours: fh, shipRate: f.shipRate }, targets: TARGET_H,
+      summary: { count: rows.length, median: median(tot), min: tot.length ? Math.min.apply(null, tot) : null, under1h: tot.filter((v) => v < 1).length, under4h: tot.filter((v) => v < 4).length }
+    };
   }
 
   /* ---------- inbound trucks ---------- */
@@ -324,19 +396,21 @@
     /* parts / shortages */
     let blocking = null;
     for (const p of (L.parts ? [] : S.parts)) {
-      if (running) p.stock = Math.max(0, p.stock - p.rate * m);
+      if (running) consumeInv(p, m);
+      flowInv(p, m);
+      p.stock = usable(p);
       const c = coverage(p);
       if (!p.pending && c < 55) {
         const slow = p.shop === 'bumper' ? 1.3 : 1;
         const late = R() < 0.08 ? 2.2 : 1;
-        p.pending = { ref: 'V-' + rint(20, 299), eta: rnd(10, 36) * slow * late, qty: Math.round(p.rate * rnd(90, 150)) };
+        p.pending = { ref: 'V-' + rint(20, 299), eta: rnd(10, 36) * slow * late, qty: Math.round(p.rate * rnd(240, 600)) };
       }
       if (p.pending) {
         p.pending.eta -= m;
         if (p.pending.eta <= 0) {
           const shop = S.shops[p.shop];
           const f = shop ? clamp(shop.buf / 70, 0.6, 1.2) : 1;
-          p.stock += Math.round(p.pending.qty * f);
+          p.inv.dock += Math.round(p.pending.qty * f);
           event(S, 'Truck ' + p.pending.ref + ' docked — ' + p.name + ' replenished', 'ok');
           if (shop) shop.buf = clamp(shop.buf + 6, 0, 99);
           p.pending = null;
@@ -413,6 +487,7 @@
     if (!L.quality && R() < 0.04 * tick) S.quality.quarantined = Math.max(0, S.quality.quarantined + (R() < 0.55 ? 1 : -1));
     if (!L.kpi) S.kpi.jis = clamp(S.kpi.jis + (98.4 - S.kpi.jis) * 0.02 * tick + (R() - 0.5) * 0.12 * tick, 80, 100);
     if (!L.kpi) S.kpi.stockAcc = clamp(S.kpi.stockAcc + (97.8 - S.kpi.stockAcc) * 0.02 * tick + (R() - 0.5) * 0.06 * tick, 90, 100);
+    if (!L.finished) S.finished.units = clamp(S.finished.units + (running ? S.build.rate * m * 0.5 : 0) - S.finished.shipRate * m * 0.5 + (176 - S.finished.units) * 0.03 * tick + (R() - 0.5) * 2 * tick, 20, 400);
     if (!L.finished) S.finished.shipOnTime = clamp(S.finished.shipOnTime + (92 - S.finished.shipOnTime) * 0.02 * tick + (R() - 0.5) * 0.5 * tick, 80, 100);
 
     /* history samples */
@@ -469,7 +544,7 @@
         event(S, 'JV C route delayed — supplier gate congestion', 'watch');
         break;
       case 'shortage': {
-        const p = S.parts[1]; p.stock = Math.min(p.stock, p.rate * 6); if (p.pending) p.pending.eta = 25;
+        const p = S.parts[1]; scaleInv(p, Math.min(p.stock, p.rate * 6)); if (p.pending) p.pending.eta = 25;
         event(S, 'Engine Mount stock dropped — coverage 6 min', 'low');
         break;
       }
@@ -478,7 +553,7 @@
   }
 
   return {
-    createState, step, inject, resetDomain, coverage, partStatus, bufferStatus, linesideStatus, routeStatus,
+    createState, step, inject, resetDomain, inventoryView, hourStatus, POSITIONS, TARGET_H, coverage, partStatus, bufferStatus, linesideStatus, routeStatus,
     nextAction, fleetView, fmtClock, makeTrucks, SHOP_NAMES, RISK_MIN
   };
 });

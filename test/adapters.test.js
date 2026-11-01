@@ -70,3 +70,24 @@ test('HTTP ingest: auth, validation, live state', async () => {
   assert.equal(h.sources.build.status, 'fresh');
   await app.close();
 });
+
+test('inventory hours: per-position split from the feed, totals, shop WIP, finished', () => {
+  const S = Sim.createState();
+  Ing.ingest(S, 'parts', [
+    { id: 'A', name: 'A', shop: 'weld', rate: 1, inv: { dock: 0, stores: 120, supermarket: 60, lineside: 30 } },     // 1 pcs/min = 60 pcs/h
+    { id: 'B', name: 'B', shop: 'weld', rate: 2, stock: 240 }                                                         // no split
+  ]);
+  const a = S.parts[0];
+  assert.equal(a.stock, 210);                                   // usable = stores + supermarket + line-side
+  Ing.ingest(S, 'shops', { press: { buf: 50, units: 114 }, weld: 78 });
+  Ing.ingest(S, 'finished', { units: 108, shipRate: 1 });
+  const V = Sim.inventoryView(S);
+  const ra = V.rows.find((r) => r.id === 'A'), rb = V.rows.find((r) => r.id === 'B');
+  assert.equal(ra.h.stores, 2); assert.equal(ra.h.supermarket, 1); assert.equal(ra.h.lineside, 0.5); assert.equal(ra.h.total, 3.5);
+  assert.equal(rb.h.total, 2); assert.equal(rb.h.stores, undefined);                       // no split -> total only
+  assert.equal(V.positions.find((p) => p.id === 'lineside').count, 1);                      // B excluded from per-position stats
+  assert.equal(V.positions.find((p) => p.id === 'lineside').status, 'watch');               // 0.5 h vs 0.75 h target: >= 50% of target => watch
+  const rate = S.build.rate * 60;                                                           // vehicles / h
+  assert.ok(Math.abs(V.wip.find((w) => w.id === 'press').hours - 114 / rate) < 1e-9);       // units given by the feed
+  assert.equal(V.finished.hours, 1.8);                                                       // 108 vehicles / (1 per min)
+});

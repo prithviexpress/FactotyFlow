@@ -43,6 +43,11 @@ function normPart(p, old) {
     rate: Math.max(0, num(p.rate, old.rate !== undefined ? old.rate : 0)),
     icon: str(p.icon, old.icon || 'box'), pending: old.pending || null
   };
+  // optional per-position stock (pcs): { dock, stores, supermarket, lineside }. usable stock = stores + supermarket + lineside
+  if (p.inv && typeof p.inv === 'object') {
+    out.inv = { dock: Math.max(0, num(p.inv.dock, 0)), stores: Math.max(0, num(p.inv.stores, 0)), supermarket: Math.max(0, num(p.inv.supermarket, 0)), lineside: Math.max(0, num(p.inv.lineside, 0)) };
+    if (p.stock === undefined) out.stock = out.inv.stores + out.inv.supermarket + out.inv.lineside;
+  } else out.inv = p.stock !== undefined ? null : (old.inv || null);
   if (p.pending === null) out.pending = null;
   else if (p.pending) out.pending = { ref: str(p.pending.ref, '—'), eta: etaMinutes(p.pending), qty: num(p.pending.qty, 0) };
   return out;
@@ -80,7 +85,9 @@ const APPLY = {
     asObj(p, 'shops');
     for (const k of BUFFER_KEYS) {
       if (p[k] === undefined) continue;
-      S.shops[k].buf = clamp(need(typeof p[k] === 'object' ? p[k].buf : p[k], k + '.buf'), 0, 100);
+      const o = p[k] !== null && typeof p[k] === 'object' ? p[k] : { buf: p[k] };
+      S.shops[k].buf = clamp(need(o.buf, k + '.buf'), 0, 100);
+      for (const f of ['units', 'hours', 'cap']) { if (o[f] !== undefined) S.shops[k][f] = need(o[f], k + '.' + f); else if (f !== 'cap') delete S.shops[k][f]; }
     }
   },
   parts(S, p) {
@@ -136,7 +143,7 @@ const APPLY = {
     for (const k of ['rejected', 'quarantined', 'spf']) if (p[k] !== undefined) S.quality[k] = need(p[k], k);
   },
   kpi(S, p) { asObj(p, 'kpi'); for (const k of ['jis', 'stockAcc']) if (p[k] !== undefined) S.kpi[k] = need(p[k], k); },
-  finished(S, p) { asObj(p, 'finished'); for (const k of ['onTime', 'shipOnTime']) if (p[k] !== undefined) S.finished[k] = need(p[k], k); },
+  finished(S, p) { asObj(p, 'finished'); for (const k of ['onTime', 'shipOnTime', 'units', 'shipRate']) if (p[k] !== undefined) S.finished[k] = need(p[k], k); },
   deliveries(S, p) { asObj(p, 'deliveries'); for (const k of ['total', 'onTime']) if (p[k] !== undefined) S.deliveries[k] = need(p[k], k); },
   event(S, p) {
     asObj(p, 'event');

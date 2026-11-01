@@ -66,6 +66,7 @@ function createApp(opts) {
       return;
     }
     if (url.pathname === '/api/state') return send(res, 200, state);
+    if (url.pathname === '/api/inventory') return send(res, 200, Sim.inventoryView(state));
     if (url.pathname === '/api/health') return send(res, 200, { demo: state.demo, mixed: state.mixed, stale: state.stale || [], sources: state.src });
     let m;
     if (req.method === 'POST' && (m = url.pathname.match(/^\/api\/ingest\/([\w.]+)$/))) {

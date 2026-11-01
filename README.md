@@ -29,7 +29,7 @@ line-side usable/safety ≥75% OK, ≥50% watch.
 
 ## Detail pages
 
-Every panel, KPI tile and several map nodes link to a page (`#/parts`, `#/inbound`, `#/transfers`, `#/lineside`, `#/amr`,
+Every panel, KPI tile and several map nodes link to a page (`#/parts`, `#/inventory` (hours of inventory at every position, CSV export, `GET /api/inventory`), `#/inbound`, `#/transfers`, `#/lineside`, `#/amr`,
 `#/quality`, `#/shop/<press|weld|paint|engine|bumper|assembly>`, `#/events`, `#/sources`). `Esc` goes back.
 Click a shop on the map to filter the risk table; click it again to open its page.
 

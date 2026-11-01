@@ -11,8 +11,8 @@ const MASK = '********';
 const DOMAIN_INFO = [
   { id: 'build', label: 'Today build (plan vs actual)', source: 'MES', sample: { plan: 920, actual: 766, rate: 1.9 } },
   { id: 'line', label: 'Line status & logistics stops', source: 'MES / Andon', sample: { stopped: false, reason: null, stops: 0, stoppedMin: 0 } },
-  { id: 'shops', label: 'Shop & store buffer levels (%)', source: 'MES / WMS', sample: { press: 82, weld: 78, paint: 65, engine: 68, bumper: 42, stores: 76, kitting: 68 } },
-  { id: 'parts', label: 'Parts: stock, consumption rate, next inbound', source: 'WMS / ERP', item: 'parts.item', sample: [{ id: 'P-BMP-F', name: 'Bumper B/H (Front)', loc: 'ASY-08', shop: 'bumper', stock: 28, rate: 1.27, pending: { ref: 'V-181', etaAt: '2026-10-14T15:05:00+05:30', qty: 160 } }] },
+  { id: 'shops', label: 'Shop & store buffer levels (%)', source: 'MES / WMS', sample: { press: { buf: 82, units: 246 }, weld: 78, paint: 65, engine: 68, bumper: { buf: 42, hours: 0.6 }, stores: 76, kitting: 68 } },
+  { id: 'parts', label: 'Parts: stock, consumption rate, next inbound', source: 'WMS / ERP', item: 'parts.item', sample: [{ id: 'P-BMP-F', name: 'Bumper B/H (Front)', loc: 'ASY-08', shop: 'bumper', stock: 28, rate: 1.27, inv: { dock: 0, stores: 12, supermarket: 9, lineside: 7 }, pending: { ref: 'V-181', etaAt: '2026-10-14T15:05:00+05:30', qty: 160 } }] },
   { id: 'yard', label: 'Yard / dock counters', source: 'Gate / yard system', sample: { expected: 34, arrived: 26, docked: 21, received: 18, occupied: 21, docks: 28, g2d: 32, turn: 68 } },
   { id: 'trucks', label: 'Inbound truck list', source: 'Gate / yard system', item: 'trucks.item', sample: [{ id: 'TRK-1019', supplier: 'Endurance', material: 'Wiring Harness', status: 'docked', dock: 4, schedAt: '2026-10-14T13:34:00+05:30' }] },
   { id: 'transfers', label: 'In-plant transfer jobs (on time / total)', source: 'Intralogistics / TMS', sample: [{ id: 'eng', onTime: 12, total: 12 }, { id: 'bmp', onTime: 6, total: 8 }, { id: 'milk', onTime: 7, total: 8 }, { id: 'amr', onTime: 8, total: 10 }] },
@@ -21,7 +21,7 @@ const DOMAIN_INFO = [
   { id: 'jv', label: 'Adjacent JV AMR fleet', source: 'Fleet manager', item: 'jv.unit', sample: { units: [{ id: 'JV-01', state: 'idle', battery: 64 }], routes: [{ name: 'JV A → Assembly', missions: 32, onTimePct: 97 }], planned: 118 } },
   { id: 'quality', label: 'Rejected / quarantined parts, SPF adherence', source: 'QMS', sample: { rejected: 16, quarantined: 24, spf: 91 } },
   { id: 'kpi', label: 'JIS accuracy & stock accuracy (%)', source: 'MES / WMS', sample: { jis: 98.4, stockAcc: 97.8 } },
-  { id: 'finished', label: 'Finished vehicles & shipment on-time (%)', source: 'Yard / dispatch', sample: { onTime: 92, shipOnTime: 92 } },
+  { id: 'finished', label: 'Finished vehicles & shipment on-time (%)', source: 'Yard / dispatch', sample: { onTime: 92, shipOnTime: 92, units: 176, shipRate: 1.8 } },
   { id: 'deliveries', label: 'Internal deliveries (total / on time)', source: 'Intralogistics / TMS', sample: { total: 375, onTime: 345 } }
 ];
 const IDS = DOMAIN_INFO.map((d) => d.id);

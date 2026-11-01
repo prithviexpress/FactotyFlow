@@ -123,7 +123,7 @@
     const sel = shop && ui.shop === shop;
     const dim = shop && ui.shop !== 'all' && ui.shop !== shop;
     const dot = st ? '<circle cx="' + (x + w - 10) + '" cy="' + (y + 10) + '" r="4.5" fill="' + COL[st] + '" class="' + (st === 'low' ? 'dot-low' : '') + '"/>' : '';
-    const href = { gate: '#/inbound', docks: '#/inbound', stores: '#/parts', kitting: '#/parts', jvs: '#/amr', finished: '#/shop/assembly', ship: '#/shop/assembly' }[id] || '';
+    const href = { gate: '#/inbound', docks: '#/inbound', stores: '#/inventory', kitting: '#/inventory', jvs: '#/amr', finished: '#/shop/assembly', ship: '#/shop/assembly' }[id] || '';
     return '<g class="nd' + (sel ? ' sel' : '') + (dim ? ' dim' : '') + '" data-node="' + id + '" data-href="' + href + '" data-shop="' + (shop || '') + '">' +
       '<rect class="box" x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="7"/>' + dot + inner + '</g>';
   }
@@ -131,16 +131,19 @@
   function bar(x, y, w, pct, color) {
     return '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="6" rx="3" fill="#10264a"/><rect x="' + x + '" y="' + y + '" width="' + Math.max(0, Math.min(w, (w * pct) / 100)).toFixed(1) + '" height="6" rx="3" fill="' + color + '"/>';
   }
-  function shopNode(id, key, x, y, w, h, icon, title, shopKey) {
+  function shopNode(id, key, x, y, w, h, icon, title, shopKey, hrsLabel) {
     const buf = S.shops[key].buf, st = Sim.bufferStatus(buf);
     return nd(id, x, y, w, h, st,
       mi(icon, x + 10, y + 26, 36, '#8fb8ee') + tx(x + 54, y + 20, title, 't1') +
-      tx(x + 54, y + 48, f0(buf) + '%', 'big ' + st) + tx(x + 54, y + 63, 'Buffer', 'sm') +
+      tx(x + 54, y + 48, f0(buf) + '%', 'big ' + st) + tx(x + 54, y + 63, 'Buffer' + (hrsLabel || ''), 'sm') +
       bar(x + 10, y + h - 11, w - 20, buf, COL[st]), shopKey);
   }
 
   function mapNodes() {
     const y = S.yard, b = S.build, pct = (b.actual / b.plan) * 100;
+    const IV = Sim.inventoryView(S), wipH = {}; IV.wip.forEach((w) => { wipH[w.id] = w.hours; });
+    const posMed = {}; IV.positions.forEach((p) => { posMed[p.id] = p.median; });
+    const hh = (h) => (h === null || h === undefined ? '' : ' \u00b7 ' + (h < 10 ? h.toFixed(1) : Math.round(h)) + ' h');
     const jv = S.jv.routes.map((r) => ({ key: r.name.split(' ')[1], st: Sim.routeStatus(r.ema * 100) }));
     const worstJv = jv.some((j) => j.st === 'low') ? 'low' : jv.some((j) => j.st === 'watch') ? 'watch' : 'ok';
     const dockSt = y.occupied / y.docks > 0.92 ? 'watch' : 'ok';
@@ -156,19 +159,19 @@
       tx(366, 72, y.occupied + ' / ' + y.docks, 'big') + tx(366, 88, 'Docked', 'sm')));
     out.push(nd('stores', 540, 20, 165, 78, Sim.bufferStatus(S.shops.stores.buf),
       tx(552, 40, 'CENTRAL STORES', 't1') + mi('stack', 552, 48, 40, '#ffc83d') +
-      tx(602, 72, f0(S.shops.stores.buf) + '%', 'big') + tx(602, 88, 'Occupancy', 'sm')));
+      tx(602, 72, f0(S.shops.stores.buf) + '%', 'big') + tx(602, 88, 'Occup.' + hh(posMed.stores), 'sm')));
     out.push(nd('kitting', 720, 20, 162, 78, Sim.bufferStatus(S.shops.kitting.buf),
       tx(732, 40, 'KITTING / SUPERMARKET', 't1', 'style="font-size:10.5px"') + mi('stack', 732, 48, 40, '#ffc83d') +
-      tx(782, 72, f0(S.shops.kitting.buf) + '%', 'big') + tx(782, 88, 'Fill level', 'sm')));
+      tx(782, 72, f0(S.shops.kitting.buf) + '%', 'big') + tx(782, 88, 'Fill' + hh(posMed.supermarket), 'sm')));
     out.push(nd('jvs', 972, 8, 180, 120, worstJv,
       tx(984, 28, 'ADJACENT JVs', 't1') + tx(984, 41, '(Supplier Buildings)', 't2') + mi('stack', 982, 58, 40, '#8fb8ee') +
       jv.map((j, i) => tx(1034, 66 + i * 20, 'JV ' + j.key, 'num') + '<circle cx="1086" cy="' + (62 + i * 20) + '" r="4.5" fill="' + COL[j.st] + '"/>' +
         tx(1096, 66 + i * 20, jvLabel[j.st], 'sm', 'style="fill:' + COL[j.st] + '"')).join('')));
-    out.push(shopNode('press', 'press', 140, 198, 134, 82, 'press', 'PRESS', 'press'));
-    out.push(shopNode('weld', 'weld', 285, 198, 144, 82, 'weld', 'WELD', 'weld'));
-    out.push(shopNode('paint', 'paint', 442, 198, 112, 82, 'paint', 'PAINT', 'paint'));
-    out.push(shopNode('engine', 'engine', 157, 303, 190, 77, 'engine', 'ENGINE SHOP', 'engine'));
-    out.push(shopNode('bumper', 'bumper', 362, 303, 165, 77, 'bumper', 'BUMPER SHOP', 'bumper'));
+    out.push(shopNode('press', 'press', 140, 198, 134, 82, 'press', 'PRESS', 'press', hh(wipH.press)));
+    out.push(shopNode('weld', 'weld', 285, 198, 144, 82, 'weld', 'WELD', 'weld', hh(wipH.weld)));
+    out.push(shopNode('paint', 'paint', 442, 198, 112, 82, 'paint', 'PAINT', 'paint', hh(wipH.paint)));
+    out.push(shopNode('engine', 'engine', 157, 303, 190, 77, 'engine', 'ENGINE SHOP', 'engine', hh(wipH.engine)));
+    out.push(shopNode('bumper', 'bumper', 362, 303, 165, 77, 'bumper', 'BUMPER SHOP', 'bumper', hh(wipH.bumper)));
     const stop = S.line.stopped, ast = stop ? 'low' : 'ok';
     out.push(nd('assembly', 640, 173, 170, 170, ast,
       mi('car', 700, 182, 52, '#bfe0ff') + tx(725, 258, 'ASSEMBLY', 'big', 'text-anchor="middle" style="font-size:23px"') +
@@ -387,7 +390,25 @@
   function setSpeed(n) { if (SERVER) post('/api/speed/' + n); else S.speed = n; render(); }
   const go = (h) => { if (h === '#/') { history.pushState(null, '', location.pathname + location.search); render(); } else location.hash = h; };
   // content is re-rendered every second, so navigation uses pointerdown (click needs the same element for down+up)
+  function downloadInvCsv() {
+    const { rows } = window.FFPages.invRows(S, ui), cols = ['inbound', 'dock', 'stores', 'supermarket', 'lineside', 'total'];
+    const q = (v) => '"' + String(v).replace(/"/g, '""') + '"', n = (v) => (v === null || v === undefined ? '' : (+v).toFixed(2));
+    const lines = [['part_id', 'part', 'shop', 'location', 'rate_per_min'].concat(cols.map((c) => c + '_hours'), cols.map((c) => c + '_pcs')).map(q).join(',')];
+    rows.forEach((r) => lines.push([q(r.id), q(r.name), q(r.shop), q(r.loc), n(r.rate)].concat(cols.map((c) => n(r.h[c])), cols.map((c) => n(r.pcs[c]))).join(',')));
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([lines.join('\n')], { type: 'text/csv' }));
+    a.download = 'inventory-hours-' + new Date().toISOString().slice(0, 16).replace(/[:T]/g, '') + '.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+  }
   document.addEventListener('pointerdown', (e) => {
+    const b = e.target.closest && e.target.closest('button');
+    if (b && (b.dataset.invsort || b.dataset.pshop || b.dataset.fleet || b.dataset.act === 'invcsv')) {   // page re-renders every second: act on pointerdown
+      if (b.dataset.invsort) ui.invSort = b.dataset.invsort;
+      else if (b.dataset.pshop) ui.pshop = b.dataset.pshop;
+      else if (b.dataset.fleet) ui.fleet = b.dataset.fleet;
+      else downloadInvCsv();
+      render(); return;
+    }
     const l = e.target.closest && e.target.closest('[data-href]');
     if (!l || !l.dataset.href) return;
     const g = l.closest('.nd');
