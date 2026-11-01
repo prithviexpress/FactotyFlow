@@ -31,7 +31,16 @@ const IDS = DOMAIN_INFO.map((d) => d.id);
 function defaults() {
   const domains = {};
   for (const d of IDS) domains[d] = blank();
-  return { staleSec: 60, sources: {}, mqtt: { url: '', username: '', password: '', qos: 0 }, plant: { jvs: Sim.DEFAULT_JVS.slice(), terms: Object.assign({}, Sim.DEFAULT_TERMS) }, domains };
+  return {
+    staleSec: 60, sources: {}, mqtt: { url: '', username: '', password: '', qos: 0 },
+    plant: { jvs: Sim.DEFAULT_JVS.slice(), terms: Object.assign({}, Sim.DEFAULT_TERMS), place: '', lat: null, lon: null },
+    alerts: {
+      weather: { enabled: false, intervalMin: 10, gustKmh: 60, rainMmH: 10, tempHighC: 40, tempLowC: 0, lookaheadH: 3, url: '' },
+      traffic: { enabled: false, provider: 'tomtom', key: '', radiusKm: 8, minDelaySec: 300, intervalMin: 5, url: '' },
+      feeds: []
+    },
+    domains
+  };
 }
 function blank() {
   return { mode: 'auto', url: '', method: 'GET', intervalSec: 15, headers: {}, topic: '', idIndex: null, mapper: 'identity', root: '', fields: {}, item: false };
@@ -48,7 +57,21 @@ function normalize(raw) {
       cfg.sources[n] = { label: String(s.label || n), token: String(s.token || ''), owns: (Array.isArray(s.owns) ? s.owns : String(s.owns || '').split(/[\s,]+/)).map((x) => String(x).trim()).filter(Boolean), staleSec: s.staleSec ? Number(s.staleSec) : 0 };
     }
   }
+  if (raw.alerts) {
+    const a = raw.alerts, num = (v, d) => (v === '' || v === null || v === undefined || !Number.isFinite(Number(v)) ? d : Number(v));
+    for (const k of ['weather', 'traffic']) {
+      const src = a[k] || {}, dst = cfg.alerts[k];
+      dst.enabled = !!src.enabled;
+      for (const f of Object.keys(dst)) {
+        if (f === 'enabled' || src[f] === undefined) continue;
+        dst[f] = typeof dst[f] === 'number' ? num(src[f], dst[f]) : String(src[f]).trim();
+      }
+    }
+    if (Array.isArray(a.feeds)) cfg.alerts.feeds = a.feeds.map((f) => ({ name: String(f.name || '').trim(), url: String(f.url || '').trim(), intervalMin: num(f.intervalMin, 10), headers: f.headers && typeof f.headers === 'object' ? f.headers : {}, root: String(f.root || '').trim(), fields: f.fields && typeof f.fields === 'object' ? f.fields : {}, kind: String(f.kind || 'event'), enabled: f.enabled !== false }));
+  }
   if (raw.plant) {
+    if (raw.plant.place !== undefined) cfg.plant.place = String(raw.plant.place).trim();
+    for (const k of ['lat', 'lon']) if (raw.plant[k] !== undefined) cfg.plant[k] = raw.plant[k] === '' || raw.plant[k] === null ? null : Number(raw.plant[k]);
     if (Array.isArray(raw.plant.jvs)) cfg.plant.jvs = raw.plant.jvs.map((x) => String(x).trim());
     if (raw.plant.terms && typeof raw.plant.terms === 'object') for (const k of Object.keys(Sim.DEFAULT_TERMS)) if (raw.plant.terms[k] !== undefined) cfg.plant.terms[k] = String(raw.plant.terms[k]).trim();
   }
@@ -87,6 +110,24 @@ function validate(cfg) {
     if (s.staleSec && !(s.staleSec >= 5)) errs.push('source "' + n + '": stale-after must be at least 5 s');
   }
   if (new Set(tokens).size !== tokens.length) errs.push('two sources share the same token');
+  const P = cfg.plant, A = cfg.alerts, okLL = P.lat !== null && P.lon !== null && Math.abs(P.lat) <= 90 && Math.abs(P.lon) <= 180;
+  if ((P.lat !== null && !(Math.abs(P.lat) <= 90)) || (P.lon !== null && !(Math.abs(P.lon) <= 180))) errs.push('plant location: latitude must be -90..90 and longitude -180..180');
+  for (const k of ['weather', 'traffic']) {
+    const a = A[k];
+    if (!a.enabled) continue;
+    if (!a.url && !okLL) errs.push('alerts.' + k + ': set the plant latitude / longitude under Plant setup first');
+    if (!(a.intervalMin >= 1 && a.intervalMin <= 1440)) errs.push('alerts.' + k + ': interval must be 1\u20131440 min');
+    if (a.url && !/^https?:\/\//i.test(a.url)) errs.push('alerts.' + k + ': URL override must start with http:// or https://');
+  }
+  if (A.traffic.enabled && !A.traffic.url && !A.traffic.key) errs.push('alerts.traffic: an API key is required (TomTom) \u2014 or give a URL override');
+  if (A.traffic.enabled && !(A.traffic.radiusKm >= 0.5 && A.traffic.radiusKm <= 50)) errs.push('alerts.traffic: radius must be 0.5\u201350 km');
+  const fnames = new Set();
+  for (const f of A.feeds) {
+    if (!/^[a-z0-9_-]{1,24}$/.test(f.name)) errs.push('alert feed "' + f.name + '": name must be 1\u201324 characters of a-z, 0-9, - or _');
+    if (fnames.has(f.name)) errs.push('alert feed "' + f.name + '": duplicate name'); fnames.add(f.name);
+    if (!/^https?:\/\//i.test(f.url)) errs.push('alert feed "' + f.name + '": URL must start with http:// or https://');
+    if (!(f.intervalMin >= 1 && f.intervalMin <= 1440)) errs.push('alert feed "' + f.name + '": interval must be 1\u20131440 min');
+  }
   let needBroker = false;
   for (const id of IDS) {
     const d = cfg.domains[id];
@@ -111,6 +152,8 @@ function mask(cfg) {
   const c = JSON.parse(JSON.stringify(cfg));
   if (c.mqtt.password && !isEnvRef(c.mqtt.password)) c.mqtt.password = MASK;
   for (const n of Object.keys(c.sources)) if (c.sources[n].token && !isEnvRef(c.sources[n].token)) c.sources[n].token = MASK;
+  if (c.alerts.traffic.key && !isEnvRef(c.alerts.traffic.key)) c.alerts.traffic.key = MASK;
+  for (const f of c.alerts.feeds) for (const k of Object.keys(f.headers || {})) if (!isEnvRef(f.headers[k])) f.headers[k] = MASK;
   for (const id of IDS) for (const k of Object.keys(c.domains[id].headers || {})) if (!isEnvRef(c.domains[id].headers[k])) c.domains[id].headers[k] = MASK;
   return c;
 }
@@ -119,6 +162,8 @@ function unmask(incoming, stored) {
   const c = normalize(incoming);
   if (c.mqtt.password === MASK) c.mqtt.password = stored.mqtt.password;
   for (const n of Object.keys(c.sources)) if (c.sources[n].token === MASK) c.sources[n].token = (stored.sources[n] && stored.sources[n].token) || '';
+  if (c.alerts.traffic.key === MASK) c.alerts.traffic.key = stored.alerts.traffic.key;
+  for (const f of c.alerts.feeds) { const old = stored.alerts.feeds.find((x) => x.name === f.name); for (const k of Object.keys(f.headers || {})) if (f.headers[k] === MASK) { if (old && old.headers && old.headers[k] !== undefined) f.headers[k] = old.headers[k]; else delete f.headers[k]; } }
   for (const id of IDS) {
     const h = c.domains[id].headers || {};
     for (const k of Object.keys(h)) if (h[k] === MASK) { const old = stored.domains[id].headers && stored.domains[id].headers[k]; if (old === undefined) delete h[k]; else h[k] = old; }

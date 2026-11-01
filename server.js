@@ -40,7 +40,7 @@ function createApp(opts) {
 
   const doIngest = (domain, payload) => Ing.ingest(state, domain, payload);
   const markErr = (domain, msg) => Ing.markError(state, domain, msg);
-  const manager = createManager({ config: cfg, getState: () => state, ingest: doIngest, markError: markErr, log });
+  const manager = createManager({ config: cfg, getState: () => state, ingest: doIngest, markError: markErr, touch: (S, d) => Ing.touch(S, d), log });
   manager.apply(cfg);
   const syncSources = () => {
     const cs = manager.config.sources;
@@ -49,6 +49,27 @@ function createApp(opts) {
   };
   syncSources();
   stops.push(() => manager.stop());
+
+  /* ---------- logo (stored next to the config file; memory only when there is no config file) ---------- */
+  const LOGO_TYPES = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp', 'image/svg+xml': 'svg' };
+  const LOGO_DIR = configFile ? path.dirname(configFile) : null;
+  let logo = null;
+  const setLogo = (l) => { logo = l; state.branding = { logo: !!l, ver: l ? l.ver : 0 }; };
+  if (LOGO_DIR && fs.existsSync(LOGO_DIR)) {
+    for (const [type, ext] of Object.entries(LOGO_TYPES)) {
+      const f = path.join(LOGO_DIR, 'factoryflow-logo.' + ext);
+      if (fs.existsSync(f)) { setLogo({ buf: fs.readFileSync(f), type, ver: Math.floor(fs.statSync(f).mtimeMs) }); break; }
+    }
+  }
+  function logoOk(buf, type) {                                   // magic bytes must match the declared type
+    const hex = buf.slice(0, 12).toString('hex');
+    if (type === 'image/png') return hex.startsWith('89504e47');
+    if (type === 'image/jpeg') return hex.startsWith('ffd8ff');
+    if (type === 'image/gif') return hex.startsWith('47494638');
+    if (type === 'image/webp') return buf.slice(0, 4).toString() === 'RIFF' && buf.slice(8, 12).toString() === 'WEBP';
+    if (type === 'image/svg+xml') { const t = buf.toString('utf8'); return /<svg[\s>]/i.test(t) && !/<script|\son\w+\s*=|javascript:|<foreignObject/i.test(t); }
+    return false;
+  }
   const wantsLive = () => Cfg.IDS.some((id) => ['rest', 'mqtt'].includes(manager.config.domains[id].mode));
 
   const isLive = () => Object.keys(state.live).length > 0;
@@ -76,6 +97,56 @@ function createApp(opts) {
     }
     if (url.pathname === '/api/state') return send(res, 200, state);
     if (req.method === 'POST' && (m0 = url.pathname.match(/^\/api\/source\/([A-Za-z0-9_-]+)$/))) return sourcePost(req, res, m0[1]);
+    if (req.method === 'GET' && url.pathname === '/logo') {
+      if (!logo) { res.writeHead(404); return res.end(); }
+      res.writeHead(200, { 'Content-Type': logo.type, 'Cache-Control': 'no-cache', 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; sandbox" });
+      return res.end(logo.buf);
+    }
+    if (url.pathname === '/api/logo' && (req.method === 'POST' || req.method === 'DELETE')) {
+      if (!isAdmin(req)) return send(res, 401, { error: adminToken ? 'admin token required' : 'logo changes are limited to localhost; set ADMIN_TOKEN to enable remote access' });
+      if (req.method === 'DELETE') {
+        if (LOGO_DIR) for (const ext of Object.values(LOGO_TYPES)) { try { fs.unlinkSync(path.join(LOGO_DIR, 'factoryflow-logo.' + ext)); } catch (e) { /* none */ } }
+        setLogo(null); return send(res, 200, { ok: true });
+      }
+      const type = String(req.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
+      if (!LOGO_TYPES[type]) return send(res, 415, { error: 'logo must be PNG, JPG, GIF, WEBP or SVG' });
+      const chunks = []; let n = 0, tooBig = false;
+      req.on('data', (c) => { n += c.length; if (n > 1048576) tooBig = true; else chunks.push(c); });
+      req.on('end', () => {
+        if (tooBig) return send(res, 413, { error: 'logo is larger than 1 MB' });
+        const buf = Buffer.concat(chunks);
+        if (!logoOk(buf, type)) return send(res, 400, { error: 'file content does not look like a valid ' + LOGO_TYPES[type].toUpperCase() + ' image' + (type === 'image/svg+xml' ? ' (scripts are not allowed in SVG)' : '') });
+        if (LOGO_DIR) { try { for (const ext of Object.values(LOGO_TYPES)) { try { fs.unlinkSync(path.join(LOGO_DIR, 'factoryflow-logo.' + ext)); } catch (e) { /* none */ } } fs.mkdirSync(LOGO_DIR, { recursive: true }); fs.writeFileSync(path.join(LOGO_DIR, 'factoryflow-logo.' + LOGO_TYPES[type]), buf); } catch (e) { return send(res, 500, { error: 'could not save the logo: ' + e.message }); } }
+        setLogo({ buf, type, ver: Date.now() });
+        send(res, 200, { ok: true });
+      });
+      return;
+    }
+    if (req.method === 'GET' && url.pathname === '/api/alerts') return send(res, 200, { alerts: state.alerts, log: state.alertLog, sources: state.alertSrc });
+    if (url.pathname === '/api/alert' && req.method === 'POST') {
+      if (token && req.headers.authorization !== 'Bearer ' + token) return send(res, 401, { error: 'unauthorized' });
+      return readRaw(req, (body) => {
+        try {
+          const b = V.parseBody(body);
+          if (!b || typeof b !== 'object' || Array.isArray(b)) throw new V.ValueError('send a JSON object: {"level":"critical","title":"...","message":"...","kind":"traffic","expiresMin":60}');
+          const level = b.level === undefined ? 'watch' : b.level;
+          if (!Sim.LEVELS.includes(level)) throw new V.ValueError('level must be one of: info, watch, critical');
+          if (!b.title || typeof b.title !== 'string') throw new V.ValueError('title is required (text)');
+          const id = b.id === undefined ? 'push:' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6) : String(b.id);
+          if (!/^[\w:.-]{1,80}$/.test(id)) throw new V.ValueError('id may contain letters, digits and : . _ - (max 80)');
+          const exp = b.expiresMin === undefined ? 60 : Number(b.expiresMin);
+          if (!Number.isFinite(exp) || exp < 0 || exp > 10080) throw new V.ValueError('expiresMin must be 0 (until cleared) to 10080');
+          const kind = ['weather', 'traffic', 'event', 'security', 'quality', 'system'].includes(b.kind) ? b.kind : 'event';
+          Sim.raiseAlert(state, { id, level, kind, title: b.title, msg: b.message === undefined ? b.msg : b.message, source: String(b.source || 'push').slice(0, 24), expiresMin: exp });
+          send(res, 200, { ok: true, id });
+        } catch (e) { send(res, e.status || 400, { error: e.message }); }
+      });
+    }
+    if ((req.method === 'DELETE' || req.method === 'POST') && (m0 = url.pathname.match(/^\/api\/alert\/([\w:.-]+?)(?:\/clear)?$/))) {
+      if (token && req.headers.authorization !== 'Bearer ' + token) return send(res, 401, { error: 'unauthorized' });
+      const cleared = Sim.clearAlert(state, m0[1]);
+      return send(res, cleared ? 200 : 404, cleared ? { ok: true } : { error: 'no active alert "' + m0[1] + '"' });
+    }
     if (req.method === 'GET' && url.pathname === '/api/values') return send(res, 200, Object.assign(V.catalog(state, 'http://' + (req.headers.host || 'localhost')), { tokenRequired: !!token }));
     if (req.method === 'GET' && (m0 = url.pathname.match(/^\/api\/value\/(.+)$/))) {
       try { return send(res, 200, V.read(state, m0[1])); } catch (e) { return send(res, e.status || 400, { error: e.message }); }
@@ -158,6 +229,16 @@ function createApp(opts) {
           log('config saved: ' + Cfg.IDS.filter((i) => ['rest', 'mqtt'].includes(next.domains[i].mode)).join(', '));
           send(res, 200, configView());
         } catch (e) { send(res, 400, { error: e.message }); }
+      });
+    }
+    if (req.method === 'POST' && url.pathname === '/api/config/test-alert') {
+      return readJson(req, (err, body) => {
+        if (err || !body || !body.kind || !body.spec) return send(res, 400, { error: 'expected {kind, spec, plant?}' });
+        const spec = body.spec, plant = Object.assign({}, manager.config.plant, body.plant || {});
+        if (spec.key === Cfg.MASK) spec.key = manager.config.alerts.traffic.key;
+        if (body.kind === 'feed' && spec.headers) { const old = manager.config.alerts.feeds.find((f) => f.name === spec.name); for (const k of Object.keys(spec.headers)) if (spec.headers[k] === Cfg.MASK) { if (old && old.headers && old.headers[k] !== undefined) spec.headers[k] = old.headers[k]; else delete spec.headers[k]; } }
+        if ((body.kind === 'weather' || body.kind === 'traffic') && !spec.url && !(Math.abs(plant.lat) <= 90 && Math.abs(plant.lon) <= 180 && plant.lat !== null && plant.lon !== null)) return send(res, 400, { error: 'set the plant latitude / longitude first' });
+        manager.testAlert(body.kind, spec, plant).then((r) => send(res, 200, r), (e) => send(res, 500, { error: e.message }));
       });
     }
     if (req.method === 'POST' && url.pathname === '/api/config/test') {

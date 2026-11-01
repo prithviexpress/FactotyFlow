@@ -138,7 +138,7 @@
       v: 1, demo: true, plant: 'Plant 01', clock, speed: 30, paused: false, weather: 28,
       build: { plan: 920, actual: 766, rate: 1.9 },
       line: { stopped: false, reason: null, stops: 0, stoppedMin: 0 },
-      mods: { bumperJam: 0, jvDelay: 0 },
+      mods: { bumperJam: 0, jvDelay: 0, traffic: 0 },
       shops: {
         press: { buf: 82, target: 80 }, weld: { buf: 78, target: 78 }, paint: { buf: 65, target: 64 },
         engine: { buf: 68, target: 68 }, bumper: { buf: 42, target: 46 }
@@ -186,6 +186,7 @@
       hist: { t: [], g2d: [], turn: [], rej: [], spf: [] },
       sampleAcc: 0, rejMark: 16,
       live: {}, src: {}, sources: {}, trucks: [], setup: null, jvSites: [],
+      alerts: [], alertLog: [], alertSrc: {}, weatherInfo: null, branding: { logo: false, ver: 0 },
       events: []
     };
     setPlant(S, {});
@@ -358,6 +359,48 @@
     if (S.trucks.length > 80) { const i = S.trucks.findIndex((x) => x.status === 'received'); if (i >= 0) S.trucks.splice(i, 1); }
   }
 
+  /* ---------- alerts: weather, traffic, unusual events (from providers, pushed by systems, or demo) ---------- */
+  const LEVELS = ['info', 'watch', 'critical'];
+  const LEVEL_EVENT = { info: 'info', watch: 'watch', critical: 'low' };
+  /** Raise or update an alert by id. Returns the alert. `expiresMin` 0/undefined = stays until cleared. */
+  function raiseAlert(S, a, now) {
+    now = now || Date.now();
+    if (!a || !a.id) throw new Error('alert needs an id');
+    const level = LEVELS.includes(a.level) ? a.level : 'watch';
+    let cur = S.alerts.find((x) => x.id === a.id);
+    const exp = a.expiresMin > 0 ? now + a.expiresMin * 60000 : (cur ? cur.expires : null);
+    if (cur) {
+      const up = LEVELS.indexOf(level) > LEVELS.indexOf(cur.level);
+      Object.assign(cur, { level, kind: a.kind || cur.kind, title: a.title || cur.title, msg: a.msg !== undefined ? a.msg : cur.msg, source: a.source || cur.source, updated: now, expires: exp });
+      if (up) event(S, '\u26a0 ' + cur.title + ' (now ' + level + ')', LEVEL_EVENT[level]);
+      return cur;
+    }
+    cur = { id: a.id, level, kind: a.kind || 'event', title: String(a.title || 'Alert').slice(0, 120), msg: String(a.msg || '').slice(0, 400), source: a.source || 'push', ts: now, updated: now, expires: exp };
+    S.alerts.unshift(cur);
+    if (S.alerts.length > 50) S.alerts.length = 50;
+    if (level !== 'info') event(S, '\u26a0 ' + cur.title, LEVEL_EVENT[level]);
+    return cur;
+  }
+  function clearAlert(S, id, now, why) {
+    const i = S.alerts.findIndex((x) => x.id === id);
+    if (i < 0) return false;
+    const a = S.alerts.splice(i, 1)[0];
+    a.clearedAt = now || Date.now(); a.why = why || 'cleared';
+    S.alertLog.unshift(a); if (S.alertLog.length > 50) S.alertLog.length = 50;
+    if (a.level !== 'info') event(S, 'Alert ' + (why === 'expired' ? 'expired' : 'cleared') + ': ' + a.title, 'ok');
+    return true;
+  }
+  function pruneAlerts(S, now) {
+    now = now || Date.now();
+    S.alerts.filter((a) => a.expires && a.expires <= now).forEach((a) => clearAlert(S, a.id, now, 'expired'));
+  }
+  /** A provider reports its complete current list: raise those, clear this source's alerts that are no longer reported. */
+  function reconcileAlerts(S, source, list, now) {
+    const ids = new Set(list.map((a) => a.id));
+    list.forEach((a) => raiseAlert(S, Object.assign({}, a, { source }), now));
+    S.alerts.filter((a) => a.source === source && !ids.has(a.id)).forEach((a) => clearAlert(S, a.id, now, 'cleared'));
+  }
+
   /* ---------- events ---------- */
   function event(S, msg, lvl) {
     S.events.unshift({ t: S.clock, msg, lvl: lvl || 'info' });
@@ -372,6 +415,7 @@
     S.clock += m;
     if (!(S.live && S.live.weather)) S.weather = clamp(S.weather + (R() - 0.5) * 0.02 * m, 24, 33);
     for (const k in S.mods) S.mods[k] = Math.max(0, S.mods[k] - m);
+    pruneAlerts(S);
     const running = !S.line.stopped;
     const L = S.live || {};
     const tick = clamp(m, 0, 2);     // noise scale so fast speeds don't explode
@@ -444,7 +488,7 @@
     /* inbound trucks */
     const y = S.yard;
     if (L.yard) { /* live */ } else {
-    if (y.arrived < y.expected && R() < 0.1 * m) { y.arrived++; moveTruck(S, 'scheduled', 'arrived'); }
+    if (y.arrived < y.expected && R() < 0.1 * m * (S.mods.traffic > 0 ? 0.25 : 1)) { y.arrived++; moveTruck(S, 'scheduled', 'arrived'); }
     else if (y.arrived >= y.expected && R() < 0.035 * m) { y.expected++; S.trucks.push(newTruck(S.clock + rnd(5, 40), 'scheduled')); }
     if (y.arrived > y.docked && y.occupied < y.docks && R() < 0.12 * m) {
       y.docked++; y.occupied++; moveTruck(S, 'arrived', 'docked');
@@ -553,6 +597,20 @@
         event(S, 'AMR fleet fault — ' + Math.min(8, idle.length) + ' units reporting critical battery', 'watch');
         break;
       }
+      case 'trafficJam':
+        S.mods.traffic = 20;
+        raiseAlert(S, { id: 'demo:traffic', level: 'critical', kind: 'traffic', title: 'Traffic jam on the Gate 2 approach road', msg: 'Crash 1.8 km from the gate: +24 min delay for inbound trucks. Arrivals are slowing down.', source: 'demo', expiresMin: 6 });
+        break;
+      case 'stormWarning':
+        raiseAlert(S, { id: 'demo:storm', level: 'watch', kind: 'weather', title: 'Thunderstorm expected in about 40 min', msg: 'Gusts up to 62 km/h and heavy rain. Secure open-air loads and pause yard moves when it arrives.', source: 'demo', expiresMin: 8 });
+        S.weatherInfo = { text: 'Storm approaching', icon: 'storm', detail: 'Gusts up to 62 km/h' };
+        break;
+      case 'unusualEvent':
+        raiseAlert(S, { id: 'demo:event', level: 'watch', kind: 'event', title: 'Road blockade reported near Supplier Park', msg: 'Local protest blocking the main road. Two inbound trucks may be delayed; check with the carrier.', source: 'demo', expiresMin: 8 });
+        break;
+      case 'clearAlerts':
+        S.alerts.filter((a) => a.source === 'demo').forEach((a) => clearAlert(S, a.id)); S.mods.traffic = 0; S.weatherInfo = null;
+        break;
       case 'jvDelay':
         S.mods.jvDelay = 15;
         event(S, S.setup.jvs[Math.min(2, S.setup.jvs.length - 1)] + ' route delayed — supplier gate congestion', 'watch');
@@ -567,7 +625,7 @@
   }
 
   return {
-    createState, step, inject, resetDomain, inventoryView, hourStatus, setPlant, DEFAULT_TERMS, DEFAULT_JVS, MAX_JVS, TARGET_H, coverage, partStatus, bufferStatus, linesideStatus, routeStatus,
+    createState, step, inject, resetDomain, raiseAlert, clearAlert, pruneAlerts, reconcileAlerts, LEVELS, inventoryView, hourStatus, setPlant, DEFAULT_TERMS, DEFAULT_JVS, MAX_JVS, TARGET_H, coverage, partStatus, bufferStatus, linesideStatus, routeStatus,
     nextAction, fleetView, fmtClock, makeTrucks, SHOP_NAMES, RISK_MIN
   };
 });

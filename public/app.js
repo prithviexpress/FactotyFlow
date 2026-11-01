@@ -5,7 +5,7 @@
   const $ = (s) => document.querySelector(s);
   const params = new URLSearchParams(location.search);
   let SERVER = false;   // true when state comes from the Node server (auto-detected, see detectServer())
-  const COL = { ok: '#22e07a', watch: '#ffc83d', low: '#ff4d4d', cy: '#29b6ff' };
+  const COL = { ok: 'var(--ok)', watch: 'var(--watch)', low: 'var(--low)', cy: 'var(--cyan)' };
   const SHOPS = ['press', 'weld', 'paint', 'engine', 'bumper', 'assembly'];
   const ui = { shop: 'all', modal: false };
   let S = null;
@@ -18,7 +18,8 @@
     el.innerHTML = html;
   }
   const ico = (n, cls) => '<svg class="ic ' + (cls || '') + '"><use href="#i-' + n + '"/></svg>';
-  const mi = (n, x, y, s, c) => '<use href="#i-' + n + '" x="' + x + '" y="' + y + '" width="' + s + '" height="' + s + '" style="color:' + (c || '#7fb2f0') + '"/>';
+  const mi = (n, x, y, s, c) => '<use href="#i-' + n + '" x="' + x + '" y="' + y + '" width="' + s + '" height="' + s + '" style="color:' + (c || 'var(--iconmap)') + '"/>';
+  const esc = (s) => String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));   // alert text comes from outside: always escape
   const pad2 = (n) => String(Math.max(0, Math.round(n))).padStart(2, '0');
   const f0 = (n) => Math.round(n);
   const f1 = (n) => n.toFixed(1);
@@ -40,8 +41,8 @@
     const line = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join('');
     const area = line + 'L' + (w - 1) + ' ' + h + 'L1 ' + h + 'Z';
     let extra = '';
-    if (o.target != null) extra += '<line x1="0" x2="' + w + '" y1="' + y(o.target) + '" y2="' + y(o.target) + '" stroke="#9fb4d6" stroke-dasharray="4 4" stroke-width="1" vector-effect="non-scaling-stroke"/>';
-    if (o.grid) for (const g of o.grid) extra += '<line x1="0" x2="' + w + '" y1="' + y(g) + '" y2="' + y(g) + '" stroke="#16294a" stroke-width="1" vector-effect="non-scaling-stroke"/>';
+    if (o.target != null) extra += '<line x1="0" x2="' + w + '" y1="' + y(o.target) + '" y2="' + y(o.target) + '" stroke="var(--ink2)" stroke-dasharray="4 4" stroke-width="1" vector-effect="non-scaling-stroke"/>';
+    if (o.grid) for (const g of o.grid) extra += '<line x1="0" x2="' + w + '" y1="' + y(g) + '" y2="' + y(g) + '" stroke="var(--line2)" stroke-width="1" vector-effect="non-scaling-stroke"/>';
     const last = pts[n - 1];
     return '<svg class="sp" data-spark="' + key + '" data-unit="' + (o.unit || '') + '" viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none">' +
       extra + '<path d="' + area + '" fill="' + o.color + '" opacity=".16"/>' +
@@ -54,28 +55,96 @@
   }
 
   /* ---------- header & KPIs ---------- */
+  /* ---------- theme, logo, weather, alerts (header) ---------- */
+  const theme = () => document.documentElement.dataset.theme || 'dark';
+  function toggleTheme() {
+    const t = theme() === 'light' ? 'dark' : 'light';
+    document.documentElement.dataset.theme = t;
+    try { localStorage.setItem('ff_theme', t); } catch (e) { /* private mode */ }
+    cache.clear(); render();
+  }
+  const LOGO_MAX = 1024 * 1024;
+  function logoSrc() {
+    if (S && S.branding && S.branding.logo) return '/logo?v=' + S.branding.ver;
+    try { return localStorage.getItem('ff_logo') || null; } catch (e) { return null; }
+  }
+  function logoHTML() {
+    const src = logoSrc();
+    return '<span class="logobox" data-act="logo"' + tipA(src ? 'Click to change the logo' : 'Click to add your logo (PNG, JPG, SVG or WEBP, max 1 MB)') + '>' +
+      (src ? '<img src="' + src.replace(/"/g, '&quot;') + '" alt="logo">' : '<span class="lph">' + ico('bars') + '<b>LOGO</b></span>') + '</span>';
+  }
+  function pickLogo() {
+    const inp = document.createElement('input');
+    inp.type = 'file'; inp.accept = 'image/png,image/jpeg,image/svg+xml,image/webp,image/gif';
+    inp.onchange = async () => {
+      const f = inp.files && inp.files[0];
+      if (!f) return;
+      if (f.size > LOGO_MAX) return alert('That image is ' + Math.round(f.size / 1024) + ' KB. The limit is 1024 KB: please use a smaller file.');
+      if (!/^image\/(png|jpeg|svg\+xml|webp|gif)$/.test(f.type)) return alert('Please choose a PNG, JPG, SVG, WEBP or GIF image.');
+      if (SERVER) {
+        const h = { 'Content-Type': f.type }, t = sessionStorage.getItem('ff_admin'); if (t) h.Authorization = 'Bearer ' + t;
+        const r = await fetch('/api/logo', { method: 'POST', headers: h, body: f });
+        if (!r.ok) { let m = ''; try { m = (await r.json()).error; } catch (e) { /* none */ } return alert('Logo upload failed: ' + (m || 'HTTP ' + r.status)); }
+      } else {
+        const rd = new FileReader();
+        rd.onload = () => { try { localStorage.setItem('ff_logo', rd.result); } catch (e) { alert('Could not store the logo in this browser.'); } cache.clear(); render(); };
+        rd.readAsDataURL(f);
+      }
+    };
+    inp.click();
+  }
+  async function removeLogo() {
+    try { localStorage.removeItem('ff_logo'); } catch (e) { /* ignore */ }
+    if (SERVER) { const h = {}, t = sessionStorage.getItem('ff_admin'); if (t) h.Authorization = 'Bearer ' + t; await fetch('/api/logo', { method: 'DELETE', headers: h }); }
+    cache.clear(); render();
+  }
+  window.FFApp = { pickLogo, removeLogo, logoSrc: () => logoSrc(), isServer: () => SERVER };
+
+  const WX_ICON = { storm: 'storm', rain: 'storm' };
+  function weatherHTML() {
+    const wi = S.weatherInfo || {}, bad = (S.alerts || []).some((a) => a.kind === 'weather' && a.level !== 'info');
+    return '<div class="env' + (bad ? ' problem' : '') + '"' + tipA(wi.text ? esc(wi.text) + (wi.detail ? '<br>' + esc(wi.detail) : '') : 'Outside temperature') + '>' + ico(WX_ICON[wi.icon] || 'sun') + '<span>' + f0(S.weather) + '\u00b0C' + (wi.text ? ' \u00b7 ' + esc(wi.text) : '') + '</span></div>';
+  }
+  const ago = (ts) => { const m = Math.max(0, Math.round((Date.now() - ts) / 60000)); return m < 1 ? 'just now' : m < 60 ? m + ' min ago' : Math.floor(m / 60) + ' h ' + (m % 60) + ' min ago'; };
+  const ackKey = (a) => a.id + ':' + a.level;                  // an escalation (watch -> critical) shows the bar again
+  const acked = () => { try { return new Set(JSON.parse(localStorage.getItem('ff_acked') || '[]')); } catch (e) { return new Set(); } };
+  function ackAlert(key) { const s = acked(); s.add(key); try { localStorage.setItem('ff_acked', JSON.stringify(Array.from(s).slice(-200))); } catch (e) { /* ignore */ } renderAlertBar(); }
+  const KIND_ICON = { weather: 'storm', traffic: 'road', system: 'warn' };
+  function renderAlertBar() {
+    const ak = acked();
+    const list = activeAlerts().filter((a) => a.level !== 'info' && !ak.has(ackKey(a))).sort((a, b) => (b.level === 'critical') - (a.level === 'critical') || b.ts - a.ts);
+    const more = list.length - 2;
+    setHTML($('#alertbar'), list.slice(0, 2).map((a, i) => '<div class="abar ' + a.level + '"><svg class="ic"><use href="#i-' + (KIND_ICON[a.kind] || 'warn') + '"/></svg><b>' + esc(a.title) + '</b><span>' + esc(a.msg) + '</span><small>' + ago(a.ts) + ' \u00b7 ' + esc(a.source) + '</small>' +
+      '<button data-ack="' + esc(ackKey(a)) + '">Acknowledge</button><button data-href="#/alerts">' + (i === 1 && more > 0 ? '+' + more + ' more' : 'All alerts') + '</button></div>').join(''));
+  }
+  function activeAlerts() { return (S.alerts || []).filter((a) => !a.cleared); }
+  function bellHTML() {
+    const al = activeAlerts(), crit = al.some((a) => a.level === 'critical'), n = al.filter((a) => a.level !== 'info').length;
+    return '<a class="bell' + (crit ? ' crit' : n ? ' warn' : '') + '" data-href="#/alerts"' + tipA(n ? n + ' active alert' + (n > 1 ? 's' : '') : 'No active alerts') + '>' + ico('bell') + (n ? '<b>' + n + '</b>' : '') + '</a>';
+  }
   function renderHeader() {
     const d = new Date();
     const shift = S.clock >= 360 && S.clock < 840 ? 'A' : S.clock >= 840 && S.clock < 1320 ? 'B' : 'C';
     const date = DAYS[d.getDay()] + ', ' + String(d.getDate()).padStart(2, '0') + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear();
     const stale = (S.stale || []).length;
-    let badge = S.demo !== false && !S.mixed
-      ? '<span class="badge" data-href="#/sources"' + tipA('Values are simulated. Click for data sources / how to connect real feeds.') + '>DEMO DATA</span>'
+    const demoOnly = S.demo !== false && !S.mixed;       // pure simulation: no badge in the top bar (the footer says "Simulated data")
+    let badge = demoOnly ? ''
       : S.mixed ? '<span class="badge mixed" data-href="#/sources"' + tipA('Some domains are fed by real systems, the rest are still simulated. Click for details.') + '>MIXED DATA</span>'
       : '<span class="badge live" data-href="#/sources"' + tipA('All domains are fed by real systems.') + '>LIVE</span>';
     if (stale) badge += '<span class="badge stale" data-href="#/sources"' + tipA('No recent data for: ' + S.stale.join(', ') + ' (showing last known values)') + '>STALE: ' + S.stale.join(', ') + '</span>';
     setHTML($('#hdr'),
-      '<span class="logo">' + ico('bars') + '</span><h1>AUTOMOTIVE LOGISTICS CONTROL TOWER</h1>' +
+      logoHTML() + '<h1>AUTOMOTIVE LOGISTICS CONTROL TOWER</h1>' +
       '<div class="meta"><span>' + S.plant + '</span><i></i><span>Shift ' + shift + '</span><i></i><span>' + Sim.fmtClock(S.clock) + ' IST</span><i></i></div>' +
       badge + '<span class="sp"></span>' +
-      '<a class="more cfg" data-href="#/settings"' + tipA('Configure where each data point comes from') + '>\u2699 Interfaces</a>' +
-      '<div class="env">' + ico('sun') + '<span>' + f0(S.weather) + '°C</span></div>' +
+      '<a class="more cfg" data-href="#/settings"' + tipA('Interfaces: endpoints, sources, alerts, plant setup, logo') + '>\u2699</a>' +
+      bellHTML() + '<button class="thm" data-act="theme"' + tipA('Switch dark / light theme') + '>' + ico(theme() === 'light' ? 'moon' : 'sun') + '</button>' +
+      weatherHTML() +
       '<div class="env">' + ico('cal') + '<span>' + date + '</span></div>');
   }
 
   function kpi(icon, color, label, sub, val, extra, o) {
     o = o || {};
-    return '<div class="kpi' + (o.alert ? ' alert' : '') + (o.href ? ' link' : '') + '"' + (o.href ? ' data-href="' + o.href + '"' : '') + tipA(o.tip || label) + '>' +
+    return '<div class="kpi' + (o.alert ? ' alert' : '') + (o.href ? ' link' : '') + '"' + (o.href ? ' data-href="' + o.href + '"' : '') + tipA((o.alert ? '\u26a0 ' + o.alert + '<br>' : '') + (o.tip || label)) + '>' +
       '<svg class="ic" style="color:' + color + '"><use href="#i-' + icon + '"/></svg>' +
       '<div class="col"><div class="l">' + label + (sub ? '<small>' + sub + '</small>' : '') + '</div>' +
       '<div class="v">' + val + '</div>' + (extra || '') + '</div>' + (o.chev === false ? '' : '<span class="chev">›</span>') + '</div>';
@@ -92,21 +161,21 @@
     const del = S.deliveries, delPct = (del.onTime / del.total) * 100;
     const jc = kcls(S.kpi.jis, 98, 95), sc = kcls(S.kpi.stockAcc, 98, 95);
     const html = [
-      kpi('car', '#8fd0ff', 'TODAY BUILD', '(Plan vs Actual)', f0(b.actual) + ' | ' + b.plan,
+      kpi('car', 'var(--iconmap)', 'TODAY BUILD', '(Plan vs Actual)', f0(b.actual) + ' | ' + b.plan,
         '<div style="display:flex;align-items:center;gap:6px"><div class="mini"><b style="width:' + pct.toFixed(1) + '%"></b></div><span class="ok" style="font-size:14px;font-weight:700">' + f0(pct) + '%</span></div>',
-        { chev: false, href: '#/shop/assembly', tip: 'Vehicles completed vs shift plan. ' + (S.line.stopped ? 'LINE STOPPED: ' + S.line.reason : 'Line running.') }),
+        { alert: PROB.build, chev: false, href: '#/shop/assembly', tip: 'Vehicles completed vs shift plan. ' + (S.line.stopped ? 'LINE STOPPED: ' + S.line.reason : 'Line running.') }),
       kpi('warn', COL.low, 'PARTS AT RISK', '(next 120 min)', '<span class="low">' + pad2(risk) + '</span><small>(of ' + S.parts.length + ' total)</small>', '',
-        { href: '#/parts', tip: 'Parts whose usable stock covers less than ' + Sim.RISK_MIN + ' min of consumption at the current line rate.' }),
+        { alert: PROB.risk, href: '#/parts', tip: 'Parts whose usable stock covers less than ' + Sim.RISK_MIN + ' min of consumption at the current line rate.' }),
       kpi('truck', COL.cy, 'ON-SITE TRUCKS', '(at plant)', pad2(onSite), '<div class="sub">(' + Math.min(4, Math.max(0, y.expected - y.arrived)) + ' expected)</div>',
-        { href: '#/inbound', tip: 'Trucks arrived at gate and not yet received.' }),
+        { alert: PROB.trucks, href: '#/inbound', tip: 'Trucks arrived at gate and not yet received.' }),
       kpi('forklift', COL.cy, 'INTERNAL DELIVERIES', 'ON TIME', '<span class="' + kcls(delPct, 92, 85) + '">' + f0(delPct) + '%</span>', '<div class="sub">(' + del.onTime + ' / ' + del.total + ')</div>',
-        { href: '#/transfers', tip: 'Cumulative on-time internal deliveries this shift.' }),
-      kpi('target', COL.cy, T('jis').toUpperCase(), '(last 2 hrs)', '<span class="' + jc + '">' + f1(S.kpi.jis) + '%</span>', '', { href: '#/quality', tip: T('jis') + ' over the last 2 hours. JIS = Just-In-Sequence: parts delivered in the exact order of the vehicles on the line (not merely on time).' }),
+        { alert: PROB.deliveries, href: '#/transfers', tip: 'Cumulative on-time internal deliveries this shift.' }),
+      kpi('target', COL.cy, T('jis').toUpperCase(), '(last 2 hrs)', '<span class="' + jc + '">' + f1(S.kpi.jis) + '%</span>', '', { alert: PROB.jis, href: '#/quality', tip: T('jis') + ' over the last 2 hours. JIS = Just-In-Sequence: parts delivered in the exact order of the vehicles on the line (not merely on time).' }),
       kpi('stop', COL.low, 'LOGISTICS LINE STOPS', '(today)', '<span class="' + (S.line.stops ? 'low' : 'ok') + '">' + pad2(S.line.stops) + '</span>',
         S.line.stopped ? '<div class="sub low">' + S.line.reason + '</div>' : '',
-        { alert: S.line.stopped, href: '#/events', tip: S.line.stopped ? 'LINE STOPPED — ' + S.line.reason : 'Line stops caused by logistics (shortages) today. Stopped time: ' + f1(S.line.stoppedMin) + ' min' }),
-      kpi('clock', COL.cy, T('bay').toUpperCase() + ' TURNAROUND', '(avg. truck)', f0(y.g2d) + '<small>min</small>', '', { href: '#/inbound', tip: 'Average gate-to-' + T('bay').toLowerCase() + ' time per truck.' }),
-      kpi('db', COL.cy, 'STOCK ACCURACY', '(cycle count)', '<span class="' + sc + '">' + f1(S.kpi.stockAcc) + '%</span>', '', { href: '#/lineside', tip: 'Cycle-count accuracy of system vs physical stock.' })
+        { alert: PROB.stops, href: '#/events', tip: S.line.stopped ? 'LINE STOPPED — ' + S.line.reason : 'Line stops caused by logistics (shortages) today. Stopped time: ' + f1(S.line.stoppedMin) + ' min' }),
+      kpi('clock', COL.cy, T('bay').toUpperCase() + ' TURNAROUND', '(avg. truck)', f0(y.g2d) + '<small>min</small>', '', { alert: PROB.bay, href: '#/inbound', tip: 'Average gate-to-' + T('bay').toLowerCase() + ' time per truck.' }),
+      kpi('db', COL.cy, 'STOCK ACCURACY', '(cycle count)', '<span class="' + sc + '">' + f1(S.kpi.stockAcc) + '%</span>', '', { alert: PROB.stock, href: '#/lineside', tip: 'Cycle-count accuracy of system vs physical stock.' })
     ].join('');
     setHTML($('#kpis'), html);
   }
@@ -126,17 +195,17 @@
     const dot = st ? '<circle cx="' + (x + w - 10) + '" cy="' + (y + 10) + '" r="4.5" fill="' + COL[st] + '" class="' + (st === 'low' ? 'dot-low' : '') + '"/>' : '';
     const href = { gate: '#/inbound', docks: '#/inbound', finished: '#/inventory', ship: '#/shop/assembly' }[id] || (/^jv\d/.test(id) ? '#/amr' : '');
     const fleetAttr = /^jv\d/.test(id) ? ' data-fleet="jv"' : '';
-    return '<g class="nd' + (sel ? ' sel' : '') + (dim ? ' dim' : '') + '" data-node="' + id + '" data-href="' + href + '"' + fleetAttr + ' data-shop="' + (shop || '') + '">' +
+    return '<g class="nd' + (sel ? ' sel' : '') + (dim ? ' dim' : '') + (st === 'low' ? ' problem' : '') + '" data-node="' + id + '" data-href="' + href + '"' + fleetAttr + ' data-shop="' + (shop || '') + '">' +
       '<rect class="box" x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="7"/>' + dot + inner + '</g>';
   }
   const tx = (x, y, s, cls, extra) => '<text x="' + x + '" y="' + y + '" class="' + (cls || '') + '" ' + (extra || '') + '>' + s + '</text>';
   function bar(x, y, w, pct, color) {
-    return '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="6" rx="3" fill="#10264a"/><rect x="' + x + '" y="' + y + '" width="' + Math.max(0, Math.min(w, (w * pct) / 100)).toFixed(1) + '" height="6" rx="3" fill="' + color + '"/>';
+    return '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="6" rx="3" fill="var(--track2)"/><rect x="' + x + '" y="' + y + '" width="' + Math.max(0, Math.min(w, (w * pct) / 100)).toFixed(1) + '" height="6" rx="3" fill="' + color + '"/>';
   }
   function shopNode(id, key, x, y, w, h, icon, title, shopKey, hrsLabel) {
     const buf = S.shops[key].buf, st = Sim.bufferStatus(buf);
     return nd(id, x, y, w, h, st,
-      mi(icon, x + 10, y + 26, 36, '#8fb8ee') + tx(x + 54, y + 20, title, 't1') +
+      mi(icon, x + 10, y + 26, 36, 'var(--iconmap)') + tx(x + 54, y + 20, title, 't1') +
       tx(x + 54, y + 48, f0(buf) + '%', 'big ' + st) + tx(x + 54, y + 63, 'Buffer' + (hrsLabel || ''), 'sm') +
       bar(x + 10, y + h - 11, w - 20, buf, COL[st]), shopKey);
   }
@@ -152,16 +221,16 @@
     const y = S.yard, b = S.build, pct = (b.actual / b.plan) * 100;
     const IV = Sim.inventoryView(S), wipH = {}; IV.wip.forEach((w) => { wipH[w.id] = w.hours; });
     const hh = (h) => (h === null || h === undefined ? '' : ' \u00b7 ' + (h < 10 ? h.toFixed(1) : Math.round(h)) + ' h');
-    const dockSt = y.occupied / y.docks > 0.92 ? 'watch' : 'ok';
+    const dockSt = y.occupied >= y.docks ? 'low' : y.occupied / y.docks > 0.92 ? 'watch' : 'ok';
     const out = [];
     out.push('<g class="nd" data-node="entrance"><rect class="box" x="0" y="193" width="72" height="46" rx="6"/>' +
       tx(36, 212, 'PLANT', 't1', 'text-anchor="middle"') + tx(36, 227, 'ENTRANCE', 't1', 'text-anchor="middle"') + '</g>');
     out.push(nd('gate', 87, 13, 195, 125, y.arrived >= y.docked + 8 ? 'watch' : 'ok',
-      mi('car', 97, 40, 40, '#8fb8ee') + tx(150, 31, T('parking').toUpperCase(), 't1') + tx(150, 44, '(Gate \u2022 Inbound Trucks)', 't2') +
+      mi('car', 97, 40, 40, 'var(--iconmap)') + tx(150, 31, T('parking').toUpperCase(), 't1') + tx(150, 44, '(Gate \u2022 Inbound Trucks)', 't2') +
       [['parked', y.expected], ['arrived', y.arrived], [T('atBay').toLowerCase(), y.docked], ['received', y.received]].map((r, i) =>
         tx(150, 66 + i * 18, r[1], 'num') + tx(178, 66 + i * 18, r[0], 'sm')).join('')));
     out.push(nd('docks', 302, 20, 175, 78, dockSt,
-      tx(314, 40, 'RECEIVING ' + T('bays').toUpperCase(), 't1') + mi('truck', 314, 48, 44, '#8fb8ee') +
+      tx(314, 40, 'RECEIVING ' + T('bays').toUpperCase(), 't1') + mi('truck', 314, 48, 44, 'var(--iconmap)') +
       tx(366, 72, y.occupied + ' / ' + y.docks, 'big') + tx(366, 88, T('atBay'), 'sm')));
     jvLayout().forEach((L) => {
       const site = S.jvSites[L.i], r = jvRoute(site.name), rp = r ? r.ema * 100 : null, rst = rp === null ? 'ok' : Sim.routeStatus(rp), bst = Sim.bufferStatus(site.buf);
@@ -181,17 +250,17 @@
     out.push(shopNode('bumper', 'bumper', 362, 303, 165, 77, 'bumper', 'BUMPER SHOP', 'bumper', hh(wipH.bumper)));
     const stop = S.line.stopped, ast = stop ? 'low' : 'ok';
     out.push(nd('assembly', 640, 173, 170, 170, ast,
-      mi('car', 700, 182, 52, '#bfe0ff') + tx(725, 258, 'ASSEMBLY', 'big', 'text-anchor="middle" style="font-size:23px"') +
-      tx(725, 277, stop ? 'LINE STOPPED' : 'Line running', 'sm', 'text-anchor="middle" style="' + (stop ? 'fill:#ff4d4d;font-weight:700;font-size:13px' : 'font-size:13px') + '"') +
+      mi('car', 700, 182, 52, 'var(--iconmap2)') + tx(725, 258, 'ASSEMBLY', 'big', 'text-anchor="middle" style="font-size:23px"') +
+      tx(725, 277, stop ? 'LINE STOPPED' : 'Line running', 'sm', 'text-anchor="middle" style="' + (stop ? 'fill:var(--low);font-weight:700;font-size:13px' : 'font-size:13px') + '"') +
       tx(725, 303, f0(b.actual) + ' / ' + b.plan, 'big', 'text-anchor="middle"') +
       bar(654, 318, 100, pct, COL[ast]) + tx(762, 325, f0(pct) + '%', 'num ' + ast), 'assembly'));
     const fo = S.finished.onTime, fst = fo >= 90 ? 'ok' : fo >= 85 ? 'watch' : 'low';
     out.push(nd('finished', 897, 193, 130, 108, fst,
-      tx(908, 213, T('motorpool').toUpperCase(), 't1') + tx(908, 226, '(to dispatch)', 't2') + mi('car', 906, 238, 36, '#8fb8ee') +
+      tx(908, 213, T('motorpool').toUpperCase(), 't1') + tx(908, 226, '(to dispatch)', 't2') + mi('car', 906, 238, 36, 'var(--iconmap)') +
       tx(950, 252, 'On-time', 'sm') + tx(950, 280, f0(fo) + '%', 'big ' + fst)));
     const so = S.finished.shipOnTime, sst = so >= 90 ? 'ok' : so >= 85 ? 'watch' : 'low';
     out.push(nd('ship', 1040, 258, 102, 95, sst,
-      tx(1050, 278, 'SHIPMENT', 't1') + tx(1050, 291, '(On-time)', 't2') + mi('truck', 1050, 296, 26, '#8fb8ee') +
+      tx(1050, 278, 'SHIPMENT', 't1') + tx(1050, 291, '(On-time)', 't2') + mi('truck', 1050, 296, 26, 'var(--iconmap)') +
       tx(1086, 340, f0(so) + '%', 'big ' + sst, 'text-anchor="middle"')));
     return out.join('');
   }
@@ -215,9 +284,9 @@
   function renderMapLegend() {
     setHTML($('#map-legend'),
       '<span><i class="bg-ok"></i>Normal</span><span><i class="bg-watch"></i>Watch</span><span><i class="bg-low"></i>Low / Risk</span>' +
-      '<span><svg viewBox="0 0 34 10"><path d="M0 5H28" stroke="#29b6ff" stroke-width="2.4" stroke-dasharray="5 4"/><path d="M26 1l7 4-7 4z" fill="#29b6ff"/></svg>Material Flow</span>' +
-      '<span><svg viewBox="0 0 34 10"><path d="M0 5H28" stroke="#22e07a" stroke-width="2.4" stroke-dasharray="5 4"/><path d="M26 1l7 4-7 4z" fill="#22e07a"/></svg>AMR Flow (Auto Transfer)</span>' +
-      '<span><svg viewBox="0 0 34 10"><path d="M0 5H34" stroke="#8aa0c4" stroke-width="2" stroke-dasharray="2 4"/></svg>Internal Road</span>');
+      '<span><svg viewBox="0 0 34 10"><path d="M0 5H28" stroke="var(--cyan)" stroke-width="2.4" stroke-dasharray="5 4"/><path d="M26 1l7 4-7 4z" fill="var(--cyan)"/></svg>Material Flow</span>' +
+      '<span><svg viewBox="0 0 34 10"><path d="M0 5H28" stroke="var(--ok)" stroke-width="2.4" stroke-dasharray="5 4"/><path d="M26 1l7 4-7 4z" fill="var(--ok)"/></svg>AMR Flow (Auto Transfer)</span>' +
+      '<span><svg viewBox="0 0 34 10"><path d="M0 5H34" stroke="var(--road)" stroke-width="2" stroke-dasharray="2 4"/></svg>Internal Road</span>');
   }
   function renderMap() {
     setHTML($('#roads'), ROADS);
@@ -270,8 +339,8 @@
       '<div class="fs"><small>Arrived</small><b>' + y.arrived + '</b><i>(' + pc(y.arrived) + ')</i></div><span class="arr">▶</span>' +
       '<div class="fs"><small>' + T('atBay') + '</small><b>' + y.docked + '</b><i>(' + pc(y.docked) + ')</i></div><span class="arr">▶</span>' +
       '<div class="fs"><small>Received</small><b>' + y.received + '</b><i>(' + pc(y.received) + ')</i></div></div>' +
-      '<div class="minis">' + mc('clock', 'Gate to ' + T('bay') + ' Time<br>(avg.)', y.g2d, 'g2d', h.g2d, '#29b6ff') +
-      mc('truck', 'Truck Turnaround Time (avg.)', y.turn, 'turn', h.turn, '#29b6ff') + '</div>');
+      '<div class="minis">' + mc('clock', 'Gate to ' + T('bay') + ' Time<br>(avg.)', y.g2d, 'g2d', h.g2d, 'var(--cyan)') +
+      mc('truck', 'Truck Turnaround Time (avg.)', y.turn, 'turn', h.turn, 'var(--cyan)') + '</div>');
   }
 
   /* ---------- transfers ---------- */
@@ -299,7 +368,7 @@
     }).join('');
     setHTML($('#p-lineside'),
       '<div class="ptitle"><h2>LINE SIDE STOCK <small>(Key Materials)</small></h2><a class="more" data-href="#/lineside">Details \u203a</a>' +
-      '<div class="legend"><span><i style="background:#22e07a;height:7px;width:16px"></i>Usable Stock</span><span><svg viewBox="0 0 34 10"><path d="M0 5H34" stroke="#dbe8ff" stroke-width="2" stroke-dasharray="2 3"/></svg>Safety Stock (Min)</span></div></div>' +
+      '<div class="legend"><span><i style="background:var(--ok);height:7px;width:16px"></i>Usable Stock</span><span><svg viewBox="0 0 34 10"><path d="M0 5H34" stroke="#dbe8ff" stroke-width="2" stroke-dasharray="2 3"/></svg>Safety Stock (Min)</span></div></div>' +
       '<table class="ls"><thead><tr><th></th><th>Part / Material</th><th>Usable / Safety (pcs)</th><th>Status</th></tr></thead><tbody>' + rows + '</tbody></table>');
   }
 
@@ -311,7 +380,7 @@
       '<div class="ptitle"><h2>QUALITY, SINGLE-PIECE FLOW &amp; REJECTIONS <small>(Today)</small></h2><a class="more" data-href="#/quality">Details \u203a</a></div>' +
       '<div class="qrow">' +
       '<div class="qb"' + tipA('Parts rejected at line / inspection today') + '><svg class="ic low" style="font-size:40px"><use href="#i-x"/></svg><div class="tx">Rejected Parts<b class="low">' + q.rejected + ' pcs</b>(' + f1((q.rejected / S.build.actual) * 100) + '% of build)</div>' +
-      spark('rej', h.rej, { color: '#ff4d4d', unit: ' pcs / 5 min', h: 60 }) + '</div>' +
+      spark('rej', h.rej, { color: 'var(--low)', unit: ' pcs / 5 min', h: 60 }) + '</div>' +
       '<div class="qb"' + tipA('Parts on hold in quarantine pending investigation') + '><svg class="ic watch" style="font-size:40px"><use href="#i-warn"/></svg><div class="tx">Quarantined Parts<b class="watch">' + q.quarantined + ' pcs</b>(Under investigation)</div></div>' +
       '<div class="qb"><svg class="ic cy" style="font-size:34px"><use href="#i-forklift"/></svg><div class="tx">Single-Piece Flow Adherence<b class="' + spfSt + '">' + f0(q.spf) + '%<span class="mut" style="font-size:11.5px;font-weight:400"> (Target 95%)</span></b></div>' +
       '<div class="sc2"><div class="yl"><span>100%</span><span>80%</span><span>60%</span></div><div class="sc">' +
@@ -334,7 +403,7 @@
     return '<div class="am" style="width:' + w + 'px"><table class="rl"><thead><tr><th>' + title + '</th><th></th><th></th></tr></thead><tbody>' +
       F.routes.map((r) => {
         const p = r.ema * 100;
-        return '<tr><td><span style="color:#6ec1ff">▸</span> ' + (short ? r.name.replace(/ \u2192 Assembly$/, '') : r.name) + '</td><td>' + r.n + '</td><td style="color:' + COL[Sim.routeStatus(p)] + '">(' + f0(p) + '%)</td></tr>';
+        return '<tr><td><span style="color:var(--cyan)">▸</span> ' + (short ? r.name.replace(/ \u2192 Assembly$/, '') : r.name) + '</td><td>' + r.n + '</td><td style="color:' + COL[Sim.routeStatus(p)] + '">(' + f0(p) + '%)</td></tr>';
       }).join('') + '</tbody></table></div>';
   }
   function renderAmr() {
@@ -348,14 +417,14 @@
   function renderFoot() {
     const sp = [1, 30, 120, 600];
     const ev = S.events[0];
-    const col = ev ? (ev.lvl === 'low' ? COL.low : ev.lvl === 'watch' ? COL.watch : ev.lvl === 'ok' ? COL.ok : '#9fb4d6') : '#9fb4d6';
+    const col = ev ? (ev.lvl === 'low' ? COL.low : ev.lvl === 'watch' ? COL.watch : ev.lvl === 'ok' ? COL.ok : 'var(--ink2)') : 'var(--ink2)';
     const demo = S.demo !== false && !S.mixed;
     let left;
     if (demo) {
-      left = (SERVER ? '' : '<button data-act="pause">' + (S.paused ? '▶ Resume' : '⏸ Pause') + '</button>') +
+      left = '<span class="mut">Simulated data</span><span class="sep"></span>' + (SERVER ? '' : '<button data-act="pause">' + (S.paused ? '▶ Resume' : '⏸ Pause') + '</button>') +
         '<span>Sim speed</span>' + sp.map((s) => '<button data-speed="' + s + '" class="' + (S.speed === s ? 'on' : '') + '">' + s + '×</button>').join('') +
-        '<span class="sep"></span><span>Inject demo scenario:</span>' +
-        [['truckDelay', 'Truck delay'], ['bumperJam', 'Bumper slowdown'], ['shortage', 'Engine mount shortage'], ['amrFault', 'AMR battery fault'], ['jvDelay', S.setup.jvs[Math.min(2, S.setup.jvs.length - 1)] + ' delay']]
+        '<span class="sep"></span><span>Demo:</span>' +
+        [['trafficJam', 'Traffic jam'], ['stormWarning', 'Storm warning'], ['unusualEvent', 'Road blockade'], ['clearAlerts', 'Clear alerts'], ['truckDelay', 'Truck delay'], ['bumperJam', 'Bumper slowdown'], ['shortage', 'Engine mount shortage'], ['amrFault', 'AMR battery fault'], ['jvDelay', S.setup.jvs[Math.min(2, S.setup.jvs.length - 1)] + ' delay']]
           .map((b) => '<button data-inject="' + b[0] + '">' + b[1] + '</button>').join('') +
         (SERVER ? '' : '<button data-act="reset">Reset</button>');
     } else {
@@ -364,9 +433,35 @@
     setHTML($('#foot'), left + '<span class="ev" style="color:' + col + '">' + (ev ? Sim.fmtClock(ev.t) + '  ' + ev.msg : '') + '</span>');
   }
 
+  /* ---------- what counts as a problem (red glow on tiles / panels / map nodes) ---------- */
+  let PROB = {};
+  function problems() {
+    const y = S.yard, P = {}, wait = Math.max(0, y.arrived - y.docked), bays = T('bays').toLowerCase();
+    const crit = S.parts.filter((p) => Sim.coverage(p) < 30).length;
+    P.build = S.line.stopped ? 'Line stopped: ' + S.line.reason : null;
+    P.stops = S.line.stopped ? 'Line stopped: ' + S.line.reason : S.line.stops > 0 ? S.line.stops + ' logistics stop' + (S.line.stops > 1 ? 's' : '') + ' today (' + f1(S.line.stoppedMin) + ' min lost)' : null;
+    P.risk = crit ? crit + ' part' + (crit > 1 ? 's' : '') + ' with under 30 min of cover' : null;
+    P.trucks = wait >= 6 ? wait + ' trucks waiting for a ' + T('bay').toLowerCase() : y.occupied >= y.docks ? 'All ' + bays + ' occupied' : null;
+    const dp = (S.deliveries.onTime / Math.max(1, S.deliveries.total)) * 100;
+    P.deliveries = dp < 85 ? 'On-time rate ' + f0(dp) + '% (below 85%)' : null;
+    P.jis = S.kpi.jis < 95 ? T('jis') + ' ' + f1(S.kpi.jis) + '% (below 95%)' : null;
+    P.bay = y.g2d > 45 ? 'Gate-to-' + T('bay').toLowerCase() + ' time ' + f0(y.g2d) + ' min (above 45)' : null;
+    P.stock = S.kpi.stockAcc < 95 ? 'Stock accuracy ' + f1(S.kpi.stockAcc) + '% (below 95%)' : null;
+    P.inbound = P.trucks || P.bay || (y.turn > 90 ? 'Truck turnaround ' + f0(y.turn) + ' min (above 90)' : null);
+    const late = S.transfers.filter((t) => (t.q.reduce((a, c) => a + c, 0) / t.q.length) * 100 < 78).map((t) => t.name);
+    P.transfers = late.length ? 'Delayed: ' + late.join(', ') : null;
+    const low = S.lineside.filter((l) => Sim.linesideStatus(l) === 'low').map((l) => l.name);
+    P.lineside = low.length ? 'Low line-side stock: ' + low.join(', ') : null;
+    P.quality = S.quality.spf < 90 ? 'Single-piece flow ' + f0(S.quality.spf) + '% (below 90%)' : null;
+    const badRoute = S.amr.routes.concat(S.jv.routes).filter((r) => Sim.routeStatus(r.ema * 100) === 'low').length, lowB = Sim.fleetView(S.amr).low + Sim.fleetView(S.jv).low;
+    P.amr = badRoute ? badRoute + ' AMR route' + (badRoute > 1 ? 's' : '') + ' running late' : lowB >= 3 ? lowB + ' AMRs with low battery' : null;
+    return P;
+  }
+  const flagPanel = (sel, why) => { const el = $(sel); if (el) { el.classList.toggle('problem', !!why); } };
+
   /* ---------- render all ---------- */
   const route = () => location.hash.replace(/^#\/?/, '');
-  const H = { spark, xlabels, ico, f0, f1, pad2, COL, statusLabel };
+  const H = { spark, xlabels, ico, f0, f1, pad2, COL, statusLabel, esc, ago };
   let lastRoute = null;
   function render() {
     if (!S) return;
@@ -374,14 +469,14 @@
     const FORM = { settings: window.FFSettings, datapoints: window.FFDatapoints };
     if (lastRoute && FORM[lastRoute] && lastRoute !== r && FORM[lastRoute].unmount) FORM[lastRoute].unmount();
     if (FORM[r]) {                                // form pages: mounted once, only status cells update (never re-rendered, or typing would be lost)
-      $('#stage').classList.add('paged'); renderHeader();
+      $('#stage').classList.add('paged'); renderHeader(); renderAlertBar();
       if (lastRoute !== r) { cache.delete($('#page')); $('#page').scrollTop = 0; lastRoute = r; FORM[r].mount($('#page'), S, { server: SERVER }); }
       else FORM[r].update(S);
       renderFoot(); return;
     }
     const page = r ? window.FFPages.render(r, S, H, ui) : null;
     $('#stage').classList.toggle('paged', page !== null);
-    renderHeader();
+    renderHeader(); renderAlertBar();
     if (page !== null) {
       if (lastRoute !== r) { cache.delete($('#page')); $('#page').scrollTop = 0; lastRoute = r; }
       setHTML($('#page'), page);
@@ -389,8 +484,10 @@
       return;
     }
     lastRoute = null;
+    PROB = problems();
     renderKpis(); renderTabs(); renderMap(); renderRisk();
     renderInbound(); renderTransfers(); renderLineside(); renderQuality(); renderAmr(); renderFoot();
+    flagPanel('#p-inbound', PROB.inbound); flagPanel('#p-transfers', PROB.transfers); flagPanel('#p-lineside', PROB.lineside); flagPanel('#p-quality', PROB.quality); flagPanel('#p-amr', PROB.amr);
   }
   addEventListener('hashchange', render);
 
@@ -410,6 +507,12 @@
     document.body.appendChild(a); a.click(); a.remove();
   }
   document.addEventListener('pointerdown', (e) => {
+    const th = e.target.closest && e.target.closest('[data-act="theme"]');
+    if (th) { toggleTheme(); return; }
+    const ak = e.target.closest && e.target.closest('[data-ack]');
+    if (ak) { ackAlert(ak.dataset.ack); return; }
+    const lg = e.target.closest && e.target.closest('[data-act="logo"]');
+    if (lg) { pickLogo(); return; }
     const b = e.target.closest && e.target.closest('button');
     if (b && (b.dataset.invsort || b.dataset.pshop || b.dataset.fleet || b.dataset.act === 'invcsv')) {   // page re-renders every second: act on pointerdown
       if (b.dataset.invsort) ui.invSort = b.dataset.invsort;

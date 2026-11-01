@@ -25,7 +25,7 @@
       H.spark(key, arr, Object.assign({ h: 150, unit: o.unit }, o)) + H.xlabels(t) + '</div>';
   }
 
-  const NAV = [['#/parts', 'Parts'], ['#/inventory', 'Inventory hrs'], ['#/inbound', 'Inbound'], ['#/transfers', 'Transfers'], ['#/lineside', 'Line side'], ['#/amr', 'AMR'], ['#/quality', 'Quality'], ['#/events', 'Events'], ['#/sources', 'Data sources'], ['#/datapoints', 'Data points'], ['#/settings', '\u2699 Interfaces']];
+  const NAV = [['#/parts', 'Parts'], ['#/inventory', 'Inventory hrs'], ['#/inbound', 'Inbound'], ['#/transfers', 'Transfers'], ['#/lineside', 'Line side'], ['#/amr', 'AMR'], ['#/quality', 'Quality'], ['#/alerts', 'Alerts'], ['#/events', 'Events'], ['#/sources', 'Data sources'], ['#/datapoints', 'Data points'], ['#/settings', '\u2699 Interfaces']];
   function frame(route, title, sub, body) {
     const here = '#/' + route;
     return '<div class="pg"><div class="pgh"><a class="back" data-href="#/">‹ Control Tower</a><div class="ttl"><h2>' + title + '</h2>' + (sub ? '<span>' + sub + '</span>' : '') + '</div></div>' +
@@ -119,8 +119,8 @@
       cards([card('Expected', y.expected), card('Arrived', y.arrived, '', H.f0((y.arrived / y.expected) * 100) + '%'), card(atBay, y.docked, '', H.f0((y.docked / y.expected) * 100) + '%'),
         card('Received', y.received, 'ok', H.f0((y.received / y.expected) * 100) + '%'), card('At plant now', Math.max(0, y.arrived - y.received), 'cy'),
         card('Gate → ' + bay.toLowerCase() + ' (avg)', H.f0(y.g2d) + ' min', y.g2d > 45 ? 'watch' : ''), card('Truck turnaround (avg)', H.f0(y.turn) + ' min', y.turn > 90 ? 'watch' : '')]) +
-      '<div class="two">' + sect('Gate to ' + bay.toLowerCase() + ' time', big(H, 'g2d', S.hist.g2d, S.hist.t, { color: '#29b6ff', unit: ' min' })) +
-      sect('Truck turnaround time', big(H, 'turn', S.hist.turn, S.hist.t, { color: '#29b6ff', unit: ' min' })) + '</div>' +
+      '<div class="two">' + sect('Gate to ' + bay.toLowerCase() + ' time', big(H, 'g2d', S.hist.g2d, S.hist.t, { color: 'var(--cyan)', unit: ' min' })) +
+      sect('Truck turnaround time', big(H, 'turn', S.hist.turn, S.hist.t, { color: 'var(--cyan)', unit: ' min' })) + '</div>' +
       sect(bay + ' occupancy — ' + y.occupied + ' / ' + y.docks, '<div class="dockgrid">' + grid + '</div>') +
       sect('Trucks (' + S.trucks.length + ')', tbl(['Truck', 'Supplier', 'Material', 'Status', bay, 'Scheduled', 'Arrived', 'Dwell'], rows)));
   }
@@ -185,7 +185,7 @@
     return frame('quality', 'Quality, Single-Piece Flow & Rejections', 'Today',
       cards([card('Rejected parts', q.rejected, 'low', H.f1((q.rejected / Math.max(1, S.build.actual)) * 100) + '% of build'), card('Quarantined', q.quarantined, 'watch', 'under investigation'),
         card('SPF adherence', H.f0(q.spf) + '%', spfSt, 'target 95%'), card(TM(S, 'jis') + ' (2 h)', H.f1(S.kpi.jis) + '%', S.kpi.jis >= 98 ? 'ok' : 'watch'), card('Stock accuracy', H.f1(S.kpi.stockAcc) + '%', S.kpi.stockAcc >= 98 ? 'ok' : 'watch')]) +
-      '<div class="two">' + sect('Rejections per 5 min', big(H, 'rej', S.hist.rej, S.hist.t, { color: '#ff4d4d', unit: ' pcs' })) +
+      '<div class="two">' + sect('Rejections per 5 min', big(H, 'rej', S.hist.rej, S.hist.t, { color: 'var(--low)', unit: ' pcs' })) +
       sect('Single-piece flow adherence', big(H, 'spf', S.hist.spf, S.hist.t, { color: H.COL[spfSt], unit: '%', min: 60, max: 100, target: 95, grid: [60, 80, 100] })) + '</div>');
   }
 
@@ -212,6 +212,21 @@
       sect('Parts for this shop (' + list.length + ')', list.length ? partsTable(S, H, list) : '<p class="note">No tracked parts.</p>'));
   }
 
+  /* ---------- alerts ---------- */
+  function alertsPage(S, H) {
+    const E = H.esc, lvl = { critical: 'low', watch: 'watch', info: 'mut' };
+    const act = (S.alerts || []).slice().sort((a, b) => (b.level === 'critical') - (a.level === 'critical') || b.ts - a.ts);
+    const row = (a, log) => '<tr><td><span class="chip ' + lvl[a.level] + '">' + a.level.toUpperCase() + '</span></td><td>' + E(a.kind) + '</td><td><b>' + E(a.title) + '</b><small>' + E(a.msg) + '</small></td><td>' + E(a.source) + '</td>' +
+      '<td>' + H.ago(a.ts) + (log ? '<small>' + (a.why || 'cleared') + ' ' + H.ago(a.clearedAt) + '</small>' : '') + '</td>' + (log ? '' : '<td>' + (a.expires ? 'in ' + Math.max(0, Math.round((a.expires - Date.now()) / 60000)) + ' min' : 'until cleared') + '</td>') + '</tr>';
+    const src = Object.keys(S.alertSrc || {}).map((n) => { const r = S.alertSrc[n]; return '<tr><td><b>' + E(n) + '</b></td><td>' + (r.last ? H.ago(r.last) : '\u2014') + '</td><td>' + (r.count || 0) + '</td><td>' + (r.alerts || 0) + '</td><td class="' + (r.error ? 'low' : 'mut') + '">' + E(r.error || '') + '</td></tr>'; });
+    return frame('alerts', 'Alerts \u2014 weather, traffic and unusual events', 'Live from your configured providers, other systems, or demo scenarios',
+      cards([card('Active', act.length, act.length ? 'watch' : 'ok'), card('Critical', act.filter((a) => a.level === 'critical').length, act.some((a) => a.level === 'critical') ? 'low' : 'ok'),
+        card('Weather', act.filter((a) => a.kind === 'weather').length), card('Traffic', act.filter((a) => a.kind === 'traffic').length), card('Other events', act.filter((a) => a.kind !== 'weather' && a.kind !== 'traffic').length)]) +
+      sect('Active alerts', act.length ? tbl(['Level', 'Type', 'What', 'Source', 'Since', 'Expires'], act.map((a) => row(a, false))) : '<p class="note">No active alerts.</p>') +
+      sect('Alert sources', src.length ? tbl(['Source', 'Last update', 'Updates', 'Alerts now', 'Last error'], src) : '<p class="note">No weather / traffic / event provider is switched on. Enable them under <a data-href="#/settings" style="color:var(--linkink);cursor:pointer">Interfaces \u2192 Alerts &amp; weather</a>, or let another system raise alerts:<br><code>curl -X POST http://host:8080/api/alert -H "Authorization: Bearer $INGEST_TOKEN" -d \'{"level":"critical","title":"Fire drill at Gate 1","message":"Evacuate the yard","kind":"security","expiresMin":30}\'</code></p>') +
+      sect('Recently cleared', (S.alertLog || []).length ? tbl(['Level', 'Type', 'What', 'Source', 'Raised'], S.alertLog.slice(0, 15).map((a) => row(a, true))) : '<p class="note">Nothing cleared yet.</p>'));
+  }
+
   /* ---------- events & sources ---------- */
   function events(S) {
     const cls = { info: 'mut', ok: 'ok', watch: 'watch', low: 'low' };
@@ -230,7 +245,7 @@
       cards([card('Mode', S.demo ? 'DEMO' : S.mixed ? 'MIXED' : 'LIVE', S.demo ? 'low' : S.mixed ? 'watch' : 'ok'), card('Live domains', live + ' / ' + DOMAINS.length), card('Stale feeds', stale, stale ? 'low' : 'ok')]) +
       sect('Source systems (one POST per system)', (() => {
         const names = Object.keys(S.sources || {});
-        if (!names.length) return '<p class="note">No source systems defined yet. Add one under <a data-href="#/settings" style="color:#9bd1ff;cursor:pointer">Interfaces \u2192 Sources</a>: each gets its own token and endpoint <code>POST /api/source/&lt;name&gt;</code>.</p>';
+        if (!names.length) return '<p class="note">No source systems defined yet. Add one under <a data-href="#/settings" style="color:var(--linkink);cursor:pointer">Interfaces \u2192 Sources</a>: each gets its own token and endpoint <code>POST /api/source/&lt;name&gt;</code>.</p>';
         return tbl(['Source', 'Endpoint', 'Owns', 'Last post', 'Posts', 'Values / post', 'Rejected', 'State', 'Last error'], names.map((n) => {
           const r = S.sources[n], st = !r.last ? chip('mut', 'NO POSTS YET') : r.stale ? chip('low', 'STALE') : chip('ok', 'FRESH');
           return '<tr><td><b>' + n + '</b><small>' + (r.label || '') + '</small></td><td><code>POST /api/source/' + n + '</code></td><td>' + ((r.owns || []).join(', ') || '\u2014') + '</td><td>' + (r.last ? r.age + ' s ago' : '\u2014') + '</td>' +
@@ -239,7 +254,7 @@
       })()) +
       sect('Domains', tbl(['Domain', 'Source', 'Last update', 'Messages', 'Freshness', 'Last error'], rows)) +
       sect('Send data', '<p class="note">Push: <code>POST /api/ingest/&lt;domain&gt;</code> (JSON, <code>Authorization: Bearer $INGEST_TOKEN</code>), or <code>POST /api/ingest/batch</code> with <code>[{domain, payload}]</code>. ' +
-        'Endpoints are entered per data point on the <a data-href="#/settings" style="color:#9bd1ff;cursor:pointer">Interfaces page</a>. Payload shapes: <code>docs/DATA-CONTRACT.md</code>. ' +
+        'Endpoints are entered per data point on the <a data-href="#/settings" style="color:var(--linkink);cursor:pointer">Interfaces page</a>. Payload shapes: <code>docs/DATA-CONTRACT.md</code>. ' +
         'A domain flips from SIMULATED to LIVE on its first valid message; a feed older than <code>staleSec</code> (default 60) is flagged STALE and keeps its last value.</p>'));
   }
 
@@ -256,6 +271,7 @@
         case 'amr': return amr(S, H, ui);
         case 'quality': return quality(S, H);
         case 'shop': return shop(S, H, seg[1]);
+        case 'alerts': return alertsPage(S, H);
         case 'events': return events(S);
         case 'sources': return sources(S);
       }

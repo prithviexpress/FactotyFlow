@@ -6,6 +6,7 @@ const Cfg = require('./config');
 const Ing = require('./ingest');
 const Sim = require('../public/sim.js');
 const { topicMatches } = require('./mqtt');
+const AF = require('./alertfeeds');
 
 const subst = (s) => String(s === undefined || s === null ? '' : s).replace(/\$\{(\w+)\}/g, (_, k) => process.env[k] || '');
 const trunc = (v, n) => { let s = typeof v === 'string' ? v : JSON.stringify(v, null, 1); return s && s.length > (n || 2500) ? s.slice(0, n || 2500) + '\n… (truncated)' : s; };
@@ -26,6 +27,57 @@ function createManager(o) {
   const failFor = (id, via) => (e) => { runtime[id] = Object.assign(runtime[id] || {}, { via, error: e.message }); o.markError(id, e.message); };
 
   function stop() { stops.forEach((s) => { try { s(); } catch (e) { /* ignore */ } }); stops = []; }
+
+  /* ---------- alert providers (weather / traffic / custom feeds) ---------- */
+  async function getJson(url, headers) {
+    const h = {}; for (const k in headers || {}) h[k] = subst(headers[k]);
+    const res = await fetch(subst(url), { headers: h, signal: AbortSignal.timeout(10000) });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return res.json();
+  }
+  /** build a provider job: { name, every (min), fetchAndDerive() -> {alerts, info?} } */
+  function providerJob(kind, spec, plant) {
+    if (kind === 'weather') return { name: 'weather', fetch: async () => AF.weatherAlerts(await getJson(spec.url || AF.weatherUrl(plant)), spec) };
+    if (kind === 'traffic') return { name: 'traffic', fetch: async () => AF.trafficAlerts(await getJson(spec.url || AF.trafficUrl({ key: subst(spec.key), lat: plant.lat, lon: plant.lon, radiusKm: spec.radiusKm })), spec) };
+    return { name: 'feed:' + spec.name, fetch: async () => AF.feedAlerts(await getJson(spec.url, spec.headers), spec) };
+  }
+  function startAlerts(next) {
+    const S = o.getState(), A = next.alerts, plant = next.plant, jobs = [];
+    if (A.weather.enabled) jobs.push(Object.assign(providerJob('weather', A.weather, plant), { every: A.weather.intervalMin }));
+    if (A.traffic.enabled) jobs.push(Object.assign(providerJob('traffic', A.traffic, plant), { every: A.traffic.intervalMin }));
+    for (const f of A.feeds) if (f.enabled) jobs.push(Object.assign(providerJob('feed', f, plant), { every: f.intervalMin }));
+    const keep = new Set(jobs.map((j) => j.name));
+    for (const n of Object.keys(S.alertSrc)) if (!keep.has(n)) { Sim.reconcileAlerts(S, n, []); Sim.clearAlert(S, 'system:alertsrc:' + n); delete S.alertSrc[n]; if (n === 'weather') { delete S.live.weather; S.weatherInfo = null; } }
+    for (const job of jobs) {
+      let busy = false;
+      const run = async () => {
+        if (busy) return; busy = true;
+        const rec = S.alertSrc[job.name] || (S.alertSrc[job.name] = { count: 0, fails: 0, alerts: 0 });
+        try {
+          const r = await job.fetch();
+          Sim.reconcileAlerts(S, job.name, r.alerts);
+          if (job.name === 'weather' && r.info) { S.weather = r.info.temp; S.weatherInfo = { text: r.info.text, icon: r.info.icon, detail: r.info.detail }; o.touch && o.touch(S, 'weather'); }
+          rec.last = Date.now(); rec.count++; rec.alerts = r.alerts.length; rec.error = null; rec.fails = 0;
+          Sim.clearAlert(S, 'system:alertsrc:' + job.name);
+        } catch (e) {
+          rec.error = e.message; rec.fails++; rec.lastErr = Date.now();
+          if (rec.fails >= 3) Sim.raiseAlert(S, { id: 'system:alertsrc:' + job.name, level: 'watch', kind: 'system', title: 'Alert source "' + job.name + '" is unreachable', msg: e.message + ' \u2014 weather/traffic/event alerts from it are not being updated.', source: 'system' });
+          if (rec.fails % 10 === 1) log('alerts ' + job.name + ' failed: ' + e.message);
+        } finally { busy = false; }
+      };
+      run();
+      const t = setInterval(run, Math.max(1, job.every) * 60000);
+      stops.push(() => clearInterval(t));
+    }
+  }
+  /** Dry-run one provider against its real endpoint; nothing is applied to the dashboard. */
+  async function testAlert(kind, spec, plant) {
+    const job = providerJob(kind, spec, plant), t0 = Date.now();
+    try {
+      const r = await job.fetch();
+      return { ok: true, ms: Date.now() - t0, alerts: r.alerts, info: r.info || null };
+    } catch (e) { return { ok: false, ms: Date.now() - t0, error: e.name === 'TimeoutError' ? 'timed out after 10 s' : e.message }; }
+  }
 
   function startRest(id, d) {
     const ok = ingestFor(id, 'rest'), bad = failFor(id, 'rest');
@@ -74,6 +126,7 @@ function createManager(o) {
       const was = prev.domains[id].mode, now = next.domains[id].mode;
       if (S.live[id] && (now === 'sim' || (polled(was) && !polled(now)))) { Sim.resetDomain(S, id); delete runtime[id]; }
     }
+    startAlerts(next);
     const mq = [];
     for (const id of Cfg.IDS) {
       const d = next.domains[id];
@@ -139,6 +192,6 @@ function createManager(o) {
     }
     return out;
   }
-  return { apply, stop, test, status, get config() { return cfg; } };
+  return { apply, stop, test, testAlert, status, get config() { return cfg; } };
 }
 module.exports = { createManager };

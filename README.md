@@ -3,6 +3,19 @@
 A live, interactive version of the control-tower dashboard (plant map, line risk, inbound trucks,
 in-plant transfers, line-side stock, quality, AMR fleets). No dependencies, no build step.
 
+## Look & feel, logo, alerts
+
+* **Red glow:** any tile, panel or map node with a problem gets a pulsing red outline; hover a KPI tile to see why. Rules: line stopped or logistics stops today; any part under 30 min of cover; 6+ trucks waiting for a bay or all bays full; internal deliveries on time < 85%; JIS < 95%; gate-to-bay > 45 min; stock accuracy < 95%; a delayed transfer route; LOW line-side stock; single-piece flow < 90%; a late AMR route or 3+ low-battery AMRs; any shop/JV/motorpool node in the red. Thresholds are in `problems()` in `public/app.js`.
+* **Dark / light theme:** the sun/moon button in the top bar (remembered per browser).
+* **Logo:** click the logo box in the top bar (or **Interfaces → Branding → Browse**). PNG, JPG, SVG, WEBP or GIF, max 1 MB. With the server it is stored next to the config file and shown on every screen; without a server it is kept in that browser only.
+* **Top bar:** no DEMO badge. MIXED DATA / LIVE / STALE badges still appear when real feeds are connected; the footer says "Simulated data" while everything is simulated.
+* **Alerts (weather, traffic, unusual events):** the bell in the top bar, a bar under it for unacknowledged WATCH / CRITICAL alerts, and `#/alerts`. Sources, set under **Interfaces → Alerts & weather**:
+  * *Weather*: Open-Meteo (free, no key) at the plant's latitude/longitude; alerts are **derived from your thresholds** (thunderstorm, heavy rain, strong gusts, heat, cold, fog). It is a forecast service, not an official warning feed.
+  * *Traffic*: TomTom Traffic Incidents around the plant (needs your API key). Closed roads and delays over your minimum raise alerts. Written from TomTom's documented response shape; not tested against a live key.
+  * *Event feeds*: any JSON URL (security bulletin, disaster feed, internal incident system) with a root path and field map.
+  * *Other systems*: `POST /api/alert` with `{"level":"critical","title":"…","message":"…","kind":"security","expiresMin":30}` (same token as the other push endpoints); `DELETE /api/alert/<id>` clears one.
+  * A provider that fails 3 times in a row raises its own "alert source unreachable" alert, so silence never looks like "all clear".
+
 ## Do I need Node.js?
 
 | What you want | Needs Node? |

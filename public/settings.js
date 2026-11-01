@@ -65,7 +65,77 @@
     return '<div class="ifbar"><div class="ifb plantb"><h3>Plant setup <small>names used across the dashboard</small></h3>' +
       '<label class="pj">JV names <small>comma-separated, 1\u20136. Each becomes a node on the plant map, a buffer-hours entry, and a JV AMR route (JV \u2192 Assembly).</small>' +
       '<input data-p="jvs" value="' + esc((p.jvs || []).join(', ')) + '" placeholder="JV1, JV2, JV3, JV4"></label>' +
+      '<div class="ptg loc"><label>Plant location <small>used for weather and traffic alerts</small><input data-p="place" value="' + esc(p.place || '') + '" placeholder="e.g. Chennai plant"></label>' +
+      '<label>Latitude <small>\u221290 to 90</small><input data-p="lat" type="number" step="any" value="' + (p.lat === null || p.lat === undefined ? '' : esc(p.lat)) + '" placeholder="13.0827"></label>' +
+      '<label>Longitude <small>\u2212180 to 180</small><input data-p="lon" type="number" step="any" value="' + (p.lon === null || p.lon === undefined ? '' : esc(p.lon)) + '" placeholder="80.2707"></label></div>' +
       '<div class="ptg">' + TERM_FIELDS.map((t) => '<label>' + t[1] + (t[2] ? '<small>' + esc(t[2]) + '</small>' : '') + '<input data-term="' + t[0] + '" value="' + esc(p.terms[t[0]]) + '"></label>').join('') + '</div></div></div>';
+  }
+
+  /* ---------- branding (logo) ---------- */
+  function brandHTML() {
+    return '<div class="ifbar"><div class="ifb brandb"><h3>Branding <small>logo shown top-left on every screen</small></h3><div class="ifrow">' +
+      '<span class="logoprev" data-logoprev></span><button class="tbtn" data-act="logopick">Browse\u2026</button><button class="tbtn" data-act="logorm">Remove</button>' +
+      '<span class="mut" style="font-size:12px">PNG, JPG, SVG, WEBP or GIF \u00b7 max 1 MB \u00b7 transparent background works best. You can also click the logo box in the top bar.</span></div></div></div>';
+  }
+  function refreshLogo() {
+    const el = root && root.querySelector('[data-logoprev]'); if (!el || !window.FFApp) return;
+    const src = window.FFApp.logoSrc(), key = src || '';
+    if (el.dataset.k === key) return; el.dataset.k = key;
+    el.innerHTML = src ? '<img src="' + esc(src) + '" alt="logo">' : '<span class="mut">no logo yet</span>';
+  }
+
+  /* ---------- alerts & weather providers ---------- */
+  function alertsHTML() {
+    const a = st.config.alerts, W = a.weather, T = a.traffic;
+    const n = (path, label, val, hint, w) => '<label' + (w ? ' style="width:' + w + 'px"' : '') + '>' + label + (hint ? '<small>' + hint + '</small>' : '') + '<input data-al="' + path + '" type="number" step="any" value="' + esc(val) + '"></label>';
+    const chk = (path, on) => '<label class="chk"><input type="checkbox" data-al="' + path + '"' + (on ? ' checked' : '') + '> enabled</label>';
+    return '<div class="ifbar"><div class="ifb alb"><h3>Alerts &amp; weather <small>weather, traffic and unusual-event alerts; they appear in the bar under the header and on the Alerts page</small></h3>' +
+      '<div class="alrow"><b>Weather</b>' + chk('weather.enabled', W.enabled) + '<span class="mut hint">Open-Meteo (free, no key). Alerts are derived from the thresholds you set; this is a forecast, not an official warning service.</span><button class="tbtn" data-act="altest" data-kind="weather">Test</button><span class="alstat" data-alstat="weather"></span></div>' +
+      '<div class="alg">' + n('weather.intervalMin', 'Check every (min)', W.intervalMin, '', 130) + n('weather.gustKmh', 'Wind gusts at or above', W.gustKmh, 'km/h', 130) + n('weather.rainMmH', 'Rain at or above', W.rainMmH, 'mm per hour', 130) +
+      n('weather.tempHighC', 'Heat at or above', W.tempHighC, '\u00b0C', 130) + n('weather.tempLowC', 'Cold at or below', W.tempLowC, '\u00b0C', 130) + n('weather.lookaheadH', 'Look ahead', W.lookaheadH, 'hours', 110) +
+      '<label style="flex:1;min-width:220px">URL override <small>advanced / testing; leave empty for Open-Meteo</small><input data-al="weather.url" value="' + esc(W.url) + '"></label></div><div class="alres" data-alres="weather"></div>' +
+      '<div class="alrow"><b>Traffic</b>' + chk('traffic.enabled', T.enabled) + '<span class="mut hint">TomTom Traffic Incidents around the plant. Needs your own API key (free tier available). Road closures and delays over the minimum raise alerts.</span><button class="tbtn" data-act="altest" data-kind="traffic">Test</button><span class="alstat" data-alstat="traffic"></span></div>' +
+      '<div class="alg"><label style="width:260px">API key <small>or ${ENV_VAR}</small><input data-al="traffic.key" type="password" value="' + esc(T.key) + '"></label>' + n('traffic.radiusKm', 'Radius around plant', T.radiusKm, 'km', 130) + n('traffic.minDelaySec', 'Ignore delays under', T.minDelaySec, 'seconds', 130) + n('traffic.intervalMin', 'Check every (min)', T.intervalMin, '', 130) +
+      '<label style="flex:1;min-width:220px">URL override <small>advanced / testing</small><input data-al="traffic.url" value="' + esc(T.url) + '"></label></div><div class="alres" data-alres="traffic"></div>' +
+      '<div class="alrow"><b>Event feeds</b><span class="mut hint">Unusual events from any JSON source (security bulletin, disaster feed, internal incident system). One object per feed: <code>name, url, intervalMin, headers, root, fields {id,title,msg,level}, kind</code>.</span><button class="tbtn" data-act="altest" data-kind="feed">Test feeds</button></div>' +
+      '<textarea data-al="feeds" rows="4" spellcheck="false" placeholder=\'[{"name":"port-news","url":"https://example.com/alerts.json","intervalMin":10,"root":"data","fields":{"id":"id","title":"headline","msg":"text","level":"severity"}}]\'>' + esc((a.feeds || []).length ? JSON.stringify(a.feeds, null, 1) : '') + '</textarea><div class="alres" data-alres="feed"></div>' +
+      '<p class="note" style="margin-top:6px">Other systems can also raise alerts directly: <code>POST ' + esc(location.origin) + '/api/alert</code> with <code>{"level":"critical","title":"\u2026","message":"\u2026","kind":"security","expiresMin":30}</code>.</p></div></div>';
+  }
+  function readAlerts() {
+    const out = { weather: {}, traffic: {}, feeds: [] };
+    root.querySelectorAll('[data-al]').forEach((i) => {
+      const k = i.dataset.al; if (k === 'feeds') return;
+      const [grp, f] = k.split('.');
+      out[grp][f] = i.type === 'checkbox' ? i.checked : i.type === 'number' ? (i.value === '' ? undefined : Number(i.value)) : i.value.trim();
+    });
+    const t = root.querySelector('[data-al="feeds"]').value.trim();
+    if (t) { try { out.feeds = JSON.parse(t); } catch (e) { throw new Error('Event feeds: not valid JSON (' + e.message + ')'); } if (!Array.isArray(out.feeds)) throw new Error('Event feeds must be a JSON array'); }
+    return out;
+  }
+  function plantLoc() {
+    const g = (k) => root.querySelector('[data-p="' + k + '"]').value.trim();
+    return { place: g('place'), lat: g('lat') === '' ? null : Number(g('lat')), lon: g('lon') === '' ? null : Number(g('lon')) };
+  }
+  const LV = { critical: 'low', watch: 'watch', info: 'mut' };
+  async function testAlerts(kind, btn) {
+    let al; try { al = readAlerts(); } catch (e) { return msg(e.message, 'low'); }
+    const box = root.querySelector('[data-alres="' + kind + '"]'); box.innerHTML = '<span class="mut">Calling the provider\u2026</span>';
+    const specs = kind === 'feed' ? al.feeds.map((f) => ({ kind: 'feed', spec: f })) : [{ kind, spec: al[kind] }];
+    if (!specs.length) { box.innerHTML = '<span class="chip low">NOTHING</span> add a feed first'; return; }
+    btn.disabled = true; let html = '';
+    for (const s of specs) {
+      const r = await api('POST', '/api/config/test-alert', { kind: s.kind, spec: s.spec, plant: plantLoc() });
+      const b = r.body;
+      html += '<div class="alt">' + (s.spec.name ? '<b>' + esc(s.spec.name) + '</b> ' : '');
+      if (!r.ok) html += '<span class="chip low">ERROR</span> ' + esc(b.error || r.status);
+      else if (!b.ok) html += '<span class="chip low">FAILED</span> ' + esc(b.error) + ' <span class="mut">' + b.ms + ' ms</span>';
+      else {
+        html += '<span class="chip ok">REACHED</span> <span class="mut">' + b.ms + ' ms</span>' + (b.info ? ' <span class="mut">now: ' + b.info.temp + '\u00b0C, ' + esc(b.info.detail) + '</span>' : '');
+        html += b.alerts.length ? '<ul>' + b.alerts.map((a) => '<li><span class="chip ' + LV[a.level] + '">' + a.level.toUpperCase() + '</span> <b>' + esc(a.title) + '</b> <span class="mut">' + esc(a.msg) + '</span></li>').join('') + '</ul>' : '<div class="mut">Reachable \u2014 and no alert conditions right now.</div>';
+      }
+      html += '</div>';
+    }
+    box.innerHTML = html; btn.disabled = false;
   }
 
   /* ---------- sources: one POST per source system ---------- */
@@ -118,7 +188,7 @@
 
   function formHTML() {
     const c = st.config, m = c.mqtt;
-    return plantHTML() + sourcesHTML() + '<div class="ifbar"><div class="ifb">' +
+    return brandHTML() + plantHTML() + alertsHTML() + sourcesHTML() + '<div class="ifbar"><div class="ifb">' +
       '<h3>MQTT broker <small>used by every row set to MQTT' + (st.mqttInstalled ? '' : ' — <span class="low">mqtt package not installed on server: run <code>npm i mqtt</code></span>') + '</small></h3>' +
       '<div class="ifrow"><input data-b="url" placeholder="mqtt://broker:1883" value="' + esc(m.url) + '"><input data-b="username" placeholder="username or ${MQTT_USER}" value="' + esc(m.username) + '">' +
       '<input data-b="password" type="password" placeholder="password or ${MQTT_PASS}" value="' + esc(m.password) + '"><select data-b="qos"><option value="0"' + (+m.qos === 0 ? ' selected' : '') + '>QoS 0</option><option value="1"' + (+m.qos === 1 ? ' selected' : '') + '>QoS 1</option></select></div></div>' +
@@ -154,7 +224,7 @@
     const terms = {};
     root.querySelectorAll('[data-term]').forEach((i) => { terms[i.dataset.term] = i.value.trim(); });
     const jvs = root.querySelector('[data-p="jvs"]').value.split(',').map((x) => x.trim()).filter(Boolean);
-    return { staleSec: Number(root.querySelector('[data-b="staleSec"]').value) || 60, sources: readSources(), mqtt: readBroker(), plant: { jvs, terms }, domains };
+    return { staleSec: Number(root.querySelector('[data-b="staleSec"]').value) || 60, sources: readSources(), mqtt: readBroker(), plant: Object.assign({ jvs, terms }, plantLoc()), alerts: readAlerts(), domains };
   }
 
   const msg = (t, cls) => { const m = root.querySelector('#if-msg'); if (m) { m.textContent = t; m.className = 'smsg ' + (cls || ''); } };
@@ -230,6 +300,9 @@
         msg('Unsaved changes', 'watch');
       }
       else if (act === 'srctpl') showTemplate(b.closest('.srow'));
+      else if (act === 'altest') testAlerts(b.dataset.kind, b);
+      else if (act === 'logopick') window.FFApp.pickLogo();
+      else if (act === 'logorm') window.FFApp.removeLogo();
       else if (act === 'more') { const d = b.closest('.ifr').querySelector('.ifd'); d.hidden = !d.hidden; }
       else if (act === 'test') testRow(b.closest('.ifr').dataset.id, b);
     });
@@ -247,6 +320,14 @@
   function update(state) {
     S = state;
     if (!root || !st) return;
+    refreshLogo();
+    root.querySelectorAll('[data-alstat]').forEach((el) => {
+      const r = (state.alertSrc || {})[el.dataset.alstat], saved = (st.config.alerts[el.dataset.alstat] || {}).enabled;
+      if (!saved) { el.className = 'alstat'; el.textContent = ''; return; }
+      if (!r || !r.last) { el.className = 'alstat ' + (r && r.error ? 'low' : 'watch'); el.textContent = r && r.error ? 'error: ' + r.error : 'waiting for first update'; return; }
+      el.className = 'alstat ' + (r.error ? 'low' : 'ok');
+      el.textContent = 'updated ' + Math.max(0, Math.round((Date.now() - r.last) / 1000)) + ' s ago \u00b7 ' + r.alerts + ' alert' + (r.alerts === 1 ? '' : 's') + (r.error ? ' \u00b7 error: ' + r.error : '');
+    });
     root.querySelectorAll('[data-sstat]').forEach((el) => {
       const r = (state.sources || {})[el.dataset.sstat];
       if (!r || !r.last) { el.className = 'sstat'; el.textContent = r && r.error ? 'rejected: ' + String(r.error).split('\n')[0] : 'no posts yet'; return; }
