@@ -12,5 +12,8 @@
   },
   "devDependencies": {
     "aedes": "^1.2.0"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }

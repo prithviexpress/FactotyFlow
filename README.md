@@ -3,6 +3,16 @@
 A live, interactive version of the control-tower dashboard (plant map, line risk, inbound trucks,
 in-plant transfers, line-side stock, quality, AMR fleets). No dependencies, no build step.
 
+## Do I need Node.js?
+
+| What you want | Needs Node? |
+|---|---|
+| Look at the dashboard and all detail pages with **simulated** data | **No.** Open `public/index.html` in a browser (works from a file, no install). |
+| Receive real data (push endpoints, source posts, REST/MQTT feeds), the **Interfaces** and **Data points** pages, config saved to disk | **Yes.** All of that is `server.js`. |
+
+Node 18 or newer is required (the code uses built-in `fetch`; I have only run it on Node 22). The server has **no npm dependencies** to install; `mqtt` is optional and only needed for MQTT feeds.
+If you cannot install Node on the machine: download the *portable* build (zip / tar.xz) from nodejs.org, unpack it anywhere, and run it directly (no admin rights, nothing installed), e.g. `node-v22.x-win-x64\node.exe server.js`.
+
 ## Run
 
 ```bash
