@@ -57,7 +57,12 @@
     const d = new Date();
     const shift = S.clock >= 360 && S.clock < 840 ? 'A' : S.clock >= 840 && S.clock < 1320 ? 'B' : 'C';
     const date = DAYS[d.getDay()] + ', ' + String(d.getDate()).padStart(2, '0') + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear();
-    const badge = S.demo ? '<span class="badge"' + tipA('Values are simulated. Connect real MES/WMS/AMR feeds to go live (see README).') + '>DEMO DATA</span>' : '<span class="badge live">LIVE</span>';
+    const stale = (S.stale || []).length;
+    let badge = S.demo !== false && !S.mixed
+      ? '<span class="badge" data-href="#/sources"' + tipA('Values are simulated. Click for data sources / how to connect real feeds.') + '>DEMO DATA</span>'
+      : S.mixed ? '<span class="badge mixed" data-href="#/sources"' + tipA('Some domains are fed by real systems, the rest are still simulated. Click for details.') + '>MIXED DATA</span>'
+      : '<span class="badge live" data-href="#/sources"' + tipA('All domains are fed by real systems.') + '>LIVE</span>';
+    if (stale) badge += '<span class="badge stale" data-href="#/sources"' + tipA('No recent data for: ' + S.stale.join(', ') + ' (showing last known values)') + '>STALE: ' + S.stale.join(', ') + '</span>';
     setHTML($('#hdr'),
       '<span class="logo">' + ico('bars') + '</span><h1>AUTOMOTIVE LOGISTICS CONTROL TOWER</h1>' +
       '<div class="meta"><span>' + S.plant + '</span><i></i><span>Shift ' + shift + '</span><i></i><span>' + Sim.fmtClock(S.clock) + ' IST</span><i></i></div>' +
@@ -68,7 +73,7 @@
 
   function kpi(icon, color, label, sub, val, extra, o) {
     o = o || {};
-    return '<div class="kpi' + (o.alert ? ' alert' : '') + '"' + tipA(o.tip || label) + '>' +
+    return '<div class="kpi' + (o.alert ? ' alert' : '') + (o.href ? ' link' : '') + '"' + (o.href ? ' data-href="' + o.href + '"' : '') + tipA(o.tip || label) + '>' +
       '<svg class="ic" style="color:' + color + '"><use href="#i-' + icon + '"/></svg>' +
       '<div class="col"><div class="l">' + label + (sub ? '<small>' + sub + '</small>' : '') + '</div>' +
       '<div class="v">' + val + '</div>' + (extra || '') + '</div>' + (o.chev === false ? '' : '<span class="chev">›</span>') + '</div>';
@@ -87,19 +92,19 @@
     const html = [
       kpi('car', '#8fd0ff', 'TODAY BUILD', '(Plan vs Actual)', f0(b.actual) + ' | ' + b.plan,
         '<div style="display:flex;align-items:center;gap:6px"><div class="mini"><b style="width:' + pct.toFixed(1) + '%"></b></div><span class="ok" style="font-size:14px;font-weight:700">' + f0(pct) + '%</span></div>',
-        { chev: false, tip: 'Vehicles completed vs shift plan. ' + (S.line.stopped ? 'LINE STOPPED: ' + S.line.reason : 'Line running.') }),
+        { chev: false, href: '#/shop/assembly', tip: 'Vehicles completed vs shift plan. ' + (S.line.stopped ? 'LINE STOPPED: ' + S.line.reason : 'Line running.') }),
       kpi('warn', COL.low, 'PARTS AT RISK', '(next 120 min)', '<span class="low">' + pad2(risk) + '</span><small>(of ' + S.parts.length + ' total)</small>', '',
-        { tip: 'Parts whose usable stock covers less than ' + Sim.RISK_MIN + ' min of consumption at the current line rate.' }),
+        { href: '#/parts', tip: 'Parts whose usable stock covers less than ' + Sim.RISK_MIN + ' min of consumption at the current line rate.' }),
       kpi('truck', COL.cy, 'ON-SITE TRUCKS', '(at plant)', pad2(onSite), '<div class="sub">(' + Math.min(4, Math.max(0, y.expected - y.arrived)) + ' expected)</div>',
-        { tip: 'Trucks arrived at gate and not yet received.' }),
+        { href: '#/inbound', tip: 'Trucks arrived at gate and not yet received.' }),
       kpi('forklift', COL.cy, 'INTERNAL DELIVERIES', 'ON TIME', '<span class="' + kcls(delPct, 92, 85) + '">' + f0(delPct) + '%</span>', '<div class="sub">(' + del.onTime + ' / ' + del.total + ')</div>',
-        { tip: 'Cumulative on-time internal deliveries this shift.' }),
-      kpi('target', COL.cy, 'JIS ACCURACY', '(last 2 hrs)', '<span class="' + jc + '">' + f1(S.kpi.jis) + '%</span>', '', { tip: 'Just-in-sequence delivery accuracy over the last 2 hours.' }),
+        { href: '#/transfers', tip: 'Cumulative on-time internal deliveries this shift.' }),
+      kpi('target', COL.cy, 'JIS ACCURACY', '(last 2 hrs)', '<span class="' + jc + '">' + f1(S.kpi.jis) + '%</span>', '', { href: '#/quality', tip: 'Just-in-sequence delivery accuracy over the last 2 hours.' }),
       kpi('stop', COL.low, 'LOGISTICS LINE STOPS', '(today)', '<span class="' + (S.line.stops ? 'low' : 'ok') + '">' + pad2(S.line.stops) + '</span>',
         S.line.stopped ? '<div class="sub low">' + S.line.reason + '</div>' : '',
-        { alert: S.line.stopped, tip: S.line.stopped ? 'LINE STOPPED — ' + S.line.reason : 'Line stops caused by logistics (shortages) today. Stopped time: ' + f1(S.line.stoppedMin) + ' min' }),
-      kpi('clock', COL.cy, 'DOCK TURNAROUND', '(avg. truck)', f0(y.g2d) + '<small>min</small>', '', { tip: 'Average gate-to-dock time per truck.' }),
-      kpi('db', COL.cy, 'STOCK ACCURACY', '(cycle count)', '<span class="' + sc + '">' + f1(S.kpi.stockAcc) + '%</span>', '', { chev: false, tip: 'Cycle-count accuracy of system vs physical stock.' })
+        { alert: S.line.stopped, href: '#/events', tip: S.line.stopped ? 'LINE STOPPED — ' + S.line.reason : 'Line stops caused by logistics (shortages) today. Stopped time: ' + f1(S.line.stoppedMin) + ' min' }),
+      kpi('clock', COL.cy, 'DOCK TURNAROUND', '(avg. truck)', f0(y.g2d) + '<small>min</small>', '', { href: '#/inbound', tip: 'Average gate-to-dock time per truck.' }),
+      kpi('db', COL.cy, 'STOCK ACCURACY', '(cycle count)', '<span class="' + sc + '">' + f1(S.kpi.stockAcc) + '%</span>', '', { href: '#/lineside', tip: 'Cycle-count accuracy of system vs physical stock.' })
     ].join('');
     setHTML($('#kpis'), html);
   }
@@ -109,7 +114,7 @@
     const tabs = [['all', 'ALL SHOPS']].concat(SHOPS.map((s) => [s, s.toUpperCase()]));
     setHTML($('#tabs'),
       tabs.map((t) => '<button data-shop="' + t[0] + '" class="' + (ui.shop === t[0] ? 'on' : '') + '">' + t[1] + '</button>').join('') +
-      '<span class="gap"></span><button class="drill" data-act="drill">' + ico('bars') + '  Drill down to shop / line / station</button>');
+      '<span class="gap"></span><button class="drill" data-href="' + (ui.shop === 'all' ? '#/parts' : '#/shop/' + ui.shop) + '">' + ico('bars') + '  Drill down to ' + (ui.shop === 'all' ? 'parts / shop / line' : ui.shop + ' shop') + ' \u203a</button>');
   }
 
   /* ---------- plant map ---------- */
@@ -117,7 +122,8 @@
     const sel = shop && ui.shop === shop;
     const dim = shop && ui.shop !== 'all' && ui.shop !== shop;
     const dot = st ? '<circle cx="' + (x + w - 10) + '" cy="' + (y + 10) + '" r="4.5" fill="' + COL[st] + '" class="' + (st === 'low' ? 'dot-low' : '') + '"/>' : '';
-    return '<g class="nd' + (sel ? ' sel' : '') + (dim ? ' dim' : '') + '" data-node="' + id + '" data-shop="' + (shop || '') + '">' +
+    const href = { gate: '#/inbound', docks: '#/inbound', stores: '#/parts', kitting: '#/parts', jvs: '#/amr', finished: '#/shop/assembly', ship: '#/shop/assembly' }[id] || '';
+    return '<g class="nd' + (sel ? ' sel' : '') + (dim ? ' dim' : '') + '" data-node="' + id + '" data-href="' + href + '" data-shop="' + (shop || '') + '">' +
       '<rect class="box" x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="7"/>' + dot + inner + '</g>';
   }
   const tx = (x, y, s, cls, extra) => '<text x="' + x + '" y="' + y + '" class="' + (cls || '') + '" ' + (extra || '') + '>' + s + '</text>';
@@ -232,7 +238,7 @@
     el.className = 'panel risk ' + (st === 'low' ? '' : st);
     const scope = ui.shop === 'all' ? '' : ' • ' + ui.shop.toUpperCase();
     setHTML(el,
-      '<div class="head"><b>NEXT 120 MIN | LINE RISK' + scope + '</b><span>Based on live VIN build sequence<br>+ applicable BOM + usable stock</span></div>' +
+      '<div class="head"><b>NEXT 120 MIN | LINE RISK' + scope + ' <a class="more" data-href="' + (ui.shop === 'all' ? '#/parts' : '#/shop/' + ui.shop) + '">All parts \u203a</a></b><span>Based on live VIN build sequence<br>+ applicable BOM + usable stock</span></div>' +
       '<div class="banner ' + (st === 'low' ? '' : st) + '"><span style="color:' + COL[st] + '">' + ico(st === 'ok' ? 'target' : 'warn') + '</span>' +
       '<b>EARLIEST SHORTAGE: <em style="color:' + COL[st] + '">' + (m < 9000 ? f0(m) + ' MIN' : '—') + '</em></b></div>' +
       (top.length ? '<table class="rt"><thead><tr><th>#</th><th>Part / Material</th><th>Location</th><th>Current<br>usable stock</th><th>Coverage<br>(at current rate)</th><th>Next action / Owner</th></tr></thead><tbody>' + partRows(top) + '</tbody></table>'
@@ -247,7 +253,7 @@
       '<div class="mc">' + ico(ic) + '<div class="tx">' + lab + '<b>' + f0(val) + ' min</b></div><div class="sc">' +
       spark(key, arr, { color: col, unit: ' min', h: 40 }) + xlabels(h.t, true) + '</div></div>';
     setHTML($('#p-inbound'),
-      '<div class="ptitle"><h2>INBOUND TRUCK FLOW <small>(Today)</small></h2></div>' +
+      '<div class="ptitle"><h2>INBOUND TRUCK FLOW <small>(Today)</small></h2><a class="more" data-href="#/inbound">Details \u203a</a></div>' +
       '<div class="funnel">' + ico('truck') +
       '<div class="fs"' + tipA('Trucks scheduled today (grows with ad-hoc loads)') + '><small>Expected</small><b>' + y.expected + '</b></div><span class="arr">▶</span>' +
       '<div class="fs"><small>Arrived</small><b>' + y.arrived + '</b><i>(' + pc(y.arrived) + ')</i></div><span class="arr">▶</span>' +
@@ -268,7 +274,7 @@
         '<td><div class="pb"><div class="tr"><b style="width:' + pct + '%;background:' + barC + '"></b></div><span>' + f0(pct) + '%</span></div></td></tr>';
     }).join('');
     setHTML($('#p-transfers'),
-      '<div class="ptitle"><h2>IN-PLANT TRANSFERS <small>(Current Shift)</small></h2></div>' +
+      '<div class="ptitle"><h2>IN-PLANT TRANSFERS <small>(Current Shift)</small></h2><a class="more" data-href="#/transfers">Details \u203a</a></div>' +
       '<table class="tr"><thead><tr><th></th><th>Route</th><th>Status</th><th style="text-align:center">On time / Total</th><th>Progress</th></tr></thead><tbody>' + rows + '</tbody></table>');
   }
 
@@ -281,7 +287,7 @@
         '<td><span class="chip ' + st + '">' + statusLabel[st] + '</span></td></tr>';
     }).join('');
     setHTML($('#p-lineside'),
-      '<div class="ptitle"><h2>LINE SIDE STOCK <small>(Key Materials)</small></h2>' +
+      '<div class="ptitle"><h2>LINE SIDE STOCK <small>(Key Materials)</small></h2><a class="more" data-href="#/lineside">Details \u203a</a>' +
       '<div class="legend"><span><i style="background:#22e07a;height:7px;width:16px"></i>Usable Stock</span><span><svg viewBox="0 0 34 10"><path d="M0 5H34" stroke="#dbe8ff" stroke-width="2" stroke-dasharray="2 3"/></svg>Safety Stock (Min)</span></div></div>' +
       '<table class="ls"><thead><tr><th></th><th>Part / Material</th><th>Usable / Safety (pcs)</th><th>Status</th></tr></thead><tbody>' + rows + '</tbody></table>');
   }
@@ -291,7 +297,7 @@
     const q = S.quality, h = S.hist;
     const spfSt = q.spf >= 95 ? 'ok' : q.spf >= 90 ? 'watch' : 'low';
     setHTML($('#p-quality'),
-      '<div class="ptitle"><h2>QUALITY, SINGLE-PIECE FLOW &amp; REJECTIONS <small>(Today)</small></h2></div>' +
+      '<div class="ptitle"><h2>QUALITY, SINGLE-PIECE FLOW &amp; REJECTIONS <small>(Today)</small></h2><a class="more" data-href="#/quality">Details \u203a</a></div>' +
       '<div class="qrow">' +
       '<div class="qb"' + tipA('Parts rejected at line / inspection today') + '><svg class="ic low" style="font-size:40px"><use href="#i-x"/></svg><div class="tx">Rejected Parts<b class="low">' + q.rejected + ' pcs</b>(' + f1((q.rejected / S.build.actual) * 100) + '% of build)</div>' +
       spark('rej', h.rej, { color: '#ff4d4d', unit: ' pcs / 5 min', h: 60 }) + '</div>' +
@@ -322,7 +328,7 @@
   }
   function renderAmr() {
     setHTML($('#p-amr'),
-      '<div class="ptitle"><h2>AMR TRANSFERS &amp; HEALTH</h2></div><div class="amrrow">' +
+      '<div class="ptitle"><h2>AMR TRANSFERS &amp; HEALTH</h2><a class="more" data-href="#/amr">Details \u203a</a></div><div class="amrrow">' +
       fleetBlock('INDOOR / IN-HOUSE', '(Plant)', 'amr', S.amr, 'in') + routeBlock('Routes (Missions Today)', S.amr, 190) +
       fleetBlock('ADJACENT JVs', '(Off-site)', 'stack', S.jv, 'jv') + routeBlock('JV Routes (Today)', S.jv, 190) + '</div>');
   }
@@ -332,69 +338,82 @@
     const sp = [1, 30, 120, 600];
     const ev = S.events[0];
     const col = ev ? (ev.lvl === 'low' ? COL.low : ev.lvl === 'watch' ? COL.watch : ev.lvl === 'ok' ? COL.ok : '#9fb4d6') : '#9fb4d6';
-    setHTML($('#foot'),
-      (SERVER ? '' : '<button data-act="pause">' + (S.paused ? '▶ Resume' : '⏸ Pause') + '</button>') +
-      '<span>Sim speed</span>' + sp.map((s) => '<button data-speed="' + s + '" class="' + (S.speed === s ? 'on' : '') + '">' + s + '×</button>').join('') +
-      '<span class="sep"></span><span>Inject demo scenario:</span>' +
-      [['truckDelay', 'Truck delay'], ['bumperJam', 'Bumper slowdown'], ['shortage', 'Engine mount shortage'], ['amrFault', 'AMR battery fault'], ['jvDelay', 'JV C delay']]
-        .map((b) => '<button data-inject="' + b[0] + '">' + b[1] + '</button>').join('') +
-      (SERVER ? '' : '<button data-act="reset">Reset</button>') +
-      '<span class="ev" style="color:' + col + '">' + (ev ? Sim.fmtClock(ev.t) + '  ' + ev.msg : '') + '</span>');
-  }
-
-  /* ---------- drill-down modal ---------- */
-  function renderModal() {
-    const m = $('#modal');
-    m.hidden = !ui.modal;
-    if (!ui.modal) return;
-    const list = sortedParts();
-    setHTML(m, '<div class="card"><h2><span>' + (ui.shop === 'all' ? 'ALL SHOPS' : ui.shop.toUpperCase()) + ' — PARTS (' + list.length + ')</span><button data-act="close">Close ✕</button></h2>' +
-      '<table><thead><tr><th>#</th><th>Part</th><th>Shop</th><th>Loc.</th><th>Stock</th><th>Rate/min</th><th>Coverage</th><th>Inbound</th><th>Next action</th></tr></thead><tbody>' +
-      list.map((p, i) => {
-        const c = Sim.coverage(p), st = Sim.partStatus(c), a = Sim.nextAction(S, p);
-        return '<tr><td>' + (i + 1) + '</td><td>' + p.name + '</td><td>' + Sim.SHOP_NAMES[p.shop] + '</td><td>' + p.loc + '</td><td>' + f0(p.stock) + '</td><td>' + p.rate + '</td>' +
-          '<td><span class="cov ' + st + '" style="font-size:13px;min-width:60px;padding:2px">' + f0(c) + ' min</span></td>' +
-          '<td>' + (p.pending ? p.pending.ref + ' • ' + Sim.fmtClock(S.clock + p.pending.eta) : '—') + '</td><td>' + a.text + ' <span class="mut">(' + a.owner + ')</span></td></tr>';
-      }).join('') + '</tbody></table></div>');
+    const demo = S.demo !== false && !S.mixed;
+    let left;
+    if (demo) {
+      left = (SERVER ? '' : '<button data-act="pause">' + (S.paused ? '▶ Resume' : '⏸ Pause') + '</button>') +
+        '<span>Sim speed</span>' + sp.map((s) => '<button data-speed="' + s + '" class="' + (S.speed === s ? 'on' : '') + '">' + s + '×</button>').join('') +
+        '<span class="sep"></span><span>Inject demo scenario:</span>' +
+        [['truckDelay', 'Truck delay'], ['bumperJam', 'Bumper slowdown'], ['shortage', 'Engine mount shortage'], ['amrFault', 'AMR battery fault'], ['jvDelay', 'JV C delay']]
+          .map((b) => '<button data-inject="' + b[0] + '">' + b[1] + '</button>').join('') +
+        (SERVER ? '' : '<button data-act="reset">Reset</button>');
+    } else {
+      left = '<span>Real-time data — simulation controls disabled</span><button data-href="#/sources">Data sources ›</button>';
+    }
+    setHTML($('#foot'), left + '<span class="ev" style="color:' + col + '">' + (ev ? Sim.fmtClock(ev.t) + '  ' + ev.msg : '') + '</span>');
   }
 
   /* ---------- render all ---------- */
+  const route = () => location.hash.replace(/^#\/?/, '');
+  const H = { spark, xlabels, ico, f0, f1, pad2, COL, statusLabel };
+  let lastRoute = null;
   function render() {
     if (!S) return;
-    renderHeader(); renderKpis(); renderTabs(); renderMap(); renderRisk();
-    renderInbound(); renderTransfers(); renderLineside(); renderQuality(); renderAmr(); renderFoot(); renderModal();
+    const r = route();
+    const page = r ? window.FFPages.render(r, S, H, ui) : null;
+    $('#stage').classList.toggle('paged', page !== null);
+    renderHeader();
+    if (page !== null) {
+      setHTML($('#page'), page);
+      if (lastRoute !== r) { $('#page').scrollTop = 0; lastRoute = r; }
+      renderFoot();
+      return;
+    }
+    lastRoute = null;
+    renderKpis(); renderTabs(); renderMap(); renderRisk();
+    renderInbound(); renderTransfers(); renderLineside(); renderQuality(); renderAmr(); renderFoot();
   }
+  addEventListener('hashchange', render);
 
   /* ---------- interaction ---------- */
   function post(path) { return fetch(path, { method: 'POST' }).catch(() => {}); }
   function setSpeed(n) { if (SERVER) post('/api/speed/' + n); else S.speed = n; render(); }
+  const go = (h) => { if (h === '#/') { history.pushState(null, '', location.pathname + location.search); render(); } else location.hash = h; };
+  // content is re-rendered every second, so navigation uses pointerdown (click needs the same element for down+up)
+  document.addEventListener('pointerdown', (e) => {
+    const l = e.target.closest && e.target.closest('[data-href]');
+    if (!l || !l.dataset.href) return;
+    const g = l.closest('.nd');
+    if (g && g.dataset.shop && ui.shop !== g.dataset.shop) return;      // first click on a shop node selects it (handled below)
+    go(l.dataset.href);
+  });
   document.addEventListener('click', (e) => {
     const t = e.target.closest('button');
-    if (!t) { if (e.target.id === 'modal') { ui.modal = false; render(); } return; }
+    if (!t) return;
     if (t.dataset.shop) { ui.shop = t.dataset.shop; render(); }
+    else if (t.dataset.pshop) { ui.pshop = t.dataset.pshop; render(); }
+    else if (t.dataset.fleet) { ui.fleet = t.dataset.fleet; render(); }
+    else if (t.dataset.href) go(t.dataset.href);
     else if (t.dataset.speed) setSpeed(+t.dataset.speed);
     else if (t.dataset.inject) { SERVER ? post('/api/inject/' + t.dataset.inject) : Sim.inject(S, t.dataset.inject); render(); }
     else if (t.dataset.act === 'pause') { S.paused = !S.paused; render(); }
     else if (t.dataset.act === 'reset') { const sp = S.speed; S = Sim.createState(); S.speed = sp; render(); }
-    else if (t.dataset.act === 'drill') { ui.modal = true; render(); }
-    else if (t.dataset.act === 'close') { ui.modal = false; render(); }
   });
-  // map nodes re-render every tick, so select on pointerdown instead of click
+  // map nodes: first click selects a shop (filters risk table), clicking the selected shop opens its page
   $('#map').addEventListener('pointerdown', (e) => {
     const g = e.target.closest('.nd');
-    if (!g) return;
-    const s = g.dataset.shop;
-    if (s) ui.shop = ui.shop === s ? 'all' : s;
-    render();
+    if (!g || !g.dataset.shop) return;
+    if (ui.shop !== g.dataset.shop) { ui.shop = g.dataset.shop; render(); }
   });
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && ui.modal) { ui.modal = false; render(); } });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && route()) go('#/'); });
 
   const tip = $('#tip');
   document.addEventListener('mousemove', (e) => {
     let text = '';
     const sp = e.target.closest && e.target.closest('[data-spark]');
     if (sp && S) {
-      const arr = S.hist[sp.dataset.spark], r = sp.getBoundingClientRect();
+      const key = sp.dataset.spark;
+      const arr = key.indexOf('shop:') === 0 ? S.hist.shops[key.slice(5)] : S.hist[key], r = sp.getBoundingClientRect();
       const i = Math.max(0, Math.min(arr.length - 1, Math.round(((e.clientX - r.left) / r.width) * (arr.length - 1))));
       text = '<b>' + Sim.fmtClock(S.hist.t[i]) + '</b> — ' + arr[i].toFixed(1) + sp.dataset.unit;
     } else {

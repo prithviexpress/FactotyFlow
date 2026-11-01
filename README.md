@@ -27,9 +27,34 @@ node server.js            # http://localhost:8080  (server streams state over SS
 "Parts at risk" = coverage under 60 min (`RISK_MIN` in `public/sim.js`). Thresholds: buffer ≥66% normal, ≥50% watch;
 line-side usable/safety ≥75% OK, ≥50% watch.
 
+## Detail pages
+
+Every panel, KPI tile and several map nodes link to a page (`#/parts`, `#/inbound`, `#/transfers`, `#/lineside`, `#/amr`,
+`#/quality`, `#/shop/<press|weld|paint|engine|bumper|assembly>`, `#/events`, `#/sources`). `Esc` goes back.
+Click a shop on the map to filter the risk table; click it again to open its page.
+
 ## Connecting real data
 
-The UI (`public/app.js`) is a pure function of one JSON state object (shape: `createState()` in `public/sim.js`).
-Replace the simulator with your feed: have `server.js` build that object from MES (build counts), WMS/ERP (stock, BOM,
-consumption), yard/gate system (trucks), AMR fleet manager (robots, missions) and QMS (rejections), then keep
-pushing it on `/events`. Set `demo:false` to switch the badge from DEMO DATA to LIVE.
+Three ways in, all feeding the same ingest layer (`adapters/ingest.js`, contract in `docs/DATA-CONTRACT.md`):
+
+| Path | Use for | Setup |
+|---|---|---|
+| **Push** `POST /api/ingest/<domain>` | MES / WMS / middleware that can call a webhook | set `INGEST_TOKEN`, send JSON |
+| **REST poller** | systems of record that only offer a GET API | `adapters.config.json` → `rest.pollers` |
+| **MQTT subscriber** | AMR fleet (e.g. VDA 5050), gate/yard events, PLC gateways | `npm i` (mqtt is an optional dependency), `adapters.config.json` → `mqtt` |
+
+```bash
+cp adapters.config.example.json adapters.config.json   # edit URLs / topics, secrets via ${ENV_VARS}
+INGEST_TOKEN=change-me node server.js
+curl -X POST localhost:8080/api/ingest/build -H 'Authorization: Bearer change-me' -d '{"plan":920,"actual":412}'
+```
+
+Vendor payloads are translated by named **mappers** in `adapters/mappers.js` (`wms-stock` and `vda5050-state` are examples
+to adapt, not tested against a real system). In live/mixed mode the clock is real time, simulation speed is locked to 1x and the
+demo scenario buttons are disabled. Domains without a feed stay simulated (header shows MIXED DATA); a silent feed is flagged STALE.
+
+Browser-only mode (no server) is always simulated; `?source=server` is required to see pushed data.
+
+## Tests
+
+`npm test` — ingest validation, auth, stale detection, topic matching, and an end-to-end run against an in-process MQTT broker (aedes).

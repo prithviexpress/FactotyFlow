@@ -2,6 +2,15 @@
   "name": "factoryflow",
   "version": "1.0.0",
   "description": "Live automotive logistics control tower dashboard",
-  "scripts": { "start": "node server.js" },
-  "license": "MIT"
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test --test-timeout=30000 test/*.test.js"
+  },
+  "license": "MIT",
+  "optionalDependencies": {
+    "mqtt": "^5.16.1"
+  },
+  "devDependencies": {
+    "aedes": "^1.2.0"
+  }
 }

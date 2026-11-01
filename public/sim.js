@@ -59,7 +59,7 @@
   /* ---------- AMR fleets ---------- */
   function makeFleet(n, o) {
     const amrs = [];
-    for (let i = 0; i < n; i++) amrs.push({ b: rnd(o.bLo, o.bHi), s: 'idle', t: 0, r: 0 });
+    for (let i = 0; i < n; i++) amrs.push({ id: (o.prefix || 'AMR-') + String(i + 1).padStart(2, '0'), b: rnd(o.bLo, o.bHi), s: 'idle', t: 0, r: 0 });
     let i = 0;
     for (let k = 0; k < o.busy; k++, i++) { amrs[i].s = 'busy'; amrs[i].t = rnd(1, 8); amrs[i].r = rint(0, o.routes.length - 1); }
     for (let k = 0; k < o.charging; k++, i++) { amrs[i].s = 'charging'; amrs[i].b = rnd(15, 40); }
@@ -175,7 +175,7 @@
         ]
       }),
       jv: makeFleet(12, {
-        bLo: 45, bHi: 80, busy: 3, charging: 0, chargers: 2, demand: 0.5, util: 0.75, planned: 118, misc: 0,
+        prefix: 'JV-', bLo: 45, bHi: 80, busy: 3, charging: 0, chargers: 2, demand: 0.5, util: 0.75, planned: 118, misc: 0,
         routes: [
           { name: 'JV A → Assembly', key: 'A', n: 32, pct: 97, p: 0.97, w: 2.4, mod: 'jvDelay0' },
           { name: 'JV B → Supermarket', key: 'B', n: 40, pct: 95, p: 0.95, w: 3, mod: 'jvDelay0' },
@@ -185,6 +185,7 @@
       parts: makeParts(clock),
       hist: { t: [], g2d: [], turn: [], rej: [], spf: [] },
       sampleAcc: 0, rejMark: 16,
+      live: {}, src: {}, trucks: [],
       events: []
     };
     // fix JV route 'mod' naming: only JV C reacts to the jvDelay injection
@@ -195,6 +196,9 @@
     S.hist.spf = seedSeries(91, 2, HIST);
     S.hist.rej = seedSeries(1.6, 1.4, HIST).map((v) => Math.max(0, +v.toFixed(1)));
     S.lineside.forEach((l) => { l.max = Math.round(l.safety * 1.3); });
+    S.hist.shops = {};
+    for (const k in S.shops) S.hist.shops[k] = seedSeries(S.shops[k].target, 3, HIST);
+    makeTrucks(S);
     event(S, 'Control tower online — demo data stream started', 'info');
     return S;
   }
@@ -237,6 +241,42 @@
     return parts;
   }
 
+  /* ---------- inbound trucks ---------- */
+  const SUPPLIERS = ['Bharat Forge', 'Sundram Fasteners', 'Motherson', 'Lumax', 'Minda', 'Bosch India', 'Varroc', 'Endurance', 'Gabriel', 'Subros'];
+  const MATERIALS = ['Bumper B/H', 'Wiring Harness', 'Seat Set', 'Engine Mount', 'Door Latch', 'Brake Disc', 'Headlamp', 'Radiator', 'Fuel Tank', 'Grille', 'Axle Shaft', 'Windshield'];
+  let truckSeq = 1000;
+  function newTruck(sched, status) {
+    return { id: 'TRK-' + (++truckSeq), sup: pick(SUPPLIERS), mat: pick(MATERIALS), status, dock: null, sched, arrivedAt: null, dockedAt: null, doneAt: null };
+  }
+  function makeTrucks(S) {
+    const y = S.yard, list = [];
+    const used = new Set();
+    for (let i = 0; i < y.expected; i++) {
+      const sched = S.clock - (y.arrived - i) * 13;
+      const st = i < y.received ? 'received' : i < y.docked ? 'docked' : i < y.arrived ? 'arrived' : 'scheduled';
+      const t = newTruck(sched, st);
+      if (st !== 'scheduled') t.arrivedAt = sched + rnd(-6, 8);
+      if (st === 'docked' || st === 'received') { t.dockedAt = t.arrivedAt + rnd(15, 45); }
+      if (st === 'received') t.doneAt = t.dockedAt + rnd(40, 90);
+      if (st === 'docked') { let d; do { d = rint(1, y.docks); } while (used.has(d)); used.add(d); t.dock = d; }
+      list.push(t);
+    }
+    S.trucks = list;
+  }
+  function moveTruck(S, from, to) {
+    const t = S.trucks.find((x) => x.status === from);
+    if (!t) return;
+    t.status = to;
+    if (to === 'arrived') t.arrivedAt = S.clock;
+    if (to === 'docked') {
+      t.dockedAt = S.clock;
+      const used = new Set(S.trucks.filter((x) => x.status === 'docked').map((x) => x.dock));
+      for (let i = 0; i < 40; i++) { const d = rint(1, S.yard.docks); if (!used.has(d)) { t.dock = d; break; } }
+    }
+    if (to === 'received') { t.doneAt = S.clock; t.dock = null; }
+    if (S.trucks.length > 80) { const i = S.trucks.findIndex((x) => x.status === 'received'); if (i >= 0) S.trucks.splice(i, 1); }
+  }
+
   /* ---------- events ---------- */
   function event(S, msg, lvl) {
     S.events.unshift({ t: S.clock, msg, lvl: lvl || 'info' });
@@ -252,28 +292,29 @@
     S.weather = clamp(S.weather + (R() - 0.5) * 0.02 * m, 24, 33);
     for (const k in S.mods) S.mods[k] = Math.max(0, S.mods[k] - m);
     const running = !S.line.stopped;
+    const L = S.live || {};
     const tick = clamp(m, 0, 2);     // noise scale so fast speeds don't explode
 
     /* build */
-    if (running) {
+    if (L.build) { /* live feed owns build counters */ } else if (running) {
       const d = Math.min(S.build.rate * m * rnd(0.9, 1.05), S.build.plan - S.build.actual);
       if (d > 0) {
         S.build.actual += d;
         S.quality.rejAcc += d * 0.0209;
-        S.finished.onTime = clamp(S.finished.onTime + (92 - S.finished.onTime) * 0.02 * tick + (R() - 0.5) * 0.6 * tick, 82, 99);
+        if (!L.finished) S.finished.onTime = clamp(S.finished.onTime + (92 - S.finished.onTime) * 0.02 * tick + (R() - 0.5) * 0.6 * tick, 82, 99);
       }
     } else {
       S.line.stoppedMin += m;
     }
-    if (S.build.actual >= S.build.plan - 0.01) {   // shift plan achieved -> roll into the next shift's plan
+    if (!L.build && S.build.actual >= S.build.plan - 0.01) {   // shift plan achieved -> roll into the next shift's plan
       event(S, 'Shift plan of ' + S.build.plan + ' vehicles achieved \u2014 next plan started', 'ok');
       S.build.actual = 0; S.line.stops = 0; S.line.stoppedMin = 0; S.quality.rejected = 0; S.rejMark = 0;
-      S.yard.expected = 34; S.yard.arrived = S.yard.docked = S.yard.received = 0;
+      if (!L.yard) { S.yard.expected = 34; S.yard.arrived = S.yard.docked = S.yard.received = 0; makeTrucks(S); }
     }
     while (S.quality.rejAcc >= 1) { S.quality.rejAcc--; S.quality.rejected++; }
 
     /* shop buffers */
-    for (const k in S.shops) {
+    for (const k in (L.shops ? {} : S.shops)) {
       const s = S.shops[k];
       s.buf = clamp(s.buf + (s.target - s.buf) * 0.03 * tick + (R() - 0.5) * 1.4 * tick, 8, 99);
       if (R() < 0.01 * tick) s.target = clamp(s.target + rnd(-8, 8), 30, 90);
@@ -282,7 +323,7 @@
 
     /* parts / shortages */
     let blocking = null;
-    for (const p of S.parts) {
+    for (const p of (L.parts ? [] : S.parts)) {
       if (running) p.stock = Math.max(0, p.stock - p.rate * m);
       const c = coverage(p);
       if (!p.pending && c < 55) {
@@ -303,7 +344,7 @@
       }
       if (p.stock <= 0 && !blocking) blocking = p;
     }
-    if (blocking && S.line.stopped === false) {
+    if (L.line || L.parts) { /* live feed owns line status */ } else if (blocking && S.line.stopped === false) {
       S.line.stopped = true; S.line.reason = 'Shortage: ' + blocking.name; S.line.stops++;
       S.kpi.jis = clamp(S.kpi.jis - 2.5, 80, 100);
       event(S, 'LINE STOP — ' + blocking.name + ' (' + blocking.loc + ') ran out', 'low');
@@ -315,21 +356,23 @@
 
     /* inbound trucks */
     const y = S.yard;
-    if (y.arrived < y.expected && R() < 0.1 * m) y.arrived++;
-    else if (y.arrived >= y.expected && R() < 0.035 * m) { y.expected++; }
+    if (L.yard) { /* live */ } else {
+    if (y.arrived < y.expected && R() < 0.1 * m) { y.arrived++; moveTruck(S, 'scheduled', 'arrived'); }
+    else if (y.arrived >= y.expected && R() < 0.035 * m) { y.expected++; S.trucks.push(newTruck(S.clock + rnd(5, 40), 'scheduled')); }
     if (y.arrived > y.docked && y.occupied < y.docks && R() < 0.12 * m) {
-      y.docked++; y.occupied++;
+      y.docked++; y.occupied++; moveTruck(S, 'arrived', 'docked');
       y.g2d = clamp(y.g2d * 0.9 + rnd(20, 48) * 0.1, 15, 90);
     }
     if (y.docked > y.received && R() < 0.1 * m) {
-      y.received++; y.occupied = Math.max(2, y.occupied - 1);
+      y.received++; y.occupied = Math.max(2, y.occupied - 1); moveTruck(S, 'docked', 'received');
       y.turn = clamp(y.turn * 0.9 + rnd(48, 90) * 0.1, 30, 140);
     }
     // unload & leave: occupied bay count drifts toward real queue
     if (y.occupied < 9 && R() < 0.2 * m) y.occupied++;
+    }
 
     /* internal transfers */
-    for (const t of S.transfers) {
+    for (const t of (L.transfers ? [] : S.transfers)) {
       let n = t.rate * m, jobs = 0;
       while (n > 0) { if (n < 1 && R() > n) break; n--; jobs++; }
       for (let i = 0; i < jobs; i++) {
@@ -341,7 +384,7 @@
     }
 
     /* line-side stock */
-    for (const l of S.lineside) {
+    for (const l of (L.lineside ? [] : S.lineside)) {
       if (running) l.usable = Math.max(0, l.usable - S.build.rate * m);
       if (!l.pend && l.usable / l.safety < 0.65) {
         const jam = l.icon === 'bumper' && S.mods.bumperJam > 0;
@@ -362,15 +405,15 @@
     }
 
     /* AMRs */
-    stepFleet(S.amr, m, null);
-    stepFleet(S.jv, m, { jvDelay: S.mods.jvDelay });
+    if (!L.amr) stepFleet(S.amr, m, null);
+    if (!L.jv) stepFleet(S.jv, m, { jvDelay: S.mods.jvDelay });
 
     /* quality & KPIs */
-    S.quality.spf = clamp(S.quality.spf + (91 - S.quality.spf) * 0.02 * tick + (R() - 0.5) * 0.7 * tick - (S.line.stopped ? 0.2 * tick : 0), 70, 99);
-    if (R() < 0.04 * tick) S.quality.quarantined = Math.max(0, S.quality.quarantined + (R() < 0.55 ? 1 : -1));
-    S.kpi.jis = clamp(S.kpi.jis + (98.4 - S.kpi.jis) * 0.02 * tick + (R() - 0.5) * 0.12 * tick, 80, 100);
-    S.kpi.stockAcc = clamp(S.kpi.stockAcc + (97.8 - S.kpi.stockAcc) * 0.02 * tick + (R() - 0.5) * 0.06 * tick, 90, 100);
-    S.finished.shipOnTime = clamp(S.finished.shipOnTime + (92 - S.finished.shipOnTime) * 0.02 * tick + (R() - 0.5) * 0.5 * tick, 80, 100);
+    if (!L.quality) S.quality.spf = clamp(S.quality.spf + (91 - S.quality.spf) * 0.02 * tick + (R() - 0.5) * 0.7 * tick - (S.line.stopped ? 0.2 * tick : 0), 70, 99);
+    if (!L.quality && R() < 0.04 * tick) S.quality.quarantined = Math.max(0, S.quality.quarantined + (R() < 0.55 ? 1 : -1));
+    if (!L.kpi) S.kpi.jis = clamp(S.kpi.jis + (98.4 - S.kpi.jis) * 0.02 * tick + (R() - 0.5) * 0.12 * tick, 80, 100);
+    if (!L.kpi) S.kpi.stockAcc = clamp(S.kpi.stockAcc + (97.8 - S.kpi.stockAcc) * 0.02 * tick + (R() - 0.5) * 0.06 * tick, 90, 100);
+    if (!L.finished) S.finished.shipOnTime = clamp(S.finished.shipOnTime + (92 - S.finished.shipOnTime) * 0.02 * tick + (R() - 0.5) * 0.5 * tick, 80, 100);
 
     /* history samples */
     S.sampleAcc += m;
@@ -380,6 +423,7 @@
       const pushH = (a, v) => { a.push(+v.toFixed(2)); if (a.length > HIST) a.shift(); };
       pushH(h.t, S.clock); pushH(h.g2d, y.g2d); pushH(h.turn, y.turn); pushH(h.spf, S.quality.spf);
       pushH(h.rej, S.quality.rejected - S.rejMark); S.rejMark = S.quality.rejected;
+      for (const k in S.shops) pushH(h.shops[k], S.shops[k].buf);
     }
     return S;
   }
@@ -420,6 +464,6 @@
 
   return {
     createState, step, inject, coverage, partStatus, bufferStatus, linesideStatus, routeStatus,
-    nextAction, fleetView, fmtClock, SHOP_NAMES, RISK_MIN
+    nextAction, fleetView, fmtClock, makeTrucks, SHOP_NAMES, RISK_MIN
   };
 });
