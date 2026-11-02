@@ -26,7 +26,7 @@ test('block layout renders the drawing\'s blocks, the JV tiles, the sequence bus
   assert.ok(!r.nodes.includes('ASSUMED POSITION'));
   assert.match(r.flows, /class="seq/); assert.match(r.flows, /animateMotion/); assert.match(r.flows, /id="rt-jv-b"/);
   // assembly A: down the gap between paint (x<=573) and assembly (x>=581), along the lane under A, then up into A at the same x as B's drops (mirror)
-  assert.match(r.flows, /id="rt-jv-wb" d="M230,138 V151 H200 V164"/); assert.match(r.flows, /id="rt-jv-wa" d="M230,138 V151 H287 V254 H283"/);          // JV also feeds weld B (straight down) and weld A (down the weld / paint gap)
+  assert.match(r.flows, /id="rt-jv-wb" d="M230,138 V151 H200 V164"/); assert.match(r.flows, /id="rt-jv-wa" d="M230,138 V151 H287 V294 H200 V282"/);      // JV also feeds weld B (from the top) and weld A (from underneath: down the weld / paint gap, along the lane under A, up into it)
   assert.match(r.flows, /id="rt-jv-a" d="M230,138 V151 H577 V294 H600 V282"/); assert.match(r.flows, /id="rt-eg-a" d="M626,138 V151 H577 V294 H700 V282"/);
   assert.match(r.flows, /id="rt-im-a" d="M784,138 V151 H577 V294 H860 V282"/); assert.ok(!r.flows.includes('H1148'));
   assert.ok(r.flows.includes('M600,294 V282') && r.flows.includes('M700,151 V164'));
@@ -132,7 +132,7 @@ test('every route line is dynamic: carriers = in flight, idle lines dim, late ro
   r = global.window.FFMap.render(S, ctx(S));
   assert.equal(count(r.flows, 'jv-wb'), 2);                                              // two carriers on JV -> Weld B
   assert.ok(r.flows.includes('class="seq" d="M200,151 V164" marker-end') || r.flows.includes('class="seq" d="M200,151 V164"'));
-  assert.ok(r.flows.includes('class="seq idle" d="M287,151 V254 H283"'));                // JV -> Weld A still idle
+  assert.ok(r.flows.includes('class="seq idle" d="M287,151 V294 H200"'));                // JV -> Weld A still idle
   S.seqflows.jvWB.onTimePct = 60;
   r = global.window.FFMap.render(S, ctx(S));
   assert.ok(r.flows.includes('seq late')); assert.ok(r.flows.includes('JV \u2192 Weld B: 2 in flight')); assert.ok(r.nodes.includes('LATE'));

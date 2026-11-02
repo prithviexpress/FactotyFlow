@@ -20,7 +20,7 @@
   const BUS_Y = 151, CH_X = 577, A_BOT = 294;      // top bus lane; the gap between paint and assembly; the lane under assembly A (mirror of the bus above B)
   const ROUTES = {                                  // sequenced-material paths. B: along the bus, drop into assembly B from the TOP.
                                                     // A: along the bus, down the gap between paint and assembly, then along the lane UNDER assembly A and up into it (mirror of B).
-    'jv-wb': 'M230,138 V' + BUS_Y + ' H200 V164', 'jv-wa': 'M230,138 V' + BUS_Y + ' H287 V254 H283',
+    'jv-wb': 'M230,138 V' + BUS_Y + ' H200 V164', 'jv-wa': 'M230,138 V' + BUS_Y + ' H287 V' + A_BOT + ' H200 V282',
     'jv-b': 'M230,138 V' + BUS_Y + ' H600 V164', 'jv-a': 'M230,138 V' + BUS_Y + ' H' + CH_X + ' V' + A_BOT + ' H600 V282',
     'eg-b': 'M626,138 V' + BUS_Y + ' H700 V164', 'eg-a': 'M626,138 V' + BUS_Y + ' H' + CH_X + ' V' + A_BOT + ' H700 V282',
     'im-b': 'M784,138 V' + BUS_Y + ' H860 V164', 'im-a': 'M784,138 V' + BUS_Y + ' H' + CH_X + ' V' + A_BOT + ' H860 V282',
@@ -71,7 +71,7 @@
       egtm: 'EGTM · shows the Engine shop buffer and the Engine → Assembly transfer route. Mapping EGTM to the engine shop is an assumption; confirm it matches your plant.',
       imma: 'IMM-A · shows the Bumper shop buffer and the Bumper → Assembly transfer route. Mapping IMM-A to the bumper shop is an assumption; confirm it matches your plant.',
       press: 'Press A/B · press buffer. Feeds weld lines A and B (sequenced, tow truck by default).',
-      weldA: 'Weld line A · weld A buffer', weldB: 'Weld line B · weld B buffer', paintA: 'Paint line A · paint A buffer', paintB: 'Paint line B · paint B buffer',
+      weldA: 'Weld line A · weld A buffer. JV material is unloaded from underneath (mirror of weld B, which takes it from the top).', weldB: 'Weld line B · weld B buffer', paintA: 'Paint line A · paint A buffer', paintB: 'Paint line B · paint B buffer',
       asmA: 'Assembly line A · built vs plan' + (split.derived ? ' (half of the total until per-line counts are pushed)' : '') + '. JV / EGTM / IMM-A material reaches it through the gap between paint and assembly, then up into it from underneath (mirror of the drops into B).',
       asmB: 'Assembly line B · built vs plan' + (split.derived ? ' (half of the total until per-line counts are pushed)' : '') + '. Sequenced material drops in from the top.',
       jv: 'JV zone · one tile per JV (names in Plant setup): buffer hours and route on-time.'
@@ -283,7 +283,7 @@
       ['M230,138 V' + BUS_Y, 0, ['jv-b', 'jv-a', 'jv-wb', 'jv-wa']], ['M626,138 V' + BUS_Y, 0, ['eg-b', 'eg-a']], ['M784,138 V' + BUS_Y, 0, ['im-b', 'im-a']],
       ['M200,' + BUS_Y + ' H230', 0, ['jv-wb']], ['M200,' + BUS_Y + ' V164', 1, ['jv-wb']],                                                  // JV -> weld B (straight down onto it)
       ['M230,' + BUS_Y + ' H860', 0, ['jv-b', 'jv-a', 'jv-wa', 'eg-b', 'eg-a', 'im-b', 'im-a']],                                          // the sequence bus
-      ['M287,' + BUS_Y + ' V254 H283', 1, ['jv-wa']],                                                                                     // JV -> weld A (down the gap between weld and paint)
+      ['M287,' + BUS_Y + ' V' + A_BOT + ' H200', 0, ['jv-wa']], ['M200,' + A_BOT + ' V282', 1, ['jv-wa']],                               // JV -> weld A: down the weld / paint gap, along the lane under weld A, up into it (mirror of weld B)
       ['M600,' + BUS_Y + ' V164', 1, ['jv-b']], ['M700,' + BUS_Y + ' V164', 1, ['eg-b']], ['M860,' + BUS_Y + ' V164', 1, ['im-b']],       // drops into assembly B
       ['M' + CH_X + ',' + BUS_Y + ' V' + A_BOT + ' H860', 0, ['jv-a', 'eg-a', 'im-a']],                                                   // down the paint / assembly gap, lane under assembly A
       ['M600,' + A_BOT + ' V282', 1, ['jv-a']], ['M700,' + A_BOT + ' V282', 1, ['eg-a']], ['M860,' + A_BOT + ' V282', 1, ['im-a']],       // up into assembly A (mirror of B)
