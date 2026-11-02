@@ -1,0 +1,3 @@
+delivery_id,vin,part_no,source_name,dest_shop,dest_line,called_ts,due_ts,delivered_ts,seq_expected,seq_actual,result
+D-90001,MA1XXXX0000001,BMP-F-001,JV1,assembly,A,2026-11-02T07:20:00+05:30,2026-11-02T07:50:00+05:30,2026-11-02T07:46:10+05:30,1001,1001,OK
+D-90002,MA1XXXX0000003,SEAT-DRV-LHD,JV2,assembly,A,2026-11-02T07:25:00+05:30,2026-11-02T07:55:00+05:30,2026-11-02T08:03:00+05:30,1003,1002,LATE
