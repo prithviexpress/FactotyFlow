@@ -47,9 +47,15 @@ def('Build & line', 'line', 'line/reason', 'Reason shown while stopped', 'text',
 def('Build & line', 'line', 'line/stops', 'Logistics line stops today', 'count', NUM, 2, field((S) => S.line, 'stops', cnt));
 def('Build & line', 'line', 'line/stoppedMin', 'Minutes lost to line stops today', 'min', NUM, 9, field((S) => S.line, 'stoppedMin', pos));
 
+const LN = (L, k, label, ex) => def('Build & line', 'build', 'build/line' + L + '/' + k, label + ' — assembly line ' + L + ' (optional; else half of the total)', 'vehicles', NUM, ex, {
+  min: k === 'plan' ? 1 : 0, int: true,
+  get: (S) => { const l = S.build['line' + L]; return l ? l[k] : null; },
+  set: (S, v) => { const key = 'line' + L, l = S.build[key] || (S.build[key] = { plan: Math.ceil(S.build.plan / 2), actual: Math.floor(S.build.actual / 2) }); l[k] = v; } });
+LN('A', 'plan', 'Shift plan', 460); LN('A', 'actual', 'Vehicles built', 383); LN('B', 'plan', 'Shift plan', 460); LN('B', 'actual', 'Vehicles built', 383);
+
 // -- buffers
 const SHOPF = (key) => ({ get: (S, e) => e.o[key], set: (S, v, e) => { e.o[key] = v; } });
-def('Shop buffers', 'shops', 'shops/{shop}/buf', 'Buffer level (shop = press | weld | paint | engine | bumper)', '%', NUM, 82, Object.assign(SHOPF('buf'), pct, { ent: 'shop', set: (S, v, e) => { e.o.buf = v; } }));
+def('Shop buffers', 'shops', 'shops/{shop}/buf', 'Buffer level (shop = press | weldA | weldB | paintA | paintB | engine | bumper)', '%', NUM, 82, Object.assign(SHOPF('buf'), pct, { ent: 'shop', set: (S, v, e) => { e.o.buf = v; } }));
 def('Shop buffers', 'shops', 'shops/{shop}/units', 'Vehicle sets in the buffer (optional, else buffer % × capacity)', 'vehicle sets', NUM, 246, Object.assign({ ent: 'shop', get: (S, e) => (e.o.units !== undefined ? e.o.units : null) , set: (S, v, e) => { e.o.units = v; } }, pos));
 def('Shop buffers', 'shops', 'shops/{shop}/hours', 'Hours of inventory in the buffer (optional override)', 'h', NUM, 2.2, Object.assign({ ent: 'shop', get: (S, e) => (e.o.hours !== undefined ? e.o.hours : null), set: (S, v, e) => { e.o.hours = v; } }, pos));
 def('JV buffers', 'jvstock', 'jvstock/{jv}/buf', 'JV buffer level (jv = a name from Plant setup, e.g. JV1)', '%', NUM, 72, Object.assign({ ent: 'jv', get: (S, e) => e.o.buf, set: (S, v, e) => { e.o.buf = v; } }, pct));

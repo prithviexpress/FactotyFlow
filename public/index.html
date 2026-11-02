@@ -59,6 +59,12 @@
           <marker id="ah-green" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#22e07a"/></marker>
           <marker id="ah-amber" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ffc83d"/></marker>
           <marker id="ah-red" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ff4d4d"/></marker>
+          <marker id="ah-seq" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" style="fill:var(--seq)"/></marker>
+          <linearGradient id="g-prod" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--bp-a)"/><stop offset="1" style="stop-color:var(--bp-b)"/></linearGradient>
+          <linearGradient id="g-asm" x1="0" y1="0" x2="1" y2="1"><stop offset="0" style="stop-color:var(--ba-a)"/><stop offset="1" style="stop-color:var(--ba-b)"/></linearGradient>
+          <linearGradient id="g-light" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--bl-a)"/><stop offset="1" style="stop-color:var(--bl-b)"/></linearGradient>
+          <linearGradient id="g-jv" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--bj-a)"/><stop offset="1" style="stop-color:var(--bj-b)"/></linearGradient>
+          <linearGradient id="g-gloss" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".20"/><stop offset=".45" stop-color="#fff" stop-opacity=".04"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
           <pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse"><path id="map-grid" d="M24 0H0V24" fill="none" stroke-width=".6"/></pattern>
         </defs>
         <rect id="map-bg" width="1152" height="384"/>
@@ -86,6 +92,7 @@
 <div id="tip" hidden></div>
 
 <script src="sim.js"></script>
+<script src="map.js"></script>
 <script src="pages.js"></script>
 <script src="settings.js"></script>
 <script src="datapoints.js"></script>

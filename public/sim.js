@@ -21,7 +21,7 @@
   const SAMPLE_MIN = 5;     // sim minutes between history samples
 
   const SHOP_NAMES = {
-    press: 'Press', weld: 'Weld', paint: 'Paint', engine: 'Engine',
+    press: 'Press', weld: 'Weld', paint: 'Paint', weldA: 'Weld A', weldB: 'Weld B', paintA: 'Paint A', paintB: 'Paint B', engine: 'EGTM',
     bumper: 'Bumper', assembly: 'Assembly'
   };
 
@@ -140,7 +140,7 @@
       line: { stopped: false, reason: null, stops: 0, stoppedMin: 0 },
       mods: { bumperJam: 0, jvDelay: 0, traffic: 0 },
       shops: {
-        press: { buf: 82, target: 80 }, weld: { buf: 78, target: 78 }, paint: { buf: 65, target: 64 },
+        press: { buf: 82, target: 80 }, weldA: { buf: 79, target: 78 }, weldB: { buf: 74, target: 76 }, paintA: { buf: 66, target: 65 }, paintB: { buf: 62, target: 63 },
         engine: { buf: 68, target: 68 }, bumper: { buf: 42, target: 46 }
       },
       yard: {
@@ -196,7 +196,7 @@
     S.hist.spf = seedSeries(91, 2, HIST);
     S.hist.rej = seedSeries(1.6, 1.4, HIST).map((v) => Math.max(0, +v.toFixed(1)));
     S.lineside.forEach((l) => { l.max = Math.round(l.safety * 1.3); });
-    const CAP = { press: 300, weld: 240, paint: 200, engine: 180, bumper: 160 };
+    const CAP = { press: 300, weldA: 120, weldB: 120, paintA: 100, paintB: 100, engine: 180, bumper: 160 };
     for (const k in CAP) S.shops[k].cap = CAP[k];
     S.parts.forEach(initInv);
     S.hist.shops = {};
@@ -248,11 +248,30 @@
   const DEFAULT_JVS = ['JV1', 'JV2', 'JV3', 'JV4'];
   const DEFAULT_TERMS = { bay: 'Bay', bays: 'Bays', atBay: 'At bay', motorpool: 'Motorpool', parking: 'Truck parking', jis: 'JIS accuracy' };
   const MAX_JVS = 6;
+  /* Plant block layout (slots). Empty label = automatic text for that block. `carrier` = how sequenced material moves from that block (amr | tow). */
+  const DEFAULT_SLOTS = {
+    jv: { label: 'JV', carrier: 'tow' }, yard: { label: '', bind: 'yard' }, egtm: { label: 'EGTM', carrier: 'amr' },
+    top1: { label: '', bind: 'motorpool' }, imma: { label: 'IMM-A', carrier: 'amr' }, top2: { label: '', bind: 'shipment' }, top3: { label: '', bind: 'none' },
+    press: { label: 'PRESS A/B', carrier: 'tow' }, weldB: { label: 'WELD B' }, weldA: { label: 'WELD A' }, paintB: { label: 'PAINT B' }, paintA: { label: 'PAINT A' },
+    asmB: { label: 'ASSEMBLY B' }, asmA: { label: 'ASSEMBLY A' }
+  };
+  const SLOT_BINDS = ['yard', 'motorpool', 'shipment', 'none'], CARRIERS = ['amr', 'tow'];
+  /** assembly line A / B counts: pushed per line when available, otherwise the total split in half */
+  function lineSplit(S) {
+    const b = S.build, A = b.lineA, B = b.lineB;
+    if (A && B) return { A, B, derived: false };
+    if (A) return { A, B: { plan: Math.max(0, b.plan - A.plan), actual: Math.max(0, b.actual - A.actual) }, derived: false };
+    if (B) return { B, A: { plan: Math.max(0, b.plan - B.plan), actual: Math.max(0, b.actual - B.actual) }, derived: false };
+    const p = Math.ceil(b.plan / 2), a = Math.ceil(b.actual / 2);
+    return { A: { plan: p, actual: a }, B: { plan: b.plan - p, actual: b.actual - a }, derived: true };
+  }
   /** Apply configured JV names / terms. JV sites (buffers) and JV AMR routes follow the list; existing values are kept by position. */
   function setPlant(S, plant) {
     plant = plant || {};
     const names = (plant.jvs && plant.jvs.length ? plant.jvs : DEFAULT_JVS).slice(0, MAX_JVS).map(String);
-    S.setup = { jvs: names, terms: Object.assign({}, DEFAULT_TERMS, plant.terms || {}) };
+    const slots = {};
+    for (const k of Object.keys(DEFAULT_SLOTS)) slots[k] = Object.assign({}, DEFAULT_SLOTS[k], (plant.slots && plant.slots[k]) || {});
+    S.setup = { jvs: names, terms: Object.assign({}, DEFAULT_TERMS, plant.terms || {}), slots };
     const old = S.jvSites || [];
     S.jvSites = names.map((n, i) => Object.assign(old[i] ? { buf: old[i].buf, target: old[i].target, cap: old[i].cap, units: old[i].units, hours: old[i].hours } : { buf: rnd(58, 80), target: 66 + rnd(0, 8), cap: 120 }, { name: n }));
     const F = S.jv, delayIdx = Math.min(2, names.length - 1), oldR = F.routes || [];
@@ -625,7 +644,7 @@
   }
 
   return {
-    createState, step, inject, resetDomain, raiseAlert, clearAlert, pruneAlerts, reconcileAlerts, LEVELS, inventoryView, hourStatus, setPlant, DEFAULT_TERMS, DEFAULT_JVS, MAX_JVS, TARGET_H, coverage, partStatus, bufferStatus, linesideStatus, routeStatus,
+    createState, step, inject, resetDomain, raiseAlert, clearAlert, pruneAlerts, reconcileAlerts, LEVELS, inventoryView, hourStatus, setPlant, lineSplit, DEFAULT_SLOTS, SLOT_BINDS, CARRIERS, DEFAULT_TERMS, DEFAULT_JVS, MAX_JVS, TARGET_H, coverage, partStatus, bufferStatus, linesideStatus, routeStatus,
     nextAction, fleetView, fmtClock, makeTrucks, SHOP_NAMES, RISK_MIN
   };
 });

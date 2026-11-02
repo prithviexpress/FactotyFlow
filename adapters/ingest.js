@@ -7,7 +7,8 @@
  */
 const DOMAINS = ['build', 'line', 'shops', 'parts', 'yard', 'trucks', 'transfers', 'lineside', 'amr', 'jv', 'jvstock', 'quality', 'kpi', 'finished', 'deliveries'];
 const SHOP_KEYS = ['press', 'weld', 'paint', 'engine', 'bumper', 'assembly'];
-const BUFFER_KEYS = ['press', 'weld', 'paint', 'engine', 'bumper'];
+const BUFFER_KEYS = ['press', 'weldA', 'weldB', 'paintA', 'paintB', 'engine', 'bumper'];
+const BUFFER_ALIAS = { weld: ['weldA', 'weldB'], paint: ['paintA', 'paintB'] };   // older feeds send one buffer for both lines
 
 class IngestError extends Error { constructor(m) { super(m); this.status = 400; } }
 
@@ -87,6 +88,8 @@ const APPLY = {
   },
   shops(S, p) {
     asObj(p, 'shops');
+    p = Object.assign({}, p);
+    for (const a of Object.keys(BUFFER_ALIAS)) if (p[a] !== undefined) for (const t of BUFFER_ALIAS[a]) if (p[t] === undefined) p[t] = p[a];
     for (const k of BUFFER_KEYS) {
       if (p[k] === undefined) continue;
       const o = p[k] !== null && typeof p[k] === 'object' ? p[k] : { buf: p[k] };

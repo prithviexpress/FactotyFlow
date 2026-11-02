@@ -12,7 +12,7 @@ const MASK = '********';
 const DOMAIN_INFO = [
   { id: 'build', label: 'Today build (plan vs actual)', source: 'MES', sample: { plan: 920, actual: 766, rate: 1.9 } },
   { id: 'line', label: 'Line status & logistics stops', source: 'MES / Andon', sample: { stopped: false, reason: null, stops: 0, stoppedMin: 0 } },
-  { id: 'shops', label: 'Shop buffer levels (%)', source: 'MES / WMS', sample: { press: { buf: 82, units: 246 }, weld: 78, paint: 65, engine: 68, bumper: { buf: 42, hours: 0.6 } } },
+  { id: 'shops', label: 'Shop buffer levels (%)', source: 'MES / WMS', sample: { press: { buf: 82, units: 246 }, weldA: 79, weldB: 74, paintA: 66, paintB: 62, engine: 68, bumper: { buf: 42, hours: 0.6 } } },
   { id: 'parts', label: 'Parts: stock, consumption rate, next inbound', source: 'WMS / ERP', item: 'parts.item', sample: [{ id: 'P-BMP-F', name: 'Bumper B/H (Front)', loc: 'ASY-08', shop: 'bumper', stock: 28, rate: 1.27, inv: { bay: 8, lineside: 20 }, pending: { ref: 'V-181', etaAt: '2026-10-14T15:05:00+05:30', qty: 160 } }] },
   { id: 'yard', label: 'Truck parking / bay counters', source: 'Gate / truck parking system', sample: { expected: 34, arrived: 26, docked: 21, received: 18, occupied: 21, docks: 28, g2d: 32, turn: 68 } },
   { id: 'trucks', label: 'Inbound truck list', source: 'Gate / truck parking system', item: 'trucks.item', sample: [{ id: 'TRK-1019', supplier: 'Endurance', material: 'Wiring Harness', status: 'docked', dock: 4, schedAt: '2026-10-14T13:34:00+05:30' }] },
@@ -33,7 +33,7 @@ function defaults() {
   for (const d of IDS) domains[d] = blank();
   return {
     staleSec: 60, sources: {}, mqtt: { url: '', username: '', password: '', qos: 0 },
-    plant: { jvs: Sim.DEFAULT_JVS.slice(), terms: Object.assign({}, Sim.DEFAULT_TERMS), place: '', lat: null, lon: null },
+    plant: { jvs: Sim.DEFAULT_JVS.slice(), terms: Object.assign({}, Sim.DEFAULT_TERMS), slots: JSON.parse(JSON.stringify(Sim.DEFAULT_SLOTS)), place: '', lat: null, lon: null },
     alerts: {
       weather: { enabled: false, intervalMin: 10, gustKmh: 60, rainMmH: 10, tempHighC: 40, tempLowC: 0, lookaheadH: 3, url: '' },
       traffic: { enabled: false, provider: 'tomtom', key: '', radiusKm: 8, minDelaySec: 300, intervalMin: 5, url: '' },
@@ -70,6 +70,12 @@ function normalize(raw) {
     if (Array.isArray(a.feeds)) cfg.alerts.feeds = a.feeds.map((f) => ({ name: String(f.name || '').trim(), url: String(f.url || '').trim(), intervalMin: num(f.intervalMin, 10), headers: f.headers && typeof f.headers === 'object' ? f.headers : {}, root: String(f.root || '').trim(), fields: f.fields && typeof f.fields === 'object' ? f.fields : {}, kind: String(f.kind || 'event'), enabled: f.enabled !== false }));
   }
   if (raw.plant) {
+    if (raw.plant.slots && typeof raw.plant.slots === 'object') {
+      for (const k of Object.keys(Sim.DEFAULT_SLOTS)) {
+        const s = raw.plant.slots[k]; if (!s || typeof s !== 'object') continue;
+        for (const f of ['label', 'bind', 'carrier']) if (s[f] !== undefined) cfg.plant.slots[k][f] = String(s[f]).trim();
+      }
+    }
     if (raw.plant.place !== undefined) cfg.plant.place = String(raw.plant.place).trim();
     for (const k of ['lat', 'lon']) if (raw.plant[k] !== undefined) cfg.plant[k] = raw.plant[k] === '' || raw.plant[k] === null ? null : Number(raw.plant[k]);
     if (Array.isArray(raw.plant.jvs)) cfg.plant.jvs = raw.plant.jvs.map((x) => String(x).trim());
@@ -110,6 +116,12 @@ function validate(cfg) {
     if (s.staleSec && !(s.staleSec >= 5)) errs.push('source "' + n + '": stale-after must be at least 5 s');
   }
   if (new Set(tokens).size !== tokens.length) errs.push('two sources share the same token');
+  for (const k of Object.keys(cfg.plant.slots)) {
+    const s = cfg.plant.slots[k];
+    if (s.label && s.label.length > 24) errs.push('layout block "' + k + '": label must be at most 24 characters');
+    if (s.bind !== undefined && !Sim.SLOT_BINDS.includes(s.bind)) errs.push('layout block "' + k + '": it can show: ' + Sim.SLOT_BINDS.join(', '));
+    if (s.carrier !== undefined && !Sim.CARRIERS.includes(s.carrier)) errs.push('layout block "' + k + '": carrier must be amr or tow');
+  }
   const P = cfg.plant, A = cfg.alerts, okLL = P.lat !== null && P.lon !== null && Math.abs(P.lat) <= 90 && Math.abs(P.lon) <= 180;
   if ((P.lat !== null && !(Math.abs(P.lat) <= 90)) || (P.lon !== null && !(Math.abs(P.lon) <= 180))) errs.push('plant location: latitude must be -90..90 and longitude -180..180');
   for (const k of ['weather', 'traffic']) {

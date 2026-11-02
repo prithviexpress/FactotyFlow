@@ -188,110 +188,19 @@
       '<span class="gap"></span><button class="drill" data-href="' + (ui.shop === 'all' ? '#/parts' : '#/shop/' + ui.shop) + '">' + ico('bars') + '  Drill down to ' + (ui.shop === 'all' ? 'parts / shop / line' : ui.shop + ' shop') + ' \u203a</button>');
   }
 
-  /* ---------- plant map ---------- */
-  function nd(id, x, y, w, h, st, inner, shop) {
-    const sel = shop && ui.shop === shop;
-    const dim = shop && ui.shop !== 'all' && ui.shop !== shop;
-    const dot = st ? '<circle cx="' + (x + w - 10) + '" cy="' + (y + 10) + '" r="4.5" fill="' + COL[st] + '" class="' + (st === 'low' ? 'dot-low' : '') + '"/>' : '';
-    const href = { gate: '#/inbound', docks: '#/inbound', finished: '#/inventory', ship: '#/shop/assembly' }[id] || (/^jv\d/.test(id) ? '#/amr' : '');
-    const fleetAttr = /^jv\d/.test(id) ? ' data-fleet="jv"' : '';
-    return '<g class="nd' + (sel ? ' sel' : '') + (dim ? ' dim' : '') + (st === 'low' ? ' problem' : '') + '" data-node="' + id + '" data-href="' + href + '"' + fleetAttr + ' data-shop="' + (shop || '') + '">' +
-      '<rect class="box" x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="7"/>' + dot + inner + '</g>';
-  }
-  const tx = (x, y, s, cls, extra) => '<text x="' + x + '" y="' + y + '" class="' + (cls || '') + '" ' + (extra || '') + '>' + s + '</text>';
-  function bar(x, y, w, pct, color) {
-    return '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="6" rx="3" fill="var(--track2)"/><rect x="' + x + '" y="' + y + '" width="' + Math.max(0, Math.min(w, (w * pct) / 100)).toFixed(1) + '" height="6" rx="3" fill="' + color + '"/>';
-  }
-  function shopNode(id, key, x, y, w, h, icon, title, shopKey, hrsLabel) {
-    const buf = S.shops[key].buf, st = Sim.bufferStatus(buf);
-    return nd(id, x, y, w, h, st,
-      mi(icon, x + 10, y + 26, 36, 'var(--iconmap)') + tx(x + 54, y + 20, title, 't1') +
-      tx(x + 54, y + 48, f0(buf) + '%', 'big ' + st) + tx(x + 54, y + 63, 'Buffer' + (hrsLabel || ''), 'sm') +
-      bar(x + 10, y + h - 11, w - 20, buf, COL[st]), shopKey);
-  }
-
-  // JV nodes share the top row right of the bays; their number/names come from the plant setup (Interfaces page)
-  function jvLayout() {
-    const n = S.jvSites.length, gap = 8, w = Math.floor((655 - (n - 1) * gap) / n);
-    return S.jvSites.map((j, i) => ({ i, x: 497 + i * (w + gap), w }));
-  }
-  const jvRoute = (name) => S.jv.routes.find((r) => (r.key || '').toLowerCase() === name.toLowerCase() || r.name.toLowerCase().indexOf(name.toLowerCase() + ' ') === 0);
-
-  function mapNodes() {
-    const y = S.yard, b = S.build, pct = (b.actual / b.plan) * 100;
-    const IV = Sim.inventoryView(S), wipH = {}; IV.wip.forEach((w) => { wipH[w.id] = w.hours; });
-    const hh = (h) => (h === null || h === undefined ? '' : ' \u00b7 ' + (h < 10 ? h.toFixed(1) : Math.round(h)) + ' h');
-    const dockSt = y.occupied >= y.docks ? 'low' : y.occupied / y.docks > 0.92 ? 'watch' : 'ok';
-    const out = [];
-    out.push('<g class="nd" data-node="entrance"><rect class="box" x="0" y="193" width="72" height="46" rx="6"/>' +
-      tx(36, 212, 'PLANT', 't1', 'text-anchor="middle"') + tx(36, 227, 'ENTRANCE', 't1', 'text-anchor="middle"') + '</g>');
-    out.push(nd('gate', 87, 13, 195, 125, y.arrived >= y.docked + 8 ? 'watch' : 'ok',
-      mi('car', 97, 40, 40, 'var(--iconmap)') + tx(150, 31, T('parking').toUpperCase(), 't1') + tx(150, 44, '(Gate \u2022 Inbound Trucks)', 't2') +
-      [['parked', y.expected], ['arrived', y.arrived], [T('atBay').toLowerCase(), y.docked], ['received', y.received]].map((r, i) =>
-        tx(150, 66 + i * 18, r[1], 'num') + tx(178, 66 + i * 18, r[0], 'sm')).join('')));
-    out.push(nd('docks', 302, 20, 175, 78, dockSt,
-      tx(314, 40, 'RECEIVING ' + T('bays').toUpperCase(), 't1') + mi('truck', 314, 48, 44, 'var(--iconmap)') +
-      tx(366, 72, y.occupied + ' / ' + y.docks, 'big') + tx(366, 88, T('atBay'), 'sm')));
-    jvLayout().forEach((L) => {
-      const site = S.jvSites[L.i], r = jvRoute(site.name), rp = r ? r.ema * 100 : null, rst = rp === null ? 'ok' : Sim.routeStatus(rp), bst = Sim.bufferStatus(site.buf);
-      const st = rst === 'low' || bst === 'low' ? 'low' : rst === 'watch' || bst === 'watch' ? 'watch' : 'ok';
-      const narrow = L.w < 130;
-      const max = Math.max(4, Math.floor((L.w - (narrow ? 52 : 28)) / 7.2)), nm = site.name.length > max ? site.name.slice(0, max - 1) + '\u2026' : site.name;
-      out.push(nd('jv' + L.i, L.x, 20, L.w, 78, st,
-        tx(L.x + 12, 40, nm, 't1') + tx(L.x + 12, 68, f0(site.buf) + '%', 'big ' + bst) +
-        tx(L.x + 12, 86, 'Buffer' + hh(wipH['jv:' + site.name]), 'sm') +
-        (narrow && rp !== null ? tx(L.x + L.w - 10, 40, f0(rp) + '%', 'num', 'text-anchor="end" style="fill:' + COL[rst] + ';font-size:12px"') : '') +
-        (!narrow && rp !== null ? tx(L.x + L.w - 12, 62, f0(rp) + '%', 'num', 'text-anchor="end" style="fill:' + COL[rst] + '"') + tx(L.x + L.w - 12, 78, 'on time', 'sm', 'text-anchor="end"') : '')));
-    });
-    out.push(shopNode('press', 'press', 140, 198, 134, 82, 'press', 'PRESS', 'press', hh(wipH.press)));
-    out.push(shopNode('weld', 'weld', 285, 198, 144, 82, 'weld', 'WELD', 'weld', hh(wipH.weld)));
-    out.push(shopNode('paint', 'paint', 442, 198, 112, 82, 'paint', 'PAINT', 'paint', hh(wipH.paint)));
-    out.push(shopNode('engine', 'engine', 157, 303, 190, 77, 'engine', 'ENGINE SHOP', 'engine', hh(wipH.engine)));
-    out.push(shopNode('bumper', 'bumper', 362, 303, 165, 77, 'bumper', 'BUMPER SHOP', 'bumper', hh(wipH.bumper)));
-    const stop = S.line.stopped, ast = stop ? 'low' : 'ok';
-    out.push(nd('assembly', 640, 173, 170, 170, ast,
-      mi('car', 700, 182, 52, 'var(--iconmap2)') + tx(725, 258, 'ASSEMBLY', 'big', 'text-anchor="middle" style="font-size:23px"') +
-      tx(725, 277, stop ? 'LINE STOPPED' : 'Line running', 'sm', 'text-anchor="middle" style="' + (stop ? 'fill:var(--low);font-weight:700;font-size:13px' : 'font-size:13px') + '"') +
-      tx(725, 303, f0(b.actual) + ' / ' + b.plan, 'big', 'text-anchor="middle"') +
-      bar(654, 318, 100, pct, COL[ast]) + tx(762, 325, f0(pct) + '%', 'num ' + ast), 'assembly'));
-    const fo = S.finished.onTime, fst = fo >= 90 ? 'ok' : fo >= 85 ? 'watch' : 'low';
-    out.push(nd('finished', 897, 193, 130, 108, fst,
-      tx(908, 213, T('motorpool').toUpperCase(), 't1') + tx(908, 226, '(to dispatch)', 't2') + mi('car', 906, 238, 36, 'var(--iconmap)') +
-      tx(950, 252, 'On-time', 'sm') + tx(950, 280, f0(fo) + '%', 'big ' + fst)));
-    const so = S.finished.shipOnTime, sst = so >= 90 ? 'ok' : so >= 85 ? 'watch' : 'low';
-    out.push(nd('ship', 1040, 258, 102, 95, sst,
-      tx(1050, 278, 'SHIPMENT', 't1') + tx(1050, 291, '(On-time)', 't2') + mi('truck', 1050, 296, 26, 'var(--iconmap)') +
-      tx(1086, 340, f0(so) + '%', 'big ' + sst, 'text-anchor="middle"')));
-    return out.join('');
-  }
-
-  function mapFlows() {
-    const stop = S.line.stopped ? ' stopped' : '';
-    const bmp = S.transfers[1], bst = (bmp.q.reduce((a, c) => a + c, 0) / bmp.q.length) * 100 < 78 ? 'red' : 'blue';
-    const f = (cls, d) => '<path class="flow ' + cls + stop + '" d="' + d + '" marker-end="url(#ah-' + cls + ')"/>';
-    return [
-      f('blue', 'M36,193 V100 H87'), f('blue', 'M282,62 H300'), f('blue', 'M390,98 V140 H620 V258 H638'),
-      f('blue', 'M274,239 H283'), f('blue', 'M429,239 H440'), f('blue', 'M554,239 H638'),
-      f('blue', 'M347,341 H360'), f(bst, 'M527,341 H600 V312 H638'),
-      f('blue', 'M810,247 H895'), f('blue', 'M1027,285 H1038')
-    ].concat(jvLayout().map((L) => {            // each JV feeds the assembly line top; own lane so lines do not overlap
-      const r = jvRoute(S.jvSites[L.i].name), st = r ? Sim.routeStatus(r.ema * 100) : 'ok', n = S.jvSites.length;
-      const lane = 106 + L.i * 5, entry = n > 1 ? 660 + (L.i * 130) / (n - 1) : 725;
-      return f(st === 'low' ? 'red' : st === 'watch' ? 'amber' : 'green', 'M' + (L.x + L.w / 2) + ',98 V' + lane + ' H' + entry.toFixed(0) + ' V171');
-    })).join('');
-  }
-  const ROADS = '<path class="road" d="M0,291 H630"/><path class="road" d="M820,291 H1152"/>';
+  /* ---------- plant map: block layout + sequenced material flows (see map.js) ---------- */
   function renderMapLegend() {
     setHTML($('#map-legend'),
       '<span><i class="bg-ok"></i>Normal</span><span><i class="bg-watch"></i>Watch</span><span><i class="bg-low"></i>Low / Risk</span>' +
-      '<span><svg viewBox="0 0 34 10"><path d="M0 5H28" stroke="var(--cyan)" stroke-width="2.4" stroke-dasharray="5 4"/><path d="M26 1l7 4-7 4z" fill="var(--cyan)"/></svg>Material Flow</span>' +
-      '<span><svg viewBox="0 0 34 10"><path d="M0 5H28" stroke="var(--ok)" stroke-width="2.4" stroke-dasharray="5 4"/><path d="M26 1l7 4-7 4z" fill="var(--ok)"/></svg>AMR Flow (Auto Transfer)</span>' +
-      '<span><svg viewBox="0 0 34 10"><path d="M0 5H34" stroke="var(--road)" stroke-width="2" stroke-dasharray="2 4"/></svg>Internal Road</span>');
+      '<span><svg viewBox="0 0 40 10"><path d="M0 5H34" stroke="var(--seq)" stroke-width="2.2" stroke-dasharray="2 4" stroke-linecap="round"/><path d="M32 1l7 4-7 4z" fill="var(--seq)"/></svg>Sequenced material flow</span>' +
+      '<span><svg viewBox="0 0 12 10"><circle cx="6" cy="5" r="4" class="cr"/><circle cx="6" cy="5" r="1.5" class="cr2"/></svg>AMR</span>' +
+      '<span><svg viewBox="0 0 16 10"><rect x="1" y="2" width="8" height="6" rx="1.5" class="cr"/><rect x="9.5" y="3" width="5.5" height="4.4" rx="1.2" class="cr2"/></svg>Tow truck</span>');
   }
   function renderMap() {
-    setHTML($('#roads'), ROADS);
-    setHTML($('#flows'), mapFlows());
-    setHTML($('#nodes'), mapNodes());
+    const r = window.FFMap.render(S, { T, f0, ui, IV: Sim.inventoryView(S) });
+    setHTML($('#roads'), '');
+    setHTML($('#flows'), r.flows);
+    setHTML($('#nodes'), r.nodes);
   }
 
   /* ---------- risk panel ---------- */

@@ -27,7 +27,7 @@ test('validation: unit/range/whole-number/enum/unknown entity', () => {
   assert.throws(() => V.apply(S, 'shops/press/buf', 'abc'), /expects a number in %/);
   assert.throws(() => V.apply(S, 'yard/arrived', '2.5'), /whole number of trucks/);
   assert.throws(() => V.apply(S, 'trucks/TRK-1019/status', 'sideways'), /one of: scheduled, arrived, docked, received/);
-  assert.throws(() => V.apply(S, 'shops/stores/buf', '5'), /unknown shop "stores"\. Valid: press, weld, paint, engine, bumper/);
+  assert.throws(() => V.apply(S, 'shops/stores/buf', '5'), /unknown shop "stores"\. Valid: press, weldA, weldB, paintA, paintB, engine, bumper/);
   assert.throws(() => V.apply(S, 'nope/x', '1'), /unknown value path/);
   assert.throws(() => V.apply(S, 'transfers/bmp/onTime', '99'), /cannot exceed total/);
   assert.equal(S.live.shops, undefined);                      // nothing flipped by rejected pushes
@@ -59,15 +59,15 @@ test('HTTP: raw number / JSON body, batch is all-or-nothing, catalogue, token, s
   assert.equal(app.state.build.plan, 900);
   r = await post('/api/value/shops/press/buf', '250'); assert.equal(r.status, 400);
   assert.match((await r.json()).error, /out of range/);
-  r = await post('/api/values', JSON.stringify({ 'shops/weld/buf': 70, 'yard/arrived': 'x' }));   // one bad -> nothing applied
-  assert.equal(r.status, 400); assert.notEqual(app.state.shops.weld.buf, 70);
-  r = await post('/api/values', JSON.stringify({ 'shops/weld/buf': 70, 'yard/arrived': 20 }));
-  assert.equal(r.status, 200); assert.equal(app.state.shops.weld.buf, 70); assert.equal(app.state.yard.arrived, 20);
+  r = await post('/api/values', JSON.stringify({ 'shops/weldA/buf': 70, 'yard/arrived': 'x' }));   // one bad -> nothing applied
+  assert.equal(r.status, 400); assert.notEqual(app.state.shops.weldA.buf, 70);
+  r = await post('/api/values', JSON.stringify({ 'shops/weldA/buf': 70, 'yard/arrived': 20 }));
+  assert.equal(r.status, 200); assert.equal(app.state.shops.weldA.buf, 70); assert.equal(app.state.yard.arrived, 20);
   const g = await (await fetch(base + '/api/value/yard/arrived')).json(); assert.equal(g.value, 20); assert.equal(g.unit, 'trucks');
   const cat = await (await fetch(base + '/api/values')).json();
   assert.ok(cat.count >= 60); assert.ok(cat.derived.length >= 15);
   const e = cat.inputs.find((x) => x.path === 'shops/{shop}/buf');
-  assert.equal(e.unit, '%'); assert.equal(e.range, '0 – 100'); assert.deepEqual(e.entities.map((x) => x.id), ['press', 'weld', 'paint', 'engine', 'bumper']);
+  assert.equal(e.unit, '%'); assert.equal(e.range, '0 – 100'); assert.deepEqual(e.entities.map((x) => x.id), ['press', 'weldA', 'weldB', 'paintA', 'paintB', 'engine', 'bumper']);
   assert.equal(e.source.live, true);
   assert.ok(!cat.inputs.some((x) => /coverage|hours/i.test(x.path) && x.group === 'Derived'));
   // a domain set to Simulated refuses pushes

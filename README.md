@@ -3,6 +3,12 @@
 A live, interactive version of the control-tower dashboard (plant map, line risk, inbound trucks,
 in-plant transfers, line-side stock, quality, AMR fleets). No dependencies, no build step.
 
+## Plant layout (central flow)
+
+The plant map is a block layout like the plant sketch (JV zone with a tile per JV, truck parking & bays, EGTM, motorpool, IMM-A, shipment, press A/B, weld A/B, paint A/B, assembly A/B).
+Red dotted lines are the sequenced material flows (JV, EGTM and IMM-A into assembly; press into weld) with animated AMR / tow-truck carriers. Block names, what the light blocks show and the carrier type are editable under **Interfaces -> Plant setup -> Plant layout**.
+Weld and paint are now two lines each (`weldA`, `weldB`, `paintA`, `paintB`); assembly shows lines A and B (pushed per line, or half of the total).
+
 ## Look & feel, logo, alerts
 
 * **Red glow:** any tile, panel or map node with a problem gets a pulsing red outline; hover a KPI tile to see why. Rules: line stopped or logistics stops today; any part under 30 min of cover; 6+ trucks waiting for a bay or all bays full; internal deliveries on time < 85%; JIS < 95%; gate-to-bay > 45 min; stock accuracy < 95%; a delayed transfer route; LOW line-side stock; single-piece flow < 90%; a late AMR route or 3+ low-battery AMRs; any shop/JV/motorpool node in the red. Thresholds are in `problems()` in `public/app.js`.

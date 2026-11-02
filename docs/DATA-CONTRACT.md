@@ -40,8 +40,9 @@ Time values: `eta` = minutes from now, or `etaAt` = ISO-8601 timestamp (converte
 | Domain | Payload | Notes |
 |---|---|---|
 | `build` | `{plan, actual, rate?}` | rate = vehicles/min |
+| `build/lineA/plan, build/lineA/actual, build/lineB/…` (value endpoints) | vehicles | optional per-assembly-line counts; without them each line shows half of the total |
 | `line` | `{stopped, reason?, stops?, stoppedMin?}` | |
-| `shops` | `{press:82, weld:78, paint:65, engine:68, bumper:42}` | buffer %; a value may be `{buf, units?, hours?, cap?}` — `units` = vehicle sets in the buffer, `hours` overrides the computed hours, `cap` = buffer capacity in sets |
+| `shops` | `{press:82, weldA:79, weldB:74, paintA:66, paintB:62, engine:68, bumper:42}` (`weld` / `paint` alone set both lines) | buffer %; a value may be `{buf, units?, hours?, cap?}` — `units` = vehicle sets in the buffer, `hours` overrides the computed hours, `cap` = buffer capacity in sets |
 | `parts` | `[{id, name, loc, shop, stock, rate, inv?:{dock, stores, supermarket, lineside}, pending?:{ref, eta\|etaAt, qty}}]` | **replaces** the list. `rate` = pcs/min consumed. coverage = stock ÷ rate |
 | `parts.item` | one part or an array | upsert by `id`; omitted fields keep their value; `pending:null` clears |
 | `yard` | `{expected, arrived, docked, received, occupied, docks, g2d, turn}` | g2d / turn in minutes |
@@ -88,3 +89,11 @@ Hours at a position = pieces at that position ÷ consumption per hour (`rate` ×
 * **Shop and JV buffer** hours = buffer vehicle-sets ÷ line rate (vehicles per hour). Give `units` (or `hours`), otherwise `buf% × cap` is used.
 * **Motorpool** hours = `finished.units` ÷ (`finished.shipRate` × 60).
 * Status colours use targets in `public/sim.js` (`TARGET_H`: line-side 0.75 h, shop buffers 1 h, JV buffers 1 h). Demo values, not plant policy: set your own.
+
+## Plant block layout (central flow)
+
+The map mirrors the plant's block arrangement: a JV zone (one tile per JV), a truck-parking / bays block, EGTM, motorpool, IMM-A, shipment, one spare block, press A/B, weld A/B, paint A/B and assembly A/B.
+The red dotted line is the **sequenced material flow**: JV, EGTM and IMM-A feed a bus that drops into assembly B and runs round the right edge into assembly A; the press feeds both weld lines.
+Animated markers are the carriers (AMR = circle, tow truck = small train); how many run follows the busy AMRs, they slow and turn red when that route is late, and stop when the line stops.
+Names, which blocks hold which widget (truck parking & bays / motorpool / shipment / none) and the carrier type (AMR or tow) of each source are set under **Interfaces -> Plant setup -> Plant layout** (`plant.slots` in the config).
+Only the transfer statuses (EGTM = Engine -> Assembly, IMM-A = Bumper -> Assembly) and the JV AMR routes feed the flow colours; press -> weld has no data feed yet.

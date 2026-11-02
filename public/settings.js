@@ -60,6 +60,24 @@
 
   const TERM_FIELDS = [['bay', 'Bay (singular)', 'what you call a receiving dock'], ['bays', 'Bays (plural)', ''], ['atBay', 'Status: truck at bay', 'e.g. "At bay"'],
     ['motorpool', 'Finished-vehicle yard', 'e.g. Motorpool'], ['parking', 'Truck waiting area', 'e.g. Truck parking'], ['jis', 'JIS KPI label', 'JIS = Just-In-Sequence (parts in vehicle order). Use "JIT adherence" only if you measure time windows, not sequence']];
+  const SLOT_ROWS = [['jv', 'JV zone', 'carrier'], ['yard', 'Block beside JV', 'bind'], ['egtm', 'Tall block (EGTM)', 'carrier'], ['top1', 'Top-right wide block', 'bind'], ['imma', 'Block below it (IMM-A)', 'carrier'],
+    ['top2', 'Tall block 1', 'bind'], ['top3', 'Tall block 2', 'bind'], ['press', 'Press', 'carrier'], ['weldB', 'Weld line B', ''], ['weldA', 'Weld line A', ''], ['paintB', 'Paint line B', ''], ['paintA', 'Paint line A', ''], ['asmB', 'Assembly line B', ''], ['asmA', 'Assembly line A', '']];
+  const BIND_LABEL = { yard: 'Truck parking & bays', motorpool: 'Motorpool', shipment: 'Shipment', none: 'Nothing (placeholder)' };
+  function layoutHTML(p) {
+    const sl = p.slots || {};
+    return '<div class="layout"><b>Plant layout</b> <small>name of each block on the plant map. Empty = automatic text. "Carrier" is how sequenced material leaves that block: AMR or tow truck.</small><div class="lgrid">' +
+      SLOT_ROWS.map((r) => {
+        const s = sl[r[0]] || {};
+        return '<div class="lrow"><span>' + r[1] + '</span><input data-slot="' + r[0] + '.label" maxlength="24" value="' + esc(s.label || '') + '" placeholder="automatic">' +
+          (r[2] === 'bind' ? '<select data-slot="' + r[0] + '.bind">' + Object.keys(BIND_LABEL).map((b) => '<option value="' + b + '"' + (s.bind === b ? ' selected' : '') + '>' + BIND_LABEL[b] + '</option>').join('') + '</select>' : '') +
+          (r[2] === 'carrier' ? '<select data-slot="' + r[0] + '.carrier"><option value="amr"' + (s.carrier === 'amr' ? ' selected' : '') + '>AMR</option><option value="tow"' + (s.carrier === 'tow' ? ' selected' : '') + '>Tow truck</option></select>' : '') + '</div>';
+      }).join('') + '</div></div>';
+  }
+  function readSlots() {
+    const out = {};
+    root.querySelectorAll('[data-slot]').forEach((i) => { const [k, f] = i.dataset.slot.split('.'); (out[k] = out[k] || {})[f] = i.value.trim(); });
+    return out;
+  }
   function plantHTML() {
     const p = st.config.plant;
     return '<div class="ifbar"><div class="ifb plantb"><h3>Plant setup <small>names used across the dashboard</small></h3>' +
@@ -67,7 +85,7 @@
       '<input data-p="jvs" value="' + esc((p.jvs || []).join(', ')) + '" placeholder="JV1, JV2, JV3, JV4"></label>' +
       '<div class="ptg loc"><label>Plant location <small>used for weather and traffic alerts</small><input data-p="place" value="' + esc(p.place || '') + '" placeholder="e.g. Chennai plant"></label>' +
       '<label>Latitude <small>\u221290 to 90</small><input data-p="lat" type="number" step="any" value="' + (p.lat === null || p.lat === undefined ? '' : esc(p.lat)) + '" placeholder="13.0827"></label>' +
-      '<label>Longitude <small>\u2212180 to 180</small><input data-p="lon" type="number" step="any" value="' + (p.lon === null || p.lon === undefined ? '' : esc(p.lon)) + '" placeholder="80.2707"></label></div>' +
+      '<label>Longitude <small>\u2212180 to 180</small><input data-p="lon" type="number" step="any" value="' + (p.lon === null || p.lon === undefined ? '' : esc(p.lon)) + '" placeholder="80.2707"></label></div>' + layoutHTML(p) +
       '<div class="ptg">' + TERM_FIELDS.map((t) => '<label>' + t[1] + (t[2] ? '<small>' + esc(t[2]) + '</small>' : '') + '<input data-term="' + t[0] + '" value="' + esc(p.terms[t[0]]) + '"></label>').join('') + '</div></div></div>';
   }
 
@@ -224,7 +242,7 @@
     const terms = {};
     root.querySelectorAll('[data-term]').forEach((i) => { terms[i.dataset.term] = i.value.trim(); });
     const jvs = root.querySelector('[data-p="jvs"]').value.split(',').map((x) => x.trim()).filter(Boolean);
-    return { staleSec: Number(root.querySelector('[data-b="staleSec"]').value) || 60, sources: readSources(), mqtt: readBroker(), plant: Object.assign({ jvs, terms }, plantLoc()), alerts: readAlerts(), domains };
+    return { staleSec: Number(root.querySelector('[data-b="staleSec"]').value) || 60, sources: readSources(), mqtt: readBroker(), plant: Object.assign({ jvs, terms, slots: readSlots() }, plantLoc()), alerts: readAlerts(), domains };
   }
 
   const msg = (t, cls) => { const m = root.querySelector('#if-msg'); if (m) { m.textContent = t; m.className = 'smsg ' + (cls || ''); } };
