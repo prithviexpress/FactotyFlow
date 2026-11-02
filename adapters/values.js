@@ -46,7 +46,9 @@ def('Build & line', 'line', 'line/stopped', 'Line stopped (1 = stopped, 0 = runn
   get: (S) => (S.line.stopped ? 1 : 0), set: (S, v) => { S.line.stopped = v; if (!v) S.line.reason = null; else if (!S.line.reason) S.line.reason = 'Line stopped'; } });
 def('Build & line', 'line', 'line/reason', 'Reason shown while stopped', 'text', 'text', 'Andon: station ASY-08', { get: (S) => S.line.reason, set: (S, v) => { S.line.reason = v; } });
 def('Build & line', 'line', 'line/stops', 'Logistics line stops today', 'count', NUM, 2, field((S) => S.line, 'stops', cnt));
-def('Build & line', 'line', 'line/stoppedMin', 'Minutes lost to line stops today', 'min', NUM, 9, field((S) => S.line, 'stoppedMin', pos));
+def('Build & line', 'line', 'line/stoppedMin', 'Line stopped WITHOUT a component today (minutes lost)', 'min', NUM, 12, field((S) => S.line, 'stoppedMin', pos));
+def('Build & line', 'line', 'line/runWithoutMin', 'Line ran WITHOUT components today (minutes it kept building with a part missing)', 'min', NUM, 47, field((S) => S.line, 'runWithoutMin', pos));
+def('Build & line', 'line', 'line/missing', 'Components missing right now while the line keeps running', 'parts', NUM, 1, field((S) => S.line, 'missing', cnt));
 
 const LN = (L, k, label, ex) => def('Build & line', 'build', 'build/line' + L + '/' + k, label + ' — assembly line ' + L + ' (optional; else half of the total)', 'vehicles', NUM, ex, {
   min: k === 'plan' ? 1 : 0, int: true,
@@ -121,6 +123,7 @@ P('lineside', 'Pieces at line-side', 'pcs', NUM, 20, pos, (v) => ({ inv: { lines
 P('inbound/qty', 'Quantity on the next inbound truck', 'pcs', NUM, 160, pos, (v) => ({ pending: { qty: v } }), (S, e) => (e.o.pending ? e.o.pending.qty : null));
 P('inbound/eta', 'Minutes until the next inbound truck arrives', 'min', NUM, 25, { min: -1440, max: 10080 }, (v) => ({ pending: { eta: v } }), (S, e) => (e.o.pending ? e.o.pending.eta : null));
 P('inbound/ref', 'Reference of the next inbound truck / ASN', 'text', 'text', 'V-181', {}, (v) => ({ pending: { ref: v } }), (S, e) => (e.o.pending ? e.o.pending.ref : null));
+def('Parts', 'parts', 'parts/{part}/critical', 'Critical part (1 = line stops when it is missing, 0 = line keeps running without it)', 'flag 0/1', 'boolean', 1, { ent: 'part', entName: 'part', get: (S, e) => (e.o.critical === false ? 0 : 1), set: (S, v, e) => Ing.ingest(S, 'parts.item', { id: e.id, critical: v }), viaIngest: true });
 P('name', 'Part description', 'text', 'text', 'Bumper B/H (Front)', {}, (v) => ({ name: v }), (S, e) => e.o.name);
 P('loc', 'Line-side location', 'text', 'text', 'ASY-08', {}, (v) => ({ loc: v }), (S, e) => e.o.loc);
 P('shop', 'Shop (press | weld | paint | engine | bumper | assembly)', 'enum', 'enum', 'bumper', { enum: ['press', 'weld', 'paint', 'engine', 'bumper', 'assembly'] }, (v) => ({ shop: v }), (S, e) => e.o.shop);

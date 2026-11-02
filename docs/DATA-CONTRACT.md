@@ -41,7 +41,7 @@ Time values: `eta` = minutes from now, or `etaAt` = ISO-8601 timestamp (converte
 |---|---|---|
 | `build` | `{plan, actual, rate?}` | rate = vehicles/min |
 | `build/lineA/plan, build/lineA/actual, build/lineB/…` (value endpoints) | vehicles | optional per-assembly-line counts; without them each line shows half of the total |
-| `line` | `{stopped, reason?, stops?, stoppedMin?}` | |
+| `line` | `{stopped, reason?, stops?, stoppedMin?, runWithoutMin?, missing?}` | `stoppedMin` = line stopped for a missing critical component (min, today); `runWithoutMin` = line kept running while a non-critical component was missing (min, today); `missing` = components missing now |
 | `shops` | `{press:82, weldA:79, weldB:74, paintA:66, paintB:62, engine:68, bumper:42}` (`weld` / `paint` alone set both lines) | buffer %; a value may be `{buf, units?, hours?, cap?}` — `units` = vehicle sets in the buffer, `hours` overrides the computed hours, `cap` = buffer capacity in sets |
 | `parts` | `[{id, name, loc, shop, stock, rate, inv?:{dock, stores, supermarket, lineside}, pending?:{ref, eta\|etaAt, qty}}]` | **replaces** the list. `rate` = pcs/min consumed. coverage = stock ÷ rate |
 | `parts.item` | one part or an array | upsert by `id`; omitted fields keep their value; `pending:null` clears |
@@ -77,7 +77,7 @@ and keeps its last value (it is never silently re-simulated).
 ```json
 "plant": { "jvs": ["JV1","JV2","JV3","JV4"], "terms": { "bay":"Bay", "bays":"Bays", "atBay":"At bay", "motorpool":"Motorpool", "parking":"Truck parking", "jit":"JIT accuracy" } }
 ```
-* `jvs` (1–6 unique names, ≤24 chars): one node on the plant map, one buffer-hours entry, one JV AMR route (`<name> → Assembly`) each. There are no central stores / kitting / supermarket positions.
+* `jvs` (1–8 unique names, ≤24 chars): one node on the plant map, one buffer-hours entry, one JV AMR route (`<name> → Assembly`) each. There are no central stores / kitting / supermarket positions.
 * `terms`: wording used on the dashboard. Data field names do not change (`docked` = at bay, `docks` = number of bays, `yard` = truck parking, `finished` = motorpool).
 * **JIT** = Just-In-Time: the share of deliveries that arrived within their delivery window (not early, not late). Feed it as `kpi/jit` (the old name `kpi/jis` still works). If your plant also tracks sequence accuracy, that is a separate number.
 

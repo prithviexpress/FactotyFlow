@@ -93,17 +93,26 @@
 
     /* ---- JV zone with one tile per JV ---- */
     {
-      const g = G.jv, n = S.jvSites.length, cols = n <= 2 ? n : n <= 4 ? 2 : 3, rows = Math.ceil(n / cols);
-      const ax = g.x + 10, ay = g.y + 30, aw = g.w - 20, ah = g.h - 30 - 8, tw = (aw - (cols - 1) * 8) / cols, th = (ah - (rows - 1) * 8) / rows;
+      const g = G.jv, n = S.jvSites.length, list = n > 6, cols = n <= 2 ? n : n <= 4 || list ? 2 : 3, rows = Math.ceil(n / cols), gp = list ? 3 : 8;
+      const ax = g.x + 10, ay = g.y + 30, aw = g.w - 20, ah = g.h - 30 - 8, tw = (aw - (cols - 1) * gp) / cols, th = (ah - (rows - 1) * gp) / rows;
       let tiles = '', worst = 'ok';
       S.jvSites.forEach((j, i) => {
-        const col = i % cols, row = Math.floor(i / cols), tx0 = ax + col * (tw + 8), ty0 = ay + row * (th + 8);
+        const col = i % cols, row = Math.floor(i / cols), tx0 = ax + col * (tw + gp), ty0 = ay + row * (th + gp);
         const r = S.jv.routes.find((q) => (q.key || '').toLowerCase() === j.name.toLowerCase() || q.name.toLowerCase().indexOf(j.name.toLowerCase() + ' ') === 0);
         const rp = r ? r.ema * 100 : null, rst = rp === null ? 'ok' : Sim.routeStatus(rp), bst = status(j.buf);
         const st = rst === 'low' || bst === 'low' ? 'low' : rst === 'watch' || bst === 'watch' ? 'watch' : 'ok';
         if (st === 'low') worst = 'low'; else if (st === 'watch' && worst === 'ok') worst = 'watch';
         const mx = Math.max(4, Math.floor((tw - 56) / 7)), nm = j.name.length > mx ? j.name.slice(0, mx - 1) + '…' : j.name;
         const w = wip['jv:' + j.name];
+        if (list) {
+          const lm = Math.max(4, Math.floor((tw - 46) / 5.6)), ln = j.name.length > lm ? j.name.slice(0, lm - 1) + '…' : j.name;
+          tiles += '<g class="nd jvt' + (st === 'low' ? ' problem' : '') + '" data-node="jv' + i + '" data-href="#/amr" data-fleet="jv" data-shop="">' +
+            '<rect class="tile" x="' + tx0 + '" y="' + ty0 + '" width="' + tw + '" height="' + th + '" rx="4"/>' +
+            '<circle cx="' + (tx0 + 8) + '" cy="' + (ty0 + th / 2 - 1) + '" r="3.2" fill="' + TINT[st] + '"/>' +
+            tx(tx0 + 15, ty0 + th / 2 + 3, ln, 'sm', 'style="font-weight:700"') + tx(tx0 + tw - 5, ty0 + th / 2 + 3, f0(j.buf) + '%', 'sm', 'text-anchor="end" style="fill:' + TINT[bst] + ';font-weight:700"') +
+            bar(tx0 + 4, ty0 + th - 5, tw - 8, j.buf, bst) + '</g>';
+          return;
+        }
         tiles += '<g class="nd jvt' + (st === 'low' ? ' problem' : '') + '" data-node="jv' + i + '" data-href="#/amr" data-fleet="jv" data-shop="">' +
           '<rect class="tile" x="' + tx0 + '" y="' + ty0 + '" width="' + tw + '" height="' + th + '" rx="7"/>' +
           tx(tx0 + 9, ty0 + 15, nm, 't1') + pill(tx0 + tw - 6, ty0 + 3, f0(j.buf) + '%', bst, 'end') +

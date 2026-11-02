@@ -73,6 +73,7 @@ test('HTTP ingest: auth, validation, live state', async () => {
 
 test('inventory hours: per-position split from the feed, JV buffers, motorpool', () => {
   const S = Sim.createState();
+  Sim.setPlant(S, { jvs: ['JV1', 'JV2', 'JV3', 'JV4'] });
   Ing.ingest(S, 'parts', [
     { id: 'A', name: 'A', shop: 'weld', rate: 1, inv: { bay: 30, lineside: 30 } },      // 1 pcs/min = 60 pcs/h
     { id: 'B', name: 'B', shop: 'weld', rate: 2, stock: 240 }                            // no split from the feed
@@ -97,13 +98,13 @@ test('inventory hours: per-position split from the feed, JV buffers, motorpool',
 
 test('plant setup: JV names and terminology drive the state', () => {
   const S = Sim.createState();
-  assert.deepEqual(S.setup.jvs, ['JV1', 'JV2', 'JV3', 'JV4']);
+  assert.deepEqual(S.setup.jvs, ['Sheet metal Belsonica', 'Sheet metal SKH', 'Seat set', 'Carpet', 'Door Trim', 'Exhaust', 'Glass', 'Fuel tank']);
   Sim.setPlant(S, { jvs: ['Alpha', 'Beta', 'Gamma'], terms: { bay: 'Berth', motorpool: 'Yard X' } });
   assert.deepEqual(S.jvSites.map((j) => j.name), ['Alpha', 'Beta', 'Gamma']);
   assert.deepEqual(S.jv.routes.map((r) => r.name), ['Alpha \u2192 Assembly', 'Beta \u2192 Assembly', 'Gamma \u2192 Assembly']);
   assert.equal(S.setup.terms.bay, 'Berth'); assert.equal(S.setup.terms.parking, 'Truck parking');   // others keep defaults
   assert.equal(Sim.inventoryView(S).finished.label, 'Yard X');
-  Sim.setPlant(S, { jvs: ['Alpha', 'Beta', 'Gamma', 'D', 'E', 'F', 'G'] });
-  assert.equal(S.jvSites.length, 6);                                                     // capped
+  Sim.setPlant(S, { jvs: ['Alpha', 'Beta', 'Gamma', 'D', 'E', 'F', 'G', 'H', 'I'] });
+  assert.equal(S.jvSites.length, 8);                                                     // capped at 8
   for (let i = 0; i < 500; i++) Sim.step(S, 30);                                         // simulates fine with renamed JVs
 });

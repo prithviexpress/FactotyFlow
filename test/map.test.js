@@ -11,7 +11,8 @@ const V = require('../adapters/values.js');
 const ctx = (S) => ({ T: (k) => S.setup.terms[k], f0: Math.round, ui: { shop: 'all' }, IV: Sim.inventoryView(S) });
 
 test('block layout renders the drawing\'s blocks, the JV tiles, the sequence bus and carriers; logistics sit apart', () => {
-  const S = Sim.createState(), r = global.window.FFMap.render(S, ctx(S));
+  const S = Sim.createState(); Sim.setPlant(S, { jvs: ['JV1', 'JV2', 'JV3', 'JV4'] });
+  const r = global.window.FFMap.render(S, ctx(S));
   for (const id of ['jvzone', 'egtm', 'imma', 'press', 'weldB', 'weldA', 'paintB', 'paintA', 'asmB', 'asmA']) assert.ok(r.nodes.includes('data-node="' + id + '"'), id);
   for (const n of ['JV1', 'JV2', 'JV3', 'JV4']) assert.ok(r.nodes.includes('>' + n + '<'), n);
   assert.ok(r.nodes.includes('ASSEMBLY A') && r.nodes.includes('ASSEMBLY B') && r.nodes.includes('PRESS A/B'));
@@ -154,4 +155,15 @@ test('seqflows data point: simulated, validated, per-value endpoints', () => {
   assert.throws(() => Ing.ingest(S, 'seqflows', { jvB: { active: 1 }, zz: { active: 1 } }), /unknown flow "zz"/);
   assert.equal(S.seqflows.jvB.active, Math.round(S.seqflows.jvB._a === undefined ? S.seqflows.jvB.active : S.seqflows.jvB.active));
   Ing.ingest(S, 'seqflows', { jvB: { active: 2, missions: 99 } }); assert.equal(S.seqflows.jvB.missions, 99);
+});
+
+test('the default 8 JV parts all render on the map (compact list mode) and the minute counters accumulate', () => {
+  const S = Sim.createState();
+  assert.equal(S.jvSites.length, 8);
+  const r = global.window.FFMap.render(S, ctx(S));
+  assert.equal((r.nodes.match(/class="nd jvt/g) || []).length, 8);
+  // run-without-components: a non-critical part runs out while the line builds
+  Sim.inject(S, 'missingPart'); Sim.step(S, 600);
+  assert.ok(S.line.missing >= 1);
+  assert.ok(S.line.runWithoutMin > 0);
 });

@@ -7,7 +7,7 @@
  */
 const DOMAINS = ['build', 'line', 'shops', 'parts', 'yard', 'trucks', 'transfers', 'lineside', 'amr', 'jv', 'jvstock', 'quality', 'kpi', 'finished', 'deliveries', 'kanban', 'seqflows'];
 const SHOP_KEYS = ['press', 'weld', 'paint', 'engine', 'bumper', 'assembly'];
-const BUFFER_KEYS = ['press', 'weldA', 'weldB', 'paintA', 'paintB', 'engine', 'bumper'];
+const BUFFER_KEYS = ['press', 'weldA', 'weldB', 'paintA', 'paintB', 'engine', 'bumper', 'ip', 'tm'];
 const BUFFER_ALIAS = { weld: ['weldA', 'weldB'], paint: ['paintA', 'paintB'] };   // older feeds send one buffer for both lines
 
 class IngestError extends Error { constructor(m) { super(m); this.status = 400; } }
@@ -42,7 +42,8 @@ function normPart(p, old) {
     shop: SHOP_KEYS.includes(p.shop) ? p.shop : (old.shop || 'assembly'),
     stock: Math.max(0, num(p.stock, old.stock !== undefined ? old.stock : 0)),
     rate: Math.max(0, num(p.rate, old.rate !== undefined ? old.rate : 0)),
-    icon: str(p.icon, old.icon || 'box'), pending: old.pending || null
+    icon: str(p.icon, old.icon || 'box'), pending: old.pending || null,
+    critical: p.critical !== undefined ? !!p.critical : (old.critical !== undefined ? old.critical : true)
   };
   // optional per-position stock (pcs): { bay, lineside } ('dock' is accepted as an alias of 'bay'). usable stock = bay + lineside
   if (p.inv && typeof p.inv === 'object') {
@@ -85,6 +86,8 @@ const APPLY = {
     S.line.reason = S.line.stopped ? str(p.reason, S.line.reason || 'Line stopped') : null;
     if (p.stops !== undefined) S.line.stops = need(p.stops, 'stops');
     if (p.stoppedMin !== undefined) S.line.stoppedMin = need(p.stoppedMin, 'stoppedMin');
+    if (p.runWithoutMin !== undefined) S.line.runWithoutMin = need(p.runWithoutMin, 'runWithoutMin');
+    if (p.missing !== undefined) S.line.missing = need(p.missing, 'missing');
   },
   shops(S, p) {
     asObj(p, 'shops');

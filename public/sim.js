@@ -21,7 +21,7 @@
   const SAMPLE_MIN = 5;     // sim minutes between history samples
 
   const SHOP_NAMES = {
-    press: 'Press', weld: 'Weld', paint: 'Paint', weldA: 'Weld A', weldB: 'Weld B', paintA: 'Paint A', paintB: 'Paint B', engine: 'EGTM',
+    press: 'Press', weld: 'Weld', paint: 'Paint', weldA: 'Weld A', weldB: 'Weld B', paintA: 'Paint A', paintB: 'Paint B', ip: 'IP', tm: 'TM', engine: 'EGTM',
     bumper: 'Bumper', assembly: 'Assembly'
   };
 
@@ -137,11 +137,11 @@
     const S = {
       v: 1, demo: true, plant: 'Plant 01', clock, speed: 30, paused: false, weather: 28,
       build: { plan: 920, actual: 766, rate: 1.9 },
-      line: { stopped: false, reason: null, stops: 0, stoppedMin: 0 },
+      line: { stopped: false, reason: null, stops: 0, stoppedMin: 0, runWithoutMin: 0, missing: 0 },
       mods: { bumperJam: 0, jvDelay: 0, traffic: 0 },
       shops: {
         press: { buf: 82, target: 80 }, weldA: { buf: 79, target: 78 }, weldB: { buf: 74, target: 76 }, paintA: { buf: 66, target: 65 }, paintB: { buf: 62, target: 63 },
-        engine: { buf: 68, target: 68 }, bumper: { buf: 42, target: 46 }
+        engine: { buf: 68, target: 68 }, bumper: { buf: 42, target: 46 }, ip: { buf: 72, target: 72 }, tm: { buf: 64, target: 65 }
       },
       yard: {
         expected: 34, arrived: 26, docked: 21, received: 18, occupied: 21, docks: 28,
@@ -158,7 +158,9 @@
         { id: 'eng', name: 'Engine → Assembly', icon: 'engine', p: 0.97, q: seedQ(12, 12), win: 12, rate: 0.25 },
         { id: 'bmp', name: 'Bumper → Assembly', icon: 'bumper', p: 0.88, q: seedQ(8, 6), win: 8, rate: 0.15, mod: 'bumperJam' },
         { id: 'milk', name: 'Milk-run (Line side)', icon: 'truck', p: 0.92, q: seedQ(8, 7), win: 8, rate: 0.18 },
-        { id: 'amr', name: 'AMR jobs (Materials)', icon: 'amr', p: 0.9, q: seedQ(10, 8), win: 10, rate: 0.2 }
+        { id: 'amr', name: 'AMR jobs (Materials)', icon: 'amr', p: 0.9, q: seedQ(10, 8), win: 10, rate: 0.2 },
+        { id: 'ip', name: 'IP \u2192 Assembly', icon: 'box', p: 0.95, q: seedQ(10, 9), win: 10, rate: 0.2 },
+        { id: 'tm', name: 'TM \u2192 Assembly', icon: 'engine', p: 0.93, q: seedQ(10, 9), win: 10, rate: 0.15 }
       ],
       lineside: [
         { name: 'Bumper (B/H-LH)', icon: 'bumper', usable: 42, safety: 100, pend: null },
@@ -200,7 +202,7 @@
     S.hist.spf = seedSeries(91, 2, HIST);
     S.hist.rej = seedSeries(1.6, 1.4, HIST).map((v) => Math.max(0, +v.toFixed(1)));
     S.lineside.forEach((l) => { l.max = Math.round(l.safety * 1.3); });
-    const CAP = { press: 300, weldA: 120, weldB: 120, paintA: 100, paintB: 100, engine: 180, bumper: 160 };
+    const CAP = { press: 300, weldA: 120, weldB: 120, paintA: 100, paintB: 100, engine: 180, bumper: 160, ip: 140, tm: 110 };
     for (const k in CAP) S.shops[k].cap = CAP[k];
     S.parts.forEach(initInv);
     S.hist.shops = {};
@@ -221,10 +223,10 @@
     const key = [
       { id: 'P-BMP-F', name: 'Bumper B/H (Front)', loc: 'ASY-08', shop: 'bumper', stock: 28, rate: 1.27, icon: 'bumper',
         pending: { ref: 'V-181', eta: 18, qty: 160 } },
-      { id: 'P-ENG-M', name: 'Engine Mount', loc: 'ASY-12', shop: 'engine', stock: 52, rate: 1.27, icon: 'mount', pending: null },
+      { id: 'P-ENG-M', name: 'Engine Mount', loc: 'ASY-12', shop: 'engine', stock: 52, rate: 1.27, icon: 'mount', pending: null, critical: true },
       { id: 'P-WH', name: 'Wiring Harness', loc: 'ASY-04', shop: 'assembly', stock: 68, rate: 1.17, icon: 'harness',
         pending: { ref: 'V-27', eta: 98, qty: 140 } },
-      { id: 'P-SEAT', name: 'Seat Set (Driver)', loc: 'ASY-02', shop: 'assembly', stock: 16, rate: 0.216, icon: 'seat', pending: null }
+      { id: 'P-SEAT', name: 'Seat Set (Driver)', loc: 'ASY-02', shop: 'assembly', stock: 16, rate: 0.216, icon: 'seat', pending: null, critical: true }
     ];
     const extra = [
       ['Door Panel', 'press'], ['Roof Panel', 'press'], ['Fender LH', 'press'], ['Fender RH', 'press'], ['Hood Outer', 'press'],
@@ -242,16 +244,16 @@
       const rate = rnd(0.3, 1.9);
       parts.push({
         id: 'P-' + String(100 + i), name: e[0], loc: 'ASY-' + String(rint(1, 24)).padStart(2, '0'), shop: e[1],
-        stock: Math.round(rate * rnd(240, 900)), rate: +rate.toFixed(2), icon: 'box', pending: null
+        stock: Math.round(rate * rnd(240, 900)), rate: +rate.toFixed(2), icon: 'box', pending: null, critical: i % 4 === 0   // non-critical parts can be missing while the line keeps running
       });
     });
     return parts;
   }
 
   /* ---------- plant setup: JV names + terminology (configurable) ---------- */
-  const DEFAULT_JVS = ['JV1', 'JV2', 'JV3', 'JV4'];
+  const DEFAULT_JVS = ['Sheet metal Belsonica', 'Sheet metal SKH', 'Seat set', 'Carpet', 'Door Trim', 'Exhaust', 'Glass', 'Fuel tank'];
   const DEFAULT_TERMS = { title: 'MATERIAL FLOW CONTROL TOWER', bay: 'Bay', bays: 'Bays', atBay: 'At bay', motorpool: 'Motorpool', parking: 'Truck parking', jit: 'JIT accuracy' };
-  const MAX_JVS = 6;
+  const MAX_JVS = 8;
   /** sequenced material routes drawn as dotted lines on the plant map; each has carriers in flight, missions today and an on-time rate */
   const SEQFLOWS = [
     { id: 'jvB', label: 'JV \u2192 Assembly B' }, { id: 'jvA', label: 'JV \u2192 Assembly A' }, { id: 'jvWB', label: 'JV \u2192 Weld B' }, { id: 'jvWA', label: 'JV \u2192 Weld A' },
@@ -462,7 +464,7 @@
     }
     if (!L.build && S.build.actual >= S.build.plan - 0.01) {   // shift plan achieved -> roll into the next shift's plan
       event(S, 'Shift plan of ' + S.build.plan + ' vehicles achieved \u2014 next plan started', 'ok');
-      S.build.actual = 0; S.line.stops = 0; S.line.stoppedMin = 0; S.quality.rejected = 0; S.rejMark = 0;
+      S.build.actual = 0; S.line.stops = 0; S.line.stoppedMin = 0; S.line.runWithoutMin = 0; S.quality.rejected = 0; S.rejMark = 0;
       if (!L.yard) { S.yard.expected = 34; S.yard.arrived = S.yard.docked = S.yard.received = 0; makeTrucks(S); }
     }
     while (S.quality.rejAcc >= 1) { S.quality.rejAcc--; S.quality.rejected++; }
@@ -502,7 +504,7 @@
           p.pending = null;
         }
       }
-      if (p.stock <= 0 && !blocking) blocking = p;
+      if (p.stock <= 0 && p.critical !== false && !blocking) blocking = p;
     }
     if (L.line || L.parts) { /* live feed owns line status */ } else if (blocking && S.line.stopped === false) {
       S.line.stopped = true; S.line.reason = 'Shortage: ' + blocking.name; S.line.stops++;
@@ -512,6 +514,13 @@
       S.line.stopped = false;
       event(S, 'Line restarted — ' + S.line.reason.replace('Shortage: ', '') + ' restocked', 'ok');
       S.line.reason = null;
+    }
+
+    /* components missing while the line keeps running (non-critical parts at zero): counts as 'line run without components' */
+    {
+      const gone = S.parts.filter((p) => p.stock <= 0 && p.critical === false);
+      S.line.missing = gone.length;
+      if (!L.line && running && gone.length) S.line.runWithoutMin += m;
     }
 
     /* inbound trucks */
@@ -662,6 +671,12 @@
         const idle = S.amr.amrs.filter((a) => a.s === 'idle');
         for (let i = 0; i < Math.min(8, idle.length); i++) idle[i].b = rnd(8, 18);
         event(S, 'AMR fleet fault — ' + Math.min(8, idle.length) + ' units reporting critical battery', 'watch');
+        break;
+      }
+      case 'missingPart': {
+        const p = S.parts.find((x) => x.critical === false && x.stock > 0) || S.parts[S.parts.length - 1];
+        if (p.inv) { p.inv.bay = 0; p.inv.lineside = 0; } p.stock = 0; p.pending = { ref: 'V-' + rint(20, 299), eta: 25, qty: Math.round(p.rate * 300) };
+        event(S, p.name + ' is missing \u2014 line keeps running without it (due in 25 min)', 'watch');
         break;
       }
       case 'trafficJam':

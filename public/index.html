@@ -48,10 +48,16 @@
   <header id="hdr"></header>
   <div id="alertbar"></div>
   <section id="kpis"></section>
+  <section id="verticals">
+    <div class="vbox" id="v-a"></div>
+    <div class="vbox" id="v-b"></div>
+    <div class="vbox" id="v-c"></div>
+    <div class="vbox risk" id="p-risk"></div>
+  </section>
   <nav id="tabs"></nav>
   <section id="main">
-    <div class="panel" id="p-map">
-      <div class="ptitle"><h2>PLANT LAYOUT &amp; MATERIAL BUFFERS</h2>
+    <div class="vbox" id="p-map">
+      <div class="vh"><span class="vb flow">&#9658;</span><h2>PLANT FLOW</h2><span class="vsub">material routes, buffers and movement health</span>
         <a class="more" data-href="#/inventory">Inventory hours &rsaquo;</a><div class="legend" id="map-legend"></div></div>
       <svg id="map" viewBox="0 0 1152 384" preserveAspectRatio="xMidYMid meet">
         <defs>
@@ -75,16 +81,6 @@
         <g id="nodes"></g>
       </svg>
     </div>
-    <div class="panel risk" id="p-risk"></div>
-  </section>
-  <section id="rowA">
-    <div class="panel" id="p-inbound"></div>
-    <div class="panel" id="p-transfers"></div>
-    <div class="panel" id="p-lineside"></div>
-  </section>
-  <section id="rowB">
-    <div class="panel" id="p-quality"></div>
-    <div class="panel" id="p-amr"></div>
   </section>
   <section id="page"></section>
   <footer id="foot"></footer>
