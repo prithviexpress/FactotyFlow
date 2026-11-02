@@ -10,12 +10,19 @@ const V = require('../adapters/values.js');
 
 const ctx = (S) => ({ T: (k) => S.setup.terms[k], f0: Math.round, ui: { shop: 'all' }, IV: Sim.inventoryView(S) });
 
-test('block layout renders every block, the JV tiles, the sequence bus and carriers', () => {
+test('block layout renders the drawing\'s blocks, the JV tiles, the sequence bus and carriers; logistics sit apart', () => {
   const S = Sim.createState(), r = global.window.FFMap.render(S, ctx(S));
-  for (const id of ['jvzone', 'yard', 'egtm', 'top1', 'imma', 'top2', 'top3', 'press', 'weldB', 'weldA', 'paintB', 'paintA', 'asmB', 'asmA']) assert.ok(r.nodes.includes('data-node="' + id + '"') || id === 'top3', id);
+  for (const id of ['jvzone', 'egtm', 'imma', 'press', 'weldB', 'weldA', 'paintB', 'paintA', 'asmB', 'asmA']) assert.ok(r.nodes.includes('data-node="' + id + '"'), id);
   for (const n of ['JV1', 'JV2', 'JV3', 'JV4']) assert.ok(r.nodes.includes('>' + n + '<'), n);
   assert.ok(r.nodes.includes('ASSEMBLY A') && r.nodes.includes('ASSEMBLY B') && r.nodes.includes('PRESS A/B'));
+  // the unnamed light blocks of the drawing stay placeholders; truck parking / motorpool / shipment are in a separate, labelled strip
+  assert.equal((r.nodes.match(/unnamed block/g) || []).length, 4);
+  assert.ok(r.nodes.includes('LOGISTICS AREAS') && r.nodes.includes('not positioned'));
+  for (const id of ['logi-yard', 'logi-motorpool', 'logi-shipment']) assert.ok(r.nodes.includes('data-node="' + id + '"'), id);
+  assert.ok(!r.nodes.includes('ASSUMED POSITION'));
   assert.match(r.flows, /class="seq/); assert.match(r.flows, /animateMotion/); assert.match(r.flows, /id="rt-jv-b"/);
+  // assembly A is fed from the west: down the gap between paint (x<=573) and assembly (x>=581), never round the right edge
+  assert.match(r.flows, /id="rt-jv-a" d="M230,138 V151 H577 V254 H581"/); assert.ok(!r.flows.includes('H1148'));
   S.line.stopped = true; S.line.reason = 'x';
   assert.ok(!global.window.FFMap.render(S, ctx(S)).flows.includes('animateMotion'));          // carriers stop with the line
 });
@@ -46,15 +53,18 @@ test('A/B buffers: shops feed accepts per-line keys and the older single weld / 
   assert.ok(errs.some((e) => /top1.*it can show/.test(e)) && errs.some((e) => /egtm.*amr or tow/.test(e)) && errs.some((e) => /jv.*24 characters/.test(e)));
 });
 
-test('logistics blocks are marked ASSUMED POSITION until confirmed; the tag and dashes go away once confirmed', () => {
+test('a widget you place in an unnamed block is marked ASSUMED POSITION until confirmed, and leaves the logistics strip', () => {
   const S = Sim.createState();
   const count = (str) => (str.match(/ASSUMED POSITION/g) || []).length;
-  assert.equal(count(global.window.FFMap.render(S, ctx(S)).nodes), 3);                 // truck parking & bays, motorpool, shipment (the spare block is a plain placeholder)
-  assert.ok(global.window.FFMap.render(S, ctx(S)).nodes.includes('k-light assumed'));
-  Sim.setPlant(S, { slots: { yard: { confirmed: true }, top1: { confirmed: true } } });
-  const r = global.window.FFMap.render(S, ctx(S));
-  assert.equal(count(r.nodes), 1);                                                       // only shipment is still unconfirmed
-  assert.ok(r.nodes.includes('data-tip="Truck parking &amp; bays \u00b7 position confirmed.'));
+  Sim.setPlant(S, { slots: { top1: { bind: 'motorpool' } } });
+  let r = global.window.FFMap.render(S, ctx(S));
+  assert.equal(count(r.nodes), 1); assert.ok(r.nodes.includes('k-light assumed'));
+  assert.ok(!r.nodes.includes('data-node="logi-motorpool"') && r.nodes.includes('data-node="logi-yard"'));   // moved out of the strip
+  Sim.setPlant(S, { slots: { top1: { bind: 'motorpool', confirmed: true } } });
+  r = global.window.FFMap.render(S, ctx(S));
+  assert.equal(count(r.nodes), 0); assert.ok(r.nodes.includes('data-tip="Motorpool \u00b7 position confirmed.'));
+  Sim.setPlant(S, { slots: { yard: { bind: 'yard' }, top1: { bind: 'motorpool' }, top2: { bind: 'shipment' } } });
+  assert.ok(!global.window.FFMap.render(S, ctx(S)).nodes.includes('LOGISTICS AREAS'));                       // everything placed: no strip
   const cfg = Cfg.normalize({ plant: { slots: { top2: { confirmed: 'true' }, top3: { confirmed: false } } } });
   assert.equal(cfg.plant.slots.top2.confirmed, true); assert.equal(cfg.plant.slots.top3.confirmed, false);
 });
