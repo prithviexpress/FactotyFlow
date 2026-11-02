@@ -168,7 +168,7 @@
       const g = G[slot], s = S.shops[key], st = status(s.buf), w = wip[key], tall = g.h > 100, nm = label(slot, fallbackLabel);
       let inner;
       if (tall) {
-        inner = tx(g.x + 12, g.y + 22, fit(nm, g.w - 18, 8.4), 'bt') + pill(g.x + 12, g.y + 30, f0(s.buf) + '%', st) + tx(g.x + 12, g.y + 66, 'Buffer', 'sm') + tx(g.x + 12, g.y + 83, w && w.hours !== null ? hh(w.hours) + ' of stock' : '—', 'bn2') +
+        inner = tx(g.x + 12, g.y + 22, fit(nm, g.w - 18, 8.4), 'bt') + pill(g.x + 12, g.y + 30, f0(s.buf) + '%', st) + tx(g.x + 12, g.y + 66, 'Buffer stock', 'sm') + tx(g.x + 12, g.y + 83, w && w.hours !== null ? hh(w.hours) : '—', 'bn2') +
           bar(g.x + 12, g.y + g.h - 30, g.w - 24, s.buf, st) + (src ? srcTag(src, g.x + 10, g.y + g.h - 22) : '');
       } else {
         inner = tx(g.x + 12, g.y + 19, fit(nm, g.w - 66, 8.4), 'bt') + pill(g.x + g.w - 9, g.y + 4, f0(s.buf) + '%', st, 'end') + tx(g.x + 12, g.y + g.h - 21, 'Buffer' + (w && w.hours !== null ? ' · ' + hh(w.hours) : ''), 'sm') + bar(g.x + 12, g.y + g.h - 11, g.w - 24, s.buf, st);
@@ -180,8 +180,8 @@
     {
       const g = G.press, s = S.shops.press, st = status(s.buf), w = wip.press;
       out.push(block({ id: 'press', kind: 'prod', tip: TIPS.press, x: g.x, y: g.y, w: g.w, h: g.h, st, family: 'press', sel: sel('press'), dim: dim('press'), inner:
-        tx(g.x + 12, g.y + 22, fit(label('press', 'PRESS A/B'), g.w - 18, 8.4), 'bt') + pill(g.x + 12, g.y + 30, f0(s.buf) + '%', st) + tx(g.x + 12, g.y + 66, 'Buffer', 'sm') +
-        tx(g.x + 12, g.y + 83, w && w.hours !== null ? hh(w.hours) + ' of stock' : '—', 'bn2') + bar(g.x + 12, g.y + g.h - 30, g.w - 24, s.buf, st) + srcTag('press', g.x + 10, g.y + g.h - 22) }));
+        tx(g.x + 12, g.y + 22, fit(label('press', 'PRESS A/B'), g.w - 18, 8.4), 'bt') + pill(g.x + 12, g.y + 30, f0(s.buf) + '%', st) + tx(g.x + 12, g.y + 66, 'Buffer stock', 'sm') +
+        tx(g.x + 12, g.y + 83, w && w.hours !== null ? hh(w.hours) : '—', 'bn2') + bar(g.x + 12, g.y + g.h - 30, g.w - 24, s.buf, st) + srcTag('press', g.x + 10, g.y + g.h - 22) }));
     }
     shop('weldB', 'weldB', 'weld', null, 'WELD B'); shop('weldA', 'weldA', 'weld', null, 'WELD A');
     shop('paintB', 'paintB', 'paint', null, 'PAINT B'); shop('paintA', 'paintA', 'paint', null, 'PAINT A');
