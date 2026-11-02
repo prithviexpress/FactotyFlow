@@ -93,7 +93,7 @@ Hours at a position = pieces at that position ÷ consumption per hour (`rate` ×
 ## Plant block layout (central flow)
 
 The map mirrors the plant's block arrangement: a JV zone (one tile per JV), a truck-parking / bays block, EGTM, motorpool, IMM-A, shipment, one spare block, press A/B, weld A/B, paint A/B and assembly A/B.
-The red dotted line is the **sequenced material flow**: JV, EGTM and IMM-A feed a bus that drops into assembly B from the top and runs down the gap between paint and assembly into assembly A from the west side; the press feeds both weld lines.
+The red dotted line is the **sequenced material flow**: JV, EGTM and IMM-A feed a bus that drops into assembly B from the top and runs down the gap between paint and assembly along a lane under assembly A and up into it with the same three drops (a mirror of B); the press feeds both weld lines.
 Animated markers are the carriers (AMR = circle, tow truck = small train); how many run follows the busy AMRs, they slow and turn red when that route is late, and stop when the line stops.
 Names, which blocks hold which widget (truck parking & bays / motorpool / shipment / none) and the carrier type (AMR or tow) of each source are set under **Interfaces -> Plant setup -> Plant layout** (`plant.slots` in the config).
 The four unnamed light blocks (`plant.slots.<yard|top1|top2|top3>`) default to `bind: "none"` (placeholders). Truck parking & bays, motorpool and shipment are not in the plant drawing, so they appear in a separate LOGISTICS AREAS strip; assigning one to a block (`bind: yard | motorpool | shipment`) draws it there marked as an assumed position until `confirmed: true`.

@@ -17,11 +17,12 @@
     paintB: { x: 291, y: R2B.y, w: 282, h: R2B.h }, paintA: { x: 291, y: R2A.y, w: 282, h: R2A.h },
     asmB: { x: 581, y: R2B.y, w: 563, h: R2B.h }, asmA: { x: 581, y: R2A.y, w: 563, h: R2A.h }
   };
-  const BUS_Y = 151, CH_X = 577, A_MID = 254;      // bus lane; the gap between paint and assembly; vertical middle of assembly A
-  const ROUTES = {                                  // sequenced-material paths. B = drop into assembly B top. A = along the bus, down the gap between paint and assembly, into assembly A from the west
-    'jv-b': 'M230,138 V' + BUS_Y + ' H600 V164', 'jv-a': 'M230,138 V' + BUS_Y + ' H' + CH_X + ' V' + A_MID + ' H581',
-    'eg-b': 'M626,138 V' + BUS_Y + ' H700 V164', 'eg-a': 'M626,138 V' + BUS_Y + ' H' + CH_X + ' V' + A_MID + ' H581',
-    'im-b': 'M784,138 V' + BUS_Y + ' H860 V164', 'im-a': 'M784,138 V' + BUS_Y + ' H' + CH_X + ' V' + A_MID + ' H581',
+  const BUS_Y = 151, CH_X = 577, A_BOT = 294;      // top bus lane; the gap between paint and assembly; the lane under assembly A (mirror of the bus above B)
+  const ROUTES = {                                  // sequenced-material paths. B: along the bus, drop into assembly B from the TOP.
+                                                    // A: along the bus, down the gap between paint and assembly, then along the lane UNDER assembly A and up into it (mirror of B).
+    'jv-b': 'M230,138 V' + BUS_Y + ' H600 V164', 'jv-a': 'M230,138 V' + BUS_Y + ' H' + CH_X + ' V' + A_BOT + ' H600 V282',
+    'eg-b': 'M626,138 V' + BUS_Y + ' H700 V164', 'eg-a': 'M626,138 V' + BUS_Y + ' H' + CH_X + ' V' + A_BOT + ' H700 V282',
+    'im-b': 'M784,138 V' + BUS_Y + ' H860 V164', 'im-a': 'M784,138 V' + BUS_Y + ' H' + CH_X + ' V' + A_BOT + ' H860 V282',
     'pr-wb': 'M142,192 H158', 'pr-wa': 'M142,254 H158'
   };
   const approxLen = (d) => { let x = 0, y = 0, len = 0; (d.match(/[MHV][^MHV]*/g) || []).forEach((c) => { const t = c[0], v = parseFloat(c.slice(1)); if (t === 'M') { const m = c.slice(1).split(','); x = +m[0]; y = +m[1]; } else if (t === 'H') { len += Math.abs(v - x); x = v; } else { len += Math.abs(v - y); y = v; } }); return len || 1; };
@@ -70,7 +71,7 @@
       imma: 'IMM-A · shows the Bumper shop buffer and the Bumper → Assembly transfer route. Mapping IMM-A to the bumper shop is an assumption; confirm it matches your plant.',
       press: 'Press A/B · press buffer. Feeds weld lines A and B (sequenced, tow truck by default).',
       weldA: 'Weld line A · weld A buffer', weldB: 'Weld line B · weld B buffer', paintA: 'Paint line A · paint A buffer', paintB: 'Paint line B · paint B buffer',
-      asmA: 'Assembly line A · built vs plan' + (split.derived ? ' (half of the total until per-line counts are pushed)' : '') + '. JV / EGTM / IMM-A material reaches it from the west side, through the gap between paint and assembly.',
+      asmA: 'Assembly line A · built vs plan' + (split.derived ? ' (half of the total until per-line counts are pushed)' : '') + '. JV / EGTM / IMM-A material reaches it through the gap between paint and assembly, then up into it from underneath (mirror of the drops into B).',
       asmB: 'Assembly line B · built vs plan' + (split.derived ? ' (half of the total until per-line counts are pushed)' : '') + '. Sequenced material drops in from the top.',
       jv: 'JV zone · one tile per JV (names in Plant setup): buffer hours and route on-time.'
     };
@@ -200,7 +201,7 @@
     /* ---- logistics areas: not part of the plant drawing, so shown apart from it ---- */
     const strip = ['yard', 'motorpool', 'shipment'].filter((b) => !placed.has(b));
     if (strip.length) {
-      const zx = 4, zy = 290, zw = 1144, zh = 90, n = strip.length, cw = (zw - 16 - (n - 1) * 8) / n, cy = zy + 26, ch = 56;
+      const zx = 4, zy = 304, zw = 1144, zh = 76, n = strip.length, cw = (zw - 16 - (n - 1) * 8) / n, cy = zy + 22, ch = 48;
       let cards = '';
       strip.forEach((b, i) => {
         const g = { x: zx + 8 + i * (cw + 8), y: cy, w: cw, h: ch }, id = 'logi-' + b;
@@ -208,21 +209,21 @@
         if (b === 'yard') {
           const waiting = Math.max(0, y.arrived - y.docked), full = y.occupied >= y.docks;
           st = full ? 'low' : waiting >= 6 || y.occupied / y.docks > 0.92 ? 'watch' : 'ok'; nm = (SL.yard.label || (T('parking') + ' & ' + T('bays'))).toUpperCase();
-          inner = tx(g.x + 16, g.y + 19, fit(nm, g.w - 150, 8.4), 'bt') + pill(g.x + g.w - 10, g.y + 4, waiting + ' waiting', waiting >= 6 ? 'low' : waiting >= 3 ? 'watch' : 'ok', 'end') +
-            tx(g.x + 16, g.y + 37, y.expected + ' parked · ' + y.arrived + ' arrived · ' + y.docked + ' ' + T('atBay').toLowerCase() + ' · ' + y.received + ' received', 'sm') +
-            bar(g.x + 16, g.y + g.h - 10, g.w - 150, (y.occupied / Math.max(1, y.docks)) * 100, st) + tx(g.x + g.w - 12, g.y + g.h - 6, y.occupied + ' / ' + y.docks + ' ' + T('bays').toLowerCase(), 'bn2', 'text-anchor="end"');
+          inner = tx(g.x + 16, g.y + 17, fit(nm, g.w - 150, 8.4), 'bt') + pill(g.x + g.w - 10, g.y + 3, waiting + ' waiting', waiting >= 6 ? 'low' : waiting >= 3 ? 'watch' : 'ok', 'end') +
+            tx(g.x + 16, g.y + 31, y.expected + ' parked · ' + y.arrived + ' arrived · ' + y.docked + ' ' + T('atBay').toLowerCase() + ' · ' + y.received + ' received', 'sm') +
+            bar(g.x + 16, g.y + g.h - 9, g.w - 150, (y.occupied / Math.max(1, y.docks)) * 100, st) + tx(g.x + g.w - 12, g.y + g.h - 5, y.occupied + ' / ' + y.docks + ' ' + T('bays').toLowerCase(), 'bn2', 'text-anchor="end"');
         } else if (b === 'motorpool') {
           const f = S.finished, h = IV.finished.hours; st = f.onTime >= 90 ? 'ok' : f.onTime >= 85 ? 'watch' : 'low'; nm = T('motorpool').toUpperCase();
-          inner = tx(g.x + 16, g.y + 19, fit(nm, g.w - 120, 8.4), 'bt') + pill(g.x + g.w - 10, g.y + 4, f0(f.onTime) + '% on time', st, 'end') +
-            tx(g.x + 16, g.y + 44, f0(f.units), 'bn2') + tx(g.x + 16 + String(f0(f.units)).length * 9 + 6, g.y + 44, 'vehicles' + (h !== null ? ' · ' + hh(h) + ' of stock' : '') + ' · dispatch ' + (f.shipRate || 0).toFixed(1) + ' / min', 'sm');
+          inner = tx(g.x + 16, g.y + 17, fit(nm, g.w - 120, 8.4), 'bt') + pill(g.x + g.w - 10, g.y + 3, f0(f.onTime) + '% on time', st, 'end') +
+            tx(g.x + 16, g.y + 39, f0(f.units), 'bn2') + tx(g.x + 16 + String(f0(f.units)).length * 9 + 6, g.y + 39, 'vehicles' + (h !== null ? ' · ' + hh(h) + ' of stock' : '') + ' · dispatch ' + (f.shipRate || 0).toFixed(1) + ' / min', 'sm');
         } else {
           const so = S.finished.shipOnTime; st = so >= 90 ? 'ok' : so >= 85 ? 'watch' : 'low'; nm = 'SHIPMENT';
-          inner = tx(g.x + 16, g.y + 19, nm, 'bt') + pill(g.x + g.w - 10, g.y + 4, f0(so) + '% on time', st, 'end') + tx(g.x + 16, g.y + 44, f0(so) + '%', 'bn2') + bar(g.x + 60, g.y + 38, g.w - 76, so, st);
+          inner = tx(g.x + 16, g.y + 17, nm, 'bt') + pill(g.x + g.w - 10, g.y + 3, f0(so) + '% on time', st, 'end') + tx(g.x + 16, g.y + 39, f0(so) + '%', 'bn2') + bar(g.x + 60, g.y + 33, g.w - 76, so, st);
         }
         cards += block({ id: id, kind: 'logi', st, href: HREF[b], tip: nm + ' · not part of the plant drawing, so it is not drawn at a position. Assign it to a block under Interfaces → Plant setup → Plant layout if you want it there.', x: g.x, y: g.y, w: g.w, h: g.h, inner });
       });
       out.push('<g class="logi-zone"><rect class="zone" x="' + zx + '" y="' + zy + '" width="' + zw + '" height="' + zh + '" rx="14"/>' +
-        '<text x="' + (zx + 14) + '" y="' + (zy + 17) + '" class="zl">LOGISTICS AREAS</text><text x="' + (zx + 132) + '" y="' + (zy + 17) + '" class="zs">not positioned: these are not in the plant drawing</text>' + cards + '</g>');
+        '<text x="' + (zx + 14) + '" y="' + (zy + 15) + '" class="zl">LOGISTICS AREAS</text><text x="' + (zx + 132) + '" y="' + (zy + 15) + '" class="zs">not positioned: these are not in the plant drawing</text>' + cards + '</g>');
     }
 
     /* ---- flows: dotted sequence lines + carriers ---- */
@@ -247,7 +248,8 @@
       seg('M230,138 V' + BUS_Y) + seg('M626,138 V' + BUS_Y) + seg('M784,138 V' + BUS_Y) +                                   // source drops onto the bus
       seg('M230,' + BUS_Y + ' H860') +                                                                                     // the sequence bus
       seg('M600,' + BUS_Y + ' V164', true) + seg('M700,' + BUS_Y + ' V164', true) + seg('M860,' + BUS_Y + ' V164', true) +  // drops into assembly B
-      seg('M' + CH_X + ',' + BUS_Y + ' V' + A_MID + ' H581', true) +                                                       // down the gap between paint and assembly, into assembly A from the west
+      seg('M' + CH_X + ',' + BUS_Y + ' V' + A_BOT + ' H860') +                                                             // down the gap between paint and assembly, then along the lane under assembly A
+      seg('M600,' + A_BOT + ' V282', true) + seg('M700,' + A_BOT + ' V282', true) + seg('M860,' + A_BOT + ' V282', true) +    // up into assembly A: mirror of the three drops into B
       seg('M142,192 H158', true) + seg('M142,254 H158', true) + carriers;
     return { flows, nodes: out.join('') };
   }

@@ -21,8 +21,10 @@ test('block layout renders the drawing\'s blocks, the JV tiles, the sequence bus
   for (const id of ['logi-yard', 'logi-motorpool', 'logi-shipment']) assert.ok(r.nodes.includes('data-node="' + id + '"'), id);
   assert.ok(!r.nodes.includes('ASSUMED POSITION'));
   assert.match(r.flows, /class="seq/); assert.match(r.flows, /animateMotion/); assert.match(r.flows, /id="rt-jv-b"/);
-  // assembly A is fed from the west: down the gap between paint (x<=573) and assembly (x>=581), never round the right edge
-  assert.match(r.flows, /id="rt-jv-a" d="M230,138 V151 H577 V254 H581"/); assert.ok(!r.flows.includes('H1148'));
+  // assembly A: down the gap between paint (x<=573) and assembly (x>=581), along the lane under A, then up into A at the same x as B's drops (mirror)
+  assert.match(r.flows, /id="rt-jv-a" d="M230,138 V151 H577 V294 H600 V282"/); assert.match(r.flows, /id="rt-eg-a" d="M626,138 V151 H577 V294 H700 V282"/);
+  assert.match(r.flows, /id="rt-im-a" d="M784,138 V151 H577 V294 H860 V282"/); assert.ok(!r.flows.includes('H1148'));
+  assert.ok(r.flows.includes('M600,294 V282') && r.flows.includes('M700,151 V164'));
   S.line.stopped = true; S.line.reason = 'x';
   assert.ok(!global.window.FFMap.render(S, ctx(S)).flows.includes('animateMotion'));          // carriers stop with the line
 });
