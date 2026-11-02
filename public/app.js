@@ -189,7 +189,7 @@
     const tabs = [['all', 'ALL SHOPS']].concat(SHOPS.map((s) => [s, s.toUpperCase()]));
     setHTML($('#tabs'),
       tabs.map((t) => '<button data-shop="' + t[0] + '" class="' + (ui.shop === t[0] ? 'on' : '') + '">' + t[1] + '</button>').join('') +
-      '<span class="gap"></span><button class="drill" data-href="' + (ui.shop === 'all' ? '#/parts' : '#/shop/' + ui.shop) + '">' + ico('bars') + '  Drill down to ' + (ui.shop === 'all' ? 'parts / shop / line' : ui.shop + ' shop') + ' \u203a</button>');
+      '<span class="gap"></span><button class="drill" data-href="' + (ui.shop === 'all' ? '#/parts' : '#/shop/' + ui.shop) + '">' + ico('bars') + '  Drill down \u203a</button>');
   }
 
   /* ---------- plant map: block layout + sequenced material flows (see map.js) ---------- */
