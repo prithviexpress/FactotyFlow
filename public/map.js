@@ -31,24 +31,31 @@
   const status = (v) => Sim.bufferStatus(v);
   const hh = (h) => (h === null || h === undefined ? '' : (h < 10 ? h.toFixed(1) : Math.round(h)) + ' h');
 
-  function pill(x, y, s, st, anchor) {
+  const TINT = { ok: 'var(--ok)', watch: 'var(--watch)', low: 'var(--low)', none: 'var(--ink3)' };
+  function pill(x, y, s, st, anchor) {              // soft status chip: tinted background, coloured text, hairline border
     const w = Math.max(32, String(s).length * 6.7 + 14), x0 = anchor === 'end' ? x - w : x;
-    return '<rect x="' + x0 + '" y="' + y + '" width="' + w + '" height="17" rx="8.5" fill="' + STFILL[st] + '"/>' +
-      '<text x="' + (x0 + w / 2) + '" y="' + (y + 12.2) + '" class="pl" text-anchor="middle" fill="' + STINK[st] + '">' + X(s) + '</text>';
+    return '<rect x="' + x0 + '" y="' + y + '" width="' + w + '" height="17" rx="8.5" fill="' + TINT[st] + '" fill-opacity=".16" stroke="' + TINT[st] + '" stroke-opacity=".55" stroke-width="1"/>' +
+      '<text x="' + (x0 + w / 2) + '" y="' + (y + 12.2) + '" class="pl" text-anchor="middle" style="fill:' + TINT[st] + '">' + X(s) + '</text>';
   }
   function tag(x, y, s, late) {
     const w = String(s).length * 5.9 + 12;
-    return '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="15" rx="7.5" fill="' + (late ? 'var(--low)' : 'rgba(255,255,255,.2)') + '" stroke="rgba(255,255,255,.35)" stroke-width=".8"/>' +
-      '<text x="' + (x + w / 2) + '" y="' + (y + 10.7) + '" class="tg" text-anchor="middle">' + X(s) + '</text>';
+    return '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="15" rx="7.5" fill="' + (late ? 'var(--low)' : 'var(--card2)') + '" fill-opacity="' + (late ? '.16' : '1') + '" stroke="' + (late ? 'var(--low)' : 'var(--cardline)') + '" stroke-width="1"/>' +
+      '<text x="' + (x + w / 2) + '" y="' + (y + 10.7) + '" class="tg" text-anchor="middle" style="fill:' + (late ? 'var(--low)' : 'var(--ink2)') + '">' + X(s) + '</text>';
   }
+  /** flat card with a status accent on the left edge. Logistics blocks whose position/use is not from the plant drawing get a dashed, hatched look + an ASSUMED POSITION tag. */
   function block(o) {
-    const cls = 'nd blk k-' + o.kind + (o.sel ? ' sel' : '') + (o.dim ? ' dim' : '') + (o.st === 'low' ? ' problem' : '');
-    return '<g class="' + cls + '" data-node="' + o.id + '" data-href="' + (o.href || '') + '"' + (o.fleet ? ' data-fleet="jv"' : '') + ' data-shop="' + (o.family || '') + '">' +
-      '<rect class="bk" x="' + o.x + '" y="' + o.y + '" width="' + o.w + '" height="' + o.h + '" rx="10" fill="url(#g-' + o.kind + ')"/>' +
-      '<rect class="gl" x="' + o.x + '" y="' + o.y + '" width="' + o.w + '" height="' + o.h + '" rx="10" fill="url(#g-gloss)"/>' + (o.inner || '') + '</g>';
+    const assumed = o.kind === 'light' && !o.confirmed;
+    const cls = 'nd blk k-' + o.kind + (assumed ? ' assumed' : '') + (o.sel ? ' sel' : '') + (o.dim ? ' dim' : '') + (o.st === 'low' ? ' problem' : '');
+    const accent = o.st && o.st !== 'none' ? TINT[o.st] : 'var(--cyan)';
+    const tw = 112;
+    return '<g class="' + cls + '" data-node="' + o.id + '" data-href="' + (o.href || '') + '"' + (o.fleet ? ' data-fleet="jv"' : '') + ' data-shop="' + (o.family || '') + '"' + (o.tip ? ' data-tip="' + X(o.tip).replace(/"/g, '&quot;') + '"' : '') + '>' +
+      '<rect class="bk" x="' + o.x + '" y="' + o.y + '" width="' + o.w + '" height="' + o.h + '" rx="12"/>' +
+      (assumed ? '<rect class="hatch" x="' + o.x + '" y="' + o.y + '" width="' + o.w + '" height="' + o.h + '" rx="12" fill="url(#hatch)"/>' : '') +
+      '<rect class="ac" x="' + (o.x + 1) + '" y="' + (o.y + 12) + '" width="4" height="' + (o.h - 24) + '" rx="2" fill="' + accent + '"/>' + (o.inner || '') +
+      (assumed ? '<rect x="' + (o.x + o.w - tw - 8) + '" y="' + (o.y - 6) + '" width="' + tw + '" height="14" rx="7" class="asm-tag"/><text x="' + (o.x + o.w - tw / 2 - 8) + '" y="' + (o.y + 4) + '" class="asm-txt" text-anchor="middle">ASSUMED POSITION</text>' : '') + '</g>';
   }
   function bar(x, y, w, pct, st) {
-    return '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="5" rx="2.5" fill="rgba(255,255,255,.22)"/><rect x="' + x + '" y="' + y + '" width="' + Math.max(0, Math.min(w, (w * pct) / 100)).toFixed(1) + '" height="5" rx="2.5" fill="' + STFILL[st === 'none' ? 'ok' : st] + '"/>';
+    return '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="4" rx="2" style="fill:var(--track)"/><rect x="' + x + '" y="' + y + '" width="' + Math.max(0, Math.min(w, (w * pct) / 100)).toFixed(1) + '" height="4" rx="2" fill="' + TINT[st === 'none' ? 'ok' : st] + '"/>';
   }
 
   function render(S, c) {
@@ -57,6 +64,15 @@
     const sel = (fam) => !!fam && ui.shop === fam, dim = (fam) => !!fam && ui.shop !== 'all' && ui.shop !== fam;
     const label = (slot, fallback) => (SL[slot] && SL[slot].label) || fallback;
     const out = [];
+    const TIPS = {
+      egtm: 'EGTM \u00b7 shows the Engine shop buffer and the Engine \u2192 Assembly transfer route. Mapping EGTM to the engine shop is an assumption; confirm it matches your plant.',
+      imma: 'IMM-A \u00b7 shows the Bumper shop buffer and the Bumper \u2192 Assembly transfer route. Mapping IMM-A to the bumper shop is an assumption; confirm it matches your plant.',
+      press: 'Press A/B \u00b7 press buffer. Feeds weld lines A and B (sequenced, tow truck by default).',
+      weldA: 'Weld line A \u00b7 weld A buffer', weldB: 'Weld line B \u00b7 weld B buffer', paintA: 'Paint line A \u00b7 paint A buffer', paintB: 'Paint line B \u00b7 paint B buffer',
+      asmA: 'Assembly line A \u00b7 built vs plan' + (Sim.lineSplit(S).derived ? ' (half of the total until per-line counts are pushed)' : ''), asmB: 'Assembly line B \u00b7 built vs plan' + (Sim.lineSplit(S).derived ? ' (half of the total until per-line counts are pushed)' : ''),
+      jv: 'JV zone \u00b7 one tile per JV (names in Plant setup): buffer hours and route on-time.'
+    };
+    const LIGHT_TIP = { yard: 'Truck parking & bays', motorpool: 'Motorpool', shipment: 'Shipment' };
 
     /* carriers / transfer status per sequence source */
     const tr = (id) => S.transfers.find((t) => t.id === id);
@@ -88,10 +104,10 @@
           '<rect class="tile" x="' + tx0 + '" y="' + ty0 + '" width="' + tw + '" height="' + th + '" rx="7"/>' +
           tx(tx0 + 9, ty0 + 17, nm, 't1') + pill(tx0 + tw - 7, ty0 + 5, f0(j.buf) + '%', bst, 'end') +
           '<text x="' + (tx0 + 9) + '" y="' + (ty0 + th - 20) + '" class="sm">' + X(w && w.hours !== null ? hh(w.hours) : '') +
-          (rp !== null ? '<tspan style="font-weight:800;fill:' + (rst === 'ok' ? '#9bf0bf' : rst === 'watch' ? '#ffe08a' : '#ffb0b0') + '">' + (w && w.hours !== null ? ' · ' : '') + f0(rp) + '% on time</tspan>' : '') + '</text>' +
+          (rp !== null ? '<tspan style="font-weight:700;fill:' + TINT[rst] + '">' + (w && w.hours !== null ? ' · ' : '') + f0(rp) + '% on time</tspan>' : '') + '</text>' +
           bar(tx0 + 9, ty0 + th - 11, tw - 18, j.buf, bst) + '</g>';
       });
-      out.push(block({ id: 'jvzone', kind: 'jv', x: g.x, y: g.y, w: g.w, h: g.h, st: worst === 'low' ? 'none' : worst, inner:
+      out.push(block({ id: 'jvzone', kind: 'jv', tip: TIPS.jv, x: g.x, y: g.y, w: g.w, h: g.h, st: worst === 'low' ? 'none' : worst, inner:
         tx(g.x + 14, g.y + 25, label('jv', 'JV'), 'bt') + tx(g.x + 14 + String(label('jv', 'JV')).length * 11 + 12, g.y + 24, n + ' site' + (n === 1 ? '' : 's') + ' · sequenced supply', 'sm') + tiles +
         srcTag('jv', g.x + 12, g.y + g.h - 21) }));
     }
@@ -105,7 +121,7 @@
       if (k === 'large') {
         let cells = '';
         const cx0 = g.x + g.w - 14 - 7 * 15, cy0 = g.y + 46;
-        for (let i = 0; i < y.docks; i++) { const cc = i % 7, cr = Math.floor(i / 7); cells += '<rect x="' + (cx0 + cc * 15) + '" y="' + (cy0 + cr * 15) + '" width="12" height="12" rx="3" fill="' + (i < y.occupied ? 'rgba(255,255,255,.92)' : 'rgba(255,255,255,.16)') + '"/>'; }
+        for (let i = 0; i < y.docks; i++) { const cc = i % 7, cr = Math.floor(i / 7); cells += '<rect x="' + (cx0 + cc * 15) + '" y="' + (cy0 + cr * 15) + '" width="12" height="12" rx="3" style="fill:' + (i < y.occupied ? 'var(--cyan)' : 'var(--track)') + '"/>'; }
         return { st, inner: tx(g.x + 14, g.y + 25, fit(title, g.w - 98, 8.4), 'bt') + wp + rows.map((r, i) => tx(g.x + 16, g.y + 62 + i * 25, r[1], 'bn') + tx(g.x + 58, g.y + 62 + i * 25, r[0], 'sm')).join('') +
           cells + tx(cx0, cy0 + 4 * 15 + 12, bays, 'bn2') + tx(g.x + 16, g.y + g.h - 12, 'gate → ' + T('bay').toLowerCase() + ' ' + f0(y.g2d) + ' min', 'sm') };
       }
@@ -129,8 +145,8 @@
     }
     function shipInner(g, slot) {
       const so = S.finished.shipOnTime, st = so >= 90 ? 'ok' : so >= 85 ? 'watch' : 'low', k = cls(g), nm = label(slot, 'SHIPMENT');
-      const ring = (cx, cy, r) => { const C = 2 * Math.PI * r; return '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="none" stroke="rgba(255,255,255,.22)" stroke-width="8"/>' +
-        '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="none" stroke="' + STFILL[st] + '" stroke-width="8" stroke-linecap="round" stroke-dasharray="' + (C * Math.min(1, so / 100)).toFixed(1) + ' ' + C.toFixed(1) + '" transform="rotate(-90 ' + cx + ' ' + cy + ')"/>' + tx(cx, cy + 5, f0(so) + '%', k === 'wide' ? 'bn2' : 'bn', 'text-anchor="middle"'); };
+      const ring = (cx, cy, r) => { const C = 2 * Math.PI * r; return '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="none" style="stroke:var(--track)" stroke-width="8"/>' +
+        '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="none" stroke="' + TINT[st] + '" stroke-width="8" stroke-linecap="round" stroke-dasharray="' + (C * Math.min(1, so / 100)).toFixed(1) + ' ' + C.toFixed(1) + '" transform="rotate(-90 ' + cx + ' ' + cy + ')"/>' + tx(cx, cy + 5, f0(so) + '%', k === 'wide' ? 'bn2' : 'bn', 'text-anchor="middle"'); };
       if (k === 'wide') return { st, inner: tx(g.x + 14, g.y + 24, fit(nm, g.w - 20, 8.4), 'bt') + ring(g.x + 46, g.y + 58, 20) + tx(g.x + 84, g.y + 56, 'on-time shipments', 'sm') + tx(g.x + 84, g.y + 72, 'today', 'sm') };
       const cx = g.x + g.w / 2, cy = g.y + 82;
       return { st, inner: tx(g.x + 14, g.y + 24, fit(nm, g.w - 20, 8.4), 'bt') + ring(cx, cy, 34) + tx(cx, g.y + 142, 'on-time', 'sm', 'text-anchor="middle"') + tx(cx, g.y + 158, 'shipments', 'sm', 'text-anchor="middle"') };
@@ -142,11 +158,12 @@
       else if (bind === 'motorpool') r = motorInner(g, slot);
       else if (bind === 'shipment') r = shipInner(g, slot);
       else {
-        out.push('<g class="nd blk k-empty"><rect class="bk" x="' + g.x + '" y="' + g.y + '" width="' + g.w + '" height="' + g.h + '" rx="10"/>' + tx(g.x + g.w / 2, g.y + g.h / 2 + 4, lbl || 'unassigned', 'sm', 'text-anchor="middle"') + '</g>');
+        out.push('<g class="nd blk k-empty" data-tip="Unassigned block: not named in your plant drawing. Choose what it shows under Interfaces \u2192 Plant setup \u2192 Plant layout."><rect class="bk" x="' + g.x + '" y="' + g.y + '" width="' + g.w + '" height="' + g.h + '" rx="12"/>' + tx(g.x + g.w / 2, g.y + g.h / 2 + 4, lbl || 'unassigned', 'sm', 'text-anchor="middle"') + '</g>');
         return;
       }
       const href = { yard: '#/inbound', motorpool: '#/inventory', shipment: '#/shop/assembly' }[bind];
-      out.push(block({ id: slot, kind: 'light', x: g.x, y: g.y, w: g.w, h: g.h, st: r.st, href, inner: r.inner }));
+      const cf = !!(SL[slot] && SL[slot].confirmed);
+      out.push(block({ id: slot, kind: 'light', confirmed: cf, tip: LIGHT_TIP[bind] + ' \u00b7 ' + (cf ? 'position confirmed.' : 'this block was not named in your plant drawing: its position and use are assumed. Tick "confirmed" under Interfaces \u2192 Plant setup \u2192 Plant layout (or change what it shows) once it is right.'), x: g.x, y: g.y, w: g.w, h: g.h, st: r.st, href, inner: r.inner }));
     }
     lightSlot('yard', SL.yard.bind, G.yard); lightSlot('top1', SL.top1.bind, G.top1); lightSlot('top2', SL.top2.bind, G.top2); lightSlot('top3', SL.top3.bind, G.top3);
 
@@ -163,14 +180,14 @@
         inner = tx(g.x + 12, g.y + 21, fit(nm, g.w - 66, 8.4), 'bt') + pill(g.x + g.w - 9, g.y + 6, f0(s.buf) + '%', st, 'end') +
           tx(g.x + 12, g.y + g.h - 24, 'Buffer' + (w && w.hours !== null ? ' · ' + hh(w.hours) : ''), 'sm') + bar(g.x + 12, g.y + g.h - 14, g.w - 24, s.buf, st);
       }
-      out.push(block({ id: slot, kind: 'prod', x: g.x, y: g.y, w: g.w, h: g.h, st, family, href, sel: sel(family), dim: dim(family), inner }));
+      out.push(block({ id: slot, kind: 'prod', tip: TIPS[slot], x: g.x, y: g.y, w: g.w, h: g.h, st, family, href, sel: sel(family), dim: dim(family), inner }));
     }
     shop('egtm', 'engine', 'engine', 'egtm', 'EGTM');
     shop('imma', 'bumper', 'bumper', 'imma', 'IMM-A');
     // press feeds both weld lines
     {
       const g = G.press, s = S.shops.press, st = status(s.buf), w = wip.press;
-      out.push(block({ id: 'press', kind: 'prod', x: g.x, y: g.y, w: g.w, h: g.h, st, family: 'press', sel: sel('press'), dim: dim('press'), inner:
+      out.push(block({ id: 'press', kind: 'prod', tip: TIPS.press, x: g.x, y: g.y, w: g.w, h: g.h, st, family: 'press', sel: sel('press'), dim: dim('press'), inner:
         tx(g.x + 12, g.y + 24, fit(label('press', 'PRESS A/B'), g.w - 18, 8.4), 'bt') + pill(g.x + 12, g.y + 34, f0(s.buf) + '%', st) + tx(g.x + 12, g.y + 70, 'Buffer', 'sm') +
         tx(g.x + 12, g.y + 88, w && w.hours !== null ? hh(w.hours) : '—', 'bn2') + tx(g.x + 12, g.y + 103, 'of stock', 'sm') +
         bar(g.x + 12, g.y + g.h - 34, g.w - 24, s.buf, st) + srcTag('press', g.x + 10, g.y + g.h - 24) }));
@@ -182,10 +199,10 @@
     const ls = Sim.lineSplit(S), stopped = S.line.stopped;
     [['asmB', 'B'], ['asmA', 'A']].forEach(([slot, L]) => {
       const g = G[slot], d = ls[L], pct = d.plan ? (d.actual / d.plan) * 100 : 0, st = stopped ? 'low' : 'ok';
-      out.push(block({ id: slot, kind: 'asm', x: g.x, y: g.y, w: g.w, h: g.h, st, family: 'assembly', href: '#/shop/assembly', sel: sel('assembly'), dim: dim('assembly'), inner:
+      out.push(block({ id: slot, kind: 'asm', tip: TIPS[slot], x: g.x, y: g.y, w: g.w, h: g.h, st, family: 'assembly', href: '#/shop/assembly', sel: sel('assembly'), dim: dim('assembly'), inner:
         tx(g.x + 16, g.y + 24, label(slot, 'ASSEMBLY ' + L), 'bt') + pill(g.x + 16 + String(label(slot, 'ASSEMBLY ' + L)).length * 9.4 + 14, g.y + 10, stopped ? 'STOPPED' : 'RUNNING', stopped ? 'low' : 'ok') +
         tx(g.x + 16, g.y + 58, f0(d.actual), 'bn') + tx(g.x + 16 + String(f0(d.actual)).length * 13 + 6, g.y + 58, '/ ' + d.plan + ' vehicles' + (ls.derived ? ' (half of total)' : ''), 'sm') +
-        '<rect x="' + (g.x + 250) + '" y="' + (g.y + 46) + '" width="' + (g.w - 330) + '" height="9" rx="4.5" fill="rgba(255,255,255,.22)"/><rect x="' + (g.x + 250) + '" y="' + (g.y + 46) + '" width="' + Math.max(0, Math.min(g.w - 330, ((g.w - 330) * pct) / 100)).toFixed(1) + '" height="9" rx="4.5" fill="' + STFILL[st] + '"/>' +
+        '<rect x="' + (g.x + 250) + '" y="' + (g.y + 46) + '" width="' + (g.w - 330) + '" height="8" rx="4" style="fill:var(--track)"/><rect x="' + (g.x + 250) + '" y="' + (g.y + 46) + '" width="' + Math.max(0, Math.min(g.w - 330, ((g.w - 330) * pct) / 100)).toFixed(1) + '" height="8" rx="4" fill="' + TINT[st] + '"/>' +
         pill(g.x + g.w - 12, g.y + 41, f0(pct) + '%', st, 'end') }));
     });
 

@@ -45,3 +45,16 @@ test('A/B buffers: shops feed accepts per-line keys and the older single weld / 
   const errs = Cfg.validate(cfg);
   assert.ok(errs.some((e) => /top1.*it can show/.test(e)) && errs.some((e) => /egtm.*amr or tow/.test(e)) && errs.some((e) => /jv.*24 characters/.test(e)));
 });
+
+test('logistics blocks are marked ASSUMED POSITION until confirmed; the tag and dashes go away once confirmed', () => {
+  const S = Sim.createState();
+  const count = (str) => (str.match(/ASSUMED POSITION/g) || []).length;
+  assert.equal(count(global.window.FFMap.render(S, ctx(S)).nodes), 3);                 // truck parking & bays, motorpool, shipment (the spare block is a plain placeholder)
+  assert.ok(global.window.FFMap.render(S, ctx(S)).nodes.includes('k-light assumed'));
+  Sim.setPlant(S, { slots: { yard: { confirmed: true }, top1: { confirmed: true } } });
+  const r = global.window.FFMap.render(S, ctx(S));
+  assert.equal(count(r.nodes), 1);                                                       // only shipment is still unconfirmed
+  assert.ok(r.nodes.includes('data-tip="Truck parking &amp; bays \u00b7 position confirmed.'));
+  const cfg = Cfg.normalize({ plant: { slots: { top2: { confirmed: 'true' }, top3: { confirmed: false } } } });
+  assert.equal(cfg.plant.slots.top2.confirmed, true); assert.equal(cfg.plant.slots.top3.confirmed, false);
+});

@@ -7,6 +7,7 @@ in-plant transfers, line-side stock, quality, AMR fleets). No dependencies, no b
 
 The plant map is a block layout like the plant sketch (JV zone with a tile per JV, truck parking & bays, EGTM, motorpool, IMM-A, shipment, press A/B, weld A/B, paint A/B, assembly A/B).
 Red dotted lines are the sequenced material flows (JV, EGTM and IMM-A into assembly; press into weld) with animated AMR / tow-truck carriers. Block names, what the light blocks show and the carrier type are editable under **Interfaces -> Plant setup -> Plant layout**.
+Blocks are flat cards with a status accent on the left edge. **Truck parking & bays, motorpool and shipment sit in blocks your drawing did not name, so they are drawn dashed and hatched with an ASSUMED POSITION tag** (and the EGTM / IMM-A to engine / bumper data mapping is noted in their tooltips). Tick *confirmed* per block under Interfaces -> Plant setup -> Plant layout once the position and use are right and the marking goes away.
 Weld and paint are now two lines each (`weldA`, `weldB`, `paintA`, `paintB`); assembly shows lines A and B (pushed per line, or half of the total).
 
 ## Look & feel, logo, alerts

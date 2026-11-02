@@ -2,7 +2,7 @@
   --sunk:#08142a;--sunk2:#06101f;--track:#0e2036;--track2:#10264a;--code:#0b1b38;--linkink:#9bd1ff;--preink:#cfe0fb;--iconink:#9db6dc;--hover:#0d1d3a;
   --grp:#0f2447;--edge:#244675;--mutbg:#26385c;--mutink:#c4d3ee;--nodefill:#0a1a33;--nodestroke:#24508f;--hl:#5aa2ff;--tipb:#3f78c8;
   --badbg:#3a0d12;--warnbg:#3a2c08;--goodbg:#06281a;--badbg2:#2a0b12;--warnbg2:#2a2208;--goodtrack:#0e2a22;--road:#8aa0c4;
-  --seq:#ff5a3c;--bp-a:#3a7cc2;--bp-b:#1d4a84;--ba-a:#2f6db3;--ba-b:#183e72;--bl-a:#5fb0cf;--bl-b:#2f7da3;--bj-a:#173a66;--bj-b:#0a1d38;
+  --card:#0f2240;--card2:#16305a;--cardline:#27487c;--hatch:rgba(255,200,61,.10);--seq:#ff5a3c;--bp-a:#3a7cc2;--bp-b:#1d4a84;--ba-a:#2f6db3;--ba-b:#183e72;--bl-a:#5fb0cf;--bl-b:#2f7da3;--bj-a:#173a66;--bj-b:#0a1d38;
   --mapbg:#07142a;--mapgrid:#12284a;--iconmap:#8fb8ee;--iconmap2:#bfe0ff;--glow:#ff4d4d99;
 
   --bg:#050c1a; --panel:#0a1428; --panel2:#0d1b36; --line:#1d3b6b; --line2:#16294a;
@@ -452,7 +452,7 @@ table.rt .pn .ic{font-size:26px}
   --sunk:#eaf0f9;--sunk2:#f0f4fa;--track:#dbe5f2;--track2:#dbe5f2;--code:#e6eef9;--linkink:#0b5cad;--preink:#1c3354;--iconink:#4f6a96;--hover:#eaf1fb;
   --grp:#e0eaf7;--edge:#b3c4dc;--mutbg:#dde6f2;--mutink:#3c5273;--nodefill:#f7faff;--nodestroke:#7ea4d6;--hl:#2b7bff;--tipb:#5b8fd6;
   --badbg:#fde8e8;--warnbg:#fff3d6;--goodbg:#e2f7ea;--badbg2:#fde8e8;--warnbg2:#fff0c8;--goodtrack:#cdeedb;--road:#6f84a4;
-  --seq:#d8381a;--bp-a:#4a8fd6;--bp-b:#2a64a8;--ba-a:#3f7fcb;--ba-b:#245596;--bl-a:#79c3dd;--bl-b:#418fb3;--bj-a:#2a5590;--bj-b:#173a68;
+  --card:#ffffff;--card2:#f1f5fb;--cardline:#c9d7ea;--hatch:rgba(196,127,0,.14);--seq:#d8381a;--bp-a:#4a8fd6;--bp-b:#2a64a8;--ba-a:#3f7fcb;--ba-b:#245596;--bl-a:#79c3dd;--bl-b:#418fb3;--bj-a:#2a5590;--bj-b:#173a68;
   --mapbg:#f3f7fc;--mapgrid:#dde7f3;--iconmap:#3d6aa8;--iconmap2:#1f3f73;--glow:#d62b2b88;
 }
 [data-theme="light"] body,[data-theme="light"] html{background:var(--bg)}
@@ -563,3 +563,34 @@ table.rt .pn .ic{font-size:26px}
 .layout{margin-top:10px}.layout>b{font-size:13px}.layout small{color:var(--ink3);font-size:11px;margin-left:6px}
 .lgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:4px 18px;margin-top:6px}
 .lrow{display:flex;align-items:center;gap:8px;font-size:12.5px}.lrow span{width:170px;flex:none;color:var(--ink2)}.lrow input{flex:1;min-width:0}.lrow select{width:170px;flex:none}
+
+/* ---- contemporary flat cards (replaces the glossy blue boxes) ---- */
+.blk .bk{fill:var(--card);stroke:var(--cardline);stroke-width:1;filter:drop-shadow(0 2px 6px rgba(0,0,0,.30));transition:filter .15s,stroke .15s}
+[data-theme="light"] .blk .bk{filter:drop-shadow(0 1px 3px rgba(30,60,110,.14))}
+.blk:hover .bk{stroke:var(--hl);filter:drop-shadow(0 3px 9px rgba(0,0,0,.38))}
+.blk .gl{display:none}
+.blk text{fill:var(--ink)}
+.blk .bt{font-size:12.5px;font-weight:700;letter-spacing:.9px;fill:var(--ink2)}
+.blk .t1{font-size:12px;font-weight:700;letter-spacing:.4px;fill:var(--ink)}
+.blk .sm{font-size:11px;fill:var(--ink2)}
+.blk .bn{font-size:22px;font-weight:700;fill:var(--ink)}
+.blk .bn2{font-size:15px;font-weight:700;fill:var(--ink)}
+.blk .pl{font-size:11px;font-weight:700}
+.blk .tg{font-size:9.5px;font-weight:700;letter-spacing:.4px}
+.blk .ac{opacity:.95}
+.nd.blk.k-jv .bk{fill:var(--card)}
+.nd.blk.k-asm .bk{fill:var(--card)}
+.nd.jvt .tile{fill:var(--card2);stroke:var(--cardline)}
+.nd.jvt:hover .tile{stroke:var(--hl)}
+.nd.jvt text{fill:var(--ink)}.nd.jvt .sm{fill:var(--ink2)}
+/* logistics blocks whose position / use is assumed: dashed, hatched, tagged */
+.nd.blk.assumed .bk{stroke:var(--watch);stroke-dasharray:6 4;stroke-opacity:.85}
+.nd.blk .hatch{pointer-events:none}
+.asm-tag{fill:var(--warnbg2);stroke:var(--watch);stroke-width:1}
+.asm-txt{fill:var(--watch)!important;font-size:8.5px;font-weight:800;letter-spacing:.7px}
+.nd.blk.sel .bk{stroke:var(--cyan);stroke-width:2.4}
+.nd.blk.k-empty .bk{fill:none;stroke:var(--line);stroke-dasharray:5 5;filter:none}
+.legend .asm{display:inline-block;width:18px;height:11px;border:1.5px dashed var(--watch);border-radius:3px;background:repeating-linear-gradient(45deg,transparent 0 3px,var(--hatch) 3px 5px)}
+.lrow .cfm{display:flex;align-items:center;gap:4px;font-size:11.5px;color:var(--ink2);white-space:nowrap}.lrow .cfm input{width:auto}
+
+#map-legend{gap:10px}#map-legend span{font-size:11.5px}

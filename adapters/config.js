@@ -74,6 +74,7 @@ function normalize(raw) {
       for (const k of Object.keys(Sim.DEFAULT_SLOTS)) {
         const s = raw.plant.slots[k]; if (!s || typeof s !== 'object') continue;
         for (const f of ['label', 'bind', 'carrier']) if (s[f] !== undefined) cfg.plant.slots[k][f] = String(s[f]).trim();
+        if (s.confirmed !== undefined) cfg.plant.slots[k].confirmed = s.confirmed === true || s.confirmed === 'true';
       }
     }
     if (raw.plant.place !== undefined) cfg.plant.place = String(raw.plant.place).trim();

@@ -250,8 +250,8 @@
   const MAX_JVS = 6;
   /* Plant block layout (slots). Empty label = automatic text for that block. `carrier` = how sequenced material moves from that block (amr | tow). */
   const DEFAULT_SLOTS = {
-    jv: { label: 'JV', carrier: 'tow' }, yard: { label: '', bind: 'yard' }, egtm: { label: 'EGTM', carrier: 'amr' },
-    top1: { label: '', bind: 'motorpool' }, imma: { label: 'IMM-A', carrier: 'amr' }, top2: { label: '', bind: 'shipment' }, top3: { label: '', bind: 'none' },
+    jv: { label: 'JV', carrier: 'tow' }, yard: { label: '', bind: 'yard', confirmed: false }, egtm: { label: 'EGTM', carrier: 'amr' },
+    top1: { label: '', bind: 'motorpool', confirmed: false }, imma: { label: 'IMM-A', carrier: 'amr' }, top2: { label: '', bind: 'shipment', confirmed: false }, top3: { label: '', bind: 'none', confirmed: false },
     press: { label: 'PRESS A/B', carrier: 'tow' }, weldB: { label: 'WELD B' }, weldA: { label: 'WELD A' }, paintB: { label: 'PAINT B' }, paintA: { label: 'PAINT A' },
     asmB: { label: 'ASSEMBLY B' }, asmA: { label: 'ASSEMBLY A' }
   };
