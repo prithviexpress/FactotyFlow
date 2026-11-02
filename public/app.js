@@ -284,7 +284,10 @@
     if (S.line.stopped) L.push(it('low', 'Line stopped', S.line.reason || 'component missing', '#/events'));
     if (S.line.missing > 0) L.push(it('watch', 'Line running without ' + S.line.missing + ' component' + (S.line.missing > 1 ? 's' : ''), S.parts.filter((p) => p.stock <= 0 && p.critical === false).map((p) => p.name).slice(0, 3).join(', '), '#/parts'));
     sortedParts().forEach((p) => { const c = Sim.coverage(p), ps = Sim.partStatus(c); if (ps === 'ok') return; const a = Sim.nextAction(S, p); L.push(it(ps, p.name + ' · ' + f0(c) + ' min cover', a.text + ' · ' + a.owner, '#/parts')); });
-    G.push({ n: 1, title: 'LINE RISKS', empty: 'No part is short in the next ' + Sim.RISK_MIN + ' min', items: L });
+    /* supply risks from the JV / in-house verticals sit under line risks (they are what stops the line next) */
+    jvRows().map((r) => ({ r, k: 'JV' })).concat(inhouseRows().map((r) => ({ r, k: 'In-house' }))).filter((x) => x.r.st !== 'ok').forEach((x) => L.push(it(x.r.st, x.k + ' · ' + x.r.name + ' buffer ' + f0(x.r.buf) + '%', (x.r.hours !== null ? x.r.hours.toFixed(1) + ' h of stock' : '') + (x.r.rp !== undefined && x.r.rp !== null ? ' · route ' + f0(x.r.rp) + '% on time' : x.r.p !== null && x.r.p !== undefined ? ' · ' + f0(x.r.p) + '% on time to assembly' : ''), x.k === 'JV' ? '#/amr' : '#/shop/' + (x.r.id === 'ip' || x.r.id === 'tm' ? 'assembly' : x.r.id))));
+    L.sort((x, y2) => SEV[x.st] - SEV[y2.st]);
+    G.push({ n: 1, title: 'LINE RISKS', empty: 'No part or buffer is short in the next ' + Sim.RISK_MIN + ' min', items: L });
     /* 2 truck delays */
     const T2 = [];
     S.trucks.forEach((t) => {
@@ -305,19 +308,12 @@
       if (r.low >= 1) A.push(it(r.low >= 3 ? 'low' : 'watch', nm[r.key] + ' · ' + r.low + ' unit' + (r.low > 1 ? 's' : '') + ' low on battery', f0(r.battery) + '% average · send to charge', '#/amr'));
       if (r.availPct < 60) A.push(it('low', nm[r.key] + ' · only ' + f0(r.availPct) + '% of the fleet available', r.charging + ' charging', '#/amr'));
     });
-    G.push({ n: 4, title: 'AMR STOPPAGES', empty: 'All AMR routes moving, batteries fine', items: A.sort((a, b) => SEV[a.st] - SEV[b.st]) });
-    /* 5 supply at risk (JV / in-house) */
-    const SP = jvRows().map((r) => ({ r, k: 'JV' })).concat(inhouseRows().map((r) => ({ r, k: 'In-house' }))).filter((x) => x.r.st !== 'ok')
-      .map((x) => it(x.r.st, x.k + ' · ' + x.r.name + ' buffer ' + f0(x.r.buf) + '%', (x.r.hours !== null ? x.r.hours.toFixed(1) + ' h of stock' : '') + (x.r.rp !== undefined && x.r.rp !== null ? ' · route ' + f0(x.r.rp) + '% on time' : x.r.p !== null && x.r.p !== undefined ? ' · ' + f0(x.r.p) + '% on time to assembly' : ''), x.k === 'JV' ? '#/amr' : '#/shop/' + (x.r.id === 'ip' || x.r.id === 'tm' ? 'assembly' : x.r.id)));
-    G.push({ n: 5, title: 'JV / IN-HOUSE SUPPLY', empty: 'All buffers and routes within limits', items: SP.sort((a, b) => SEV[a.st] - SEV[b.st]) });
-    /* 6 internal deliveries and kanban */
-    const D = [];
-    S.transfers.forEach((t) => { const pc = (t.q.reduce((a, c) => a + c, 0) / t.q.length) * 100; if (pc < 90) D.push(it(pc < 78 ? 'low' : 'watch', t.name + ' · ' + f0(pc) + '% on time', 'internal delivery', '#/transfers')); });
-    if (S.kanban.overdue >= 2) D.push(it(S.kanban.overdue >= 4 ? 'low' : 'watch', 'Kanban · ' + f0(S.kanban.overdue) + ' overdue signals', 'average wait ' + f0(S.kanban.avgWaitMin) + ' min', '#/lineside'));
-    G.push({ n: 6, title: 'INTERNAL DELIVERIES / KANBAN', empty: 'Deliveries and kanban on time', items: D.sort((a, b) => SEV[a.st] - SEV[b.st]) });
+    S.transfers.forEach((t) => { const pc = (t.q.reduce((x, c) => x + c, 0) / t.q.length) * 100; if (pc < 90) A.push(it(pc < 78 ? 'low' : 'watch', t.name + ' · ' + f0(pc) + '% on time', 'internal delivery', '#/transfers')); });
+    if (S.kanban.overdue >= 2) A.push(it(S.kanban.overdue >= 4 ? 'low' : 'watch', 'Kanban · ' + f0(S.kanban.overdue) + ' overdue signals', 'average wait ' + f0(S.kanban.avgWaitMin) + ' min', '#/lineside'));
+    G.push({ n: 4, title: 'AMR STOPPAGES', empty: 'All AMR routes moving, batteries fine, kanban on time', items: A.sort((x, y2) => SEV[x.st] - SEV[y2.st]) });
     return G;
   }
-  const ROW_BUDGET = 9;                 // rows the panel can show: one per group first, spare rows go to the groups with most items, in order
+  const ROW_BUDGET = 13;                 // rows the panel can show: one per group first, spare rows go to the groups with most items, in order
   function renderActions() {
     const gs = actionGroups(), total = gs.reduce((a, g) => a + g.items.length, 0), red = gs.some((g) => g.items.some((i) => i.st === 'low')), el = $('#p-act');
     el.classList.toggle('problem', red);
@@ -326,7 +322,7 @@
     setHTML(el, '<div class="vh"><span class="vb">!</span><h2>ACTIONABLE ITEMS</h2><span class="vr ' + (red ? 'low' : total ? 'watch' : 'ok') + '">' + (total ? total + ' open' : 'all clear') + '</span></div><div class="vbody ag">' +
       gs.map((g) => {
         const worstSt = g.items.some((i) => i.st === 'low') ? 'low' : g.items.length ? 'watch' : 'ok', k = shown[g.n];
-        return '<div class="agrp ' + worstSt + '"><div class="agh"><span class="gn">' + g.n + '</span><b>' + esc(g.title) + '</b><span class="cnt ' + worstSt + '"' + (g.items.length > k ? tipA((g.items.length - k) + ' more not shown: open the first item for the full list') : '') + '>' + (g.items.length || '✓') + '</span></div>' +
+        return '<div class="agrp ' + worstSt + '" style="flex-grow:' + (Math.max(1, k) + 0.7) + '"><div class="agh"><span class="gn">' + g.n + '</span><b>' + esc(g.title) + '</b><span class="cnt ' + worstSt + '"' + (g.items.length > k ? tipA((g.items.length - k) + ' more not shown: open the first item for the full list') : '') + '>' + (g.items.length || '✓') + '</span></div>' +
           (g.items.length ? g.items.slice(0, k).map((i) => '<div class="ai ' + i.st + '" data-href="' + i.href + '"' + tipA(esc(i.t) + (i.d ? ' — ' + esc(i.d) : '')) + '><i class="sd ' + i.st + '"></i><span><b>' + esc(i.t) + '</b>' + (i.d ? '<small>' + esc(i.d) + '</small>' : '') + '</span></div>').join('') : '<div class="ai none"><span>' + esc(g.empty) + '</span></div>') + '</div>';
       }).join('') + '</div>');
   }
