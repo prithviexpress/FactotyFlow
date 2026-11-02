@@ -16,7 +16,11 @@ test('block layout renders the drawing\'s blocks, the JV tiles, the sequence bus
   for (const n of ['JV1', 'JV2', 'JV3', 'JV4']) assert.ok(r.nodes.includes('>' + n + '<'), n);
   assert.ok(r.nodes.includes('ASSEMBLY A') && r.nodes.includes('ASSEMBLY B') && r.nodes.includes('PRESS A/B'));
   // the unnamed light blocks of the drawing stay placeholders; truck parking / motorpool / shipment are in a separate, labelled strip
-  assert.equal((r.nodes.match(/unnamed block/g) || []).length, 4);
+  // vacant blocks: AMR fleet health and kanban transfer health overlays (a different look from shop cards); one spare block stays a placeholder
+  assert.equal((r.nodes.match(/unnamed block/g) || []).length, 1);
+  assert.ok(r.nodes.includes('AMR FLEET HEALTH') && r.nodes.includes('KANBAN TRANSFERS') && r.nodes.includes('OVERLAY'));
+  assert.equal((r.nodes.match(/class="nd ovl/g) || []).length, 2);
+  assert.ok(!/class="nd blk[^"]*"[^>]*data-node="(amrhealth|kanbanhealth)"/.test(r.nodes));          // overlays are not drawn as blocks / cards
   assert.ok(r.nodes.includes('LOGISTICS AREAS') && r.nodes.includes('not positioned'));
   for (const id of ['logi-yard', 'logi-motorpool', 'logi-shipment']) assert.ok(r.nodes.includes('data-node="' + id + '"'), id);
   assert.ok(!r.nodes.includes('ASSUMED POSITION'));
@@ -69,4 +73,36 @@ test('a widget you place in an unnamed block is marked ASSUMED POSITION until co
   assert.ok(!global.window.FFMap.render(S, ctx(S)).nodes.includes('LOGISTICS AREAS'));                       // everything placed: no strip
   const cfg = Cfg.normalize({ plant: { slots: { top2: { confirmed: 'true' }, top3: { confirmed: false } } } });
   assert.equal(cfg.plant.slots.top2.confirmed, true); assert.equal(cfg.plant.slots.top3.confirmed, false);
+});
+
+test('overlays: kanban spans the two tall blocks unless the second is used; both can be moved or removed', () => {
+  const S = Sim.createState();
+  let r = global.window.FFMap.render(S, ctx(S));
+  assert.ok(r.nodes.includes('data-node="kanbanhealth"'));
+  Sim.setPlant(S, { slots: { top3: { bind: 'shipment' }, yard: { bind: 'none' } } });
+  r = global.window.FFMap.render(S, ctx(S));
+  assert.ok(r.nodes.includes('data-node="top3"') && r.nodes.includes('>KANBAN<') && !r.nodes.includes('AMR FLEET HEALTH'));      // narrow kanban view; AMR overlay removed
+});
+
+test('movement health: AMR status rules and kanban status rules', () => {
+  const S = Sim.createState();
+  for (const k of ['amr', 'jv']) { S[k].amrs.forEach((a) => { a.b = 80; if (a.s === 'charging') a.s = 'idle'; }); S[k].routes.forEach((r) => { r.ema = 0.97; }); S[k].util = 0.3; }
+  assert.equal(Sim.amrHealth(S).status, 'ok');
+  S.amr.amrs[0].s = 'idle'; S.amr.amrs[0].b = 10; assert.equal(Sim.amrHealth(S).status, 'watch');                    // one low battery
+  S.jv.routes[0].ema = 0.7; assert.equal(Sim.amrHealth(S).status, 'low');                                           // a late route
+  assert.equal(Sim.kanbanStatus({ overdue: 0, onTimePct: 99 }), 'ok'); assert.equal(Sim.kanbanStatus({ overdue: 2, onTimePct: 99 }), 'watch');
+  assert.equal(Sim.kanbanStatus({ overdue: 1, onTimePct: 90 }), 'watch'); assert.equal(Sim.kanbanStatus({ overdue: 4, onTimePct: 99 }), 'low'); assert.equal(Sim.kanbanStatus({ overdue: 0, onTimePct: 80 }), 'low');
+});
+
+test('kanban data point: simulated by default, pushable per value or as a group, validated', () => {
+  const S = Sim.createState();
+  for (let i = 0; i < 400; i++) Sim.step(S, 30);
+  assert.ok(S.kanban.open >= 0 && S.kanban.open <= S.kanban.cards && S.kanban.onTimePct >= 40 && S.kanban.onTimePct <= 100);
+  V.apply(S, 'kanban/overdue', '5'); V.apply(S, 'kanban/onTimePct', '81');
+  assert.equal(S.live.kanban, true); const before = S.kanban.overdue;
+  for (let i = 0; i < 50; i++) Sim.step(S, 30);
+  assert.equal(S.kanban.overdue, before);                                       // once live the simulator leaves it alone
+  assert.throws(() => V.apply(S, 'kanban/onTimePct', '120'), /out of range/);
+  assert.throws(() => Ing.ingest(S, 'kanban', { onTimePct: 140 }), /between 0 and 100/);
+  Ing.ingest(S, 'kanban', { open: 30, cards: 150 }); assert.equal(S.kanban.open, 30);
 });

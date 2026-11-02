@@ -43,7 +43,7 @@ test('Interfaces API: save -> poll -> live; test endpoint; sim mode hands domain
   const call = (m, p, b) => fetch(base + p, { method: m, headers: { 'Content-Type': 'application/json' }, body: b ? JSON.stringify(b) : undefined });
 
   let v = await (await call('GET', '/api/config')).json();
-  assert.equal(v.meta.domains.length, 15);
+  assert.equal(v.meta.domains.length, 16);
   const row = { mode: 'rest', url: vurl + '/ok', intervalSec: 1, headers: { Authorization: 'Bearer vendor-secret' }, root: 'data', fields: { plan: 'shiftPlan', actual: 'built' } };
 
   // dry-run

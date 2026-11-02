@@ -86,6 +86,13 @@ def('Quality', 'quality', 'quality/rejected', 'Rejected parts today', 'pcs', NUM
 def('Quality', 'quality', 'quality/quarantined', 'Quarantined parts (under investigation)', 'pcs', NUM, 24, field((S) => S.quality, 'quarantined', cnt));
 def('Quality', 'quality', 'quality/spf', 'Single-piece flow adherence', '%', NUM, 91, field((S) => S.quality, 'spf', pct));
 
+// -- kanban pull signals (shown in the movement-health overlay on the plant map)
+def('Kanban', 'kanban', 'kanban/cards', 'Kanban cards / bins in the loop', 'cards', NUM, 120, field((S) => S.kanban, 'cards', { min: 1, int: true }));
+def('Kanban', 'kanban', 'kanban/open', 'Pull signals open right now', 'signals', NUM, 18, field((S) => S.kanban, 'open', cnt));
+def('Kanban', 'kanban', 'kanban/overdue', 'Open signals past their due time', 'signals', NUM, 2, field((S) => S.kanban, 'overdue', cnt));
+def('Kanban', 'kanban', 'kanban/avgWaitMin', 'Average wait from signal to delivery', 'min', NUM, 14, field((S) => S.kanban, 'avgWaitMin', { min: 0, max: 1440 }));
+def('Kanban', 'kanban', 'kanban/onTimePct', 'Signals delivered on time', '%', NUM, 94, field((S) => S.kanban, 'onTimePct', pct));
+
 // -- in-plant transfers (rolling window of jobs)
 const okOf = (t) => t.q.reduce((a, c) => a + c, 0);
 const mkQ = (ok, total) => Array.from({ length: total }, (_, i) => (i < ok ? 1 : 0));
@@ -153,6 +160,7 @@ const DERIVED = [
   ['AMR missions done / planned', 'sum of route missions + misc / planned'],
   ['Rejected % of build', 'quality/rejected ÷ build/actual'],
   ['JV node colour', 'worse of buffer status and route on-time status'],
+  ['Kanban / AMR health status on the map', 'kanban: red at 4+ overdue or on-time < 85%, amber at 2+ overdue or < 93%. AMR: red at a late route, 3+ low batteries or < 60% available; amber at a slow route, any low battery or utilisation > 85%'],
   ['Sparklines / trends', 'sampled every 5 min from the live values above'],
   ['Clock, date, shift (A 06–14, B 14–22, C 22–06)', 'server clock'],
   ['LIVE / MIXED / DEMO and STALE badges', 'which domains received data, and how recently (staleSec on the Interfaces page)']

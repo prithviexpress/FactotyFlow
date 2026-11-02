@@ -150,12 +150,57 @@
     const HREF = { yard: '#/inbound', motorpool: '#/inventory', shipment: '#/shop/assembly' };
     const innerOf = (bind, g, slot) => (bind === 'yard' ? yardInner(g, label(slot, '') || (T('parking') + ' & ' + T('bays')).toUpperCase()) : bind === 'motorpool' ? motorInner(g, slot) : shipInner(g, slot));
 
-    /* the four light blocks of the drawing: unnamed there, so they stay placeholders unless you assign a widget (then marked ASSUMED until confirmed) */
-    const placed = new Set();
+    /* ---- movement-health overlays (AMR fleets, kanban). Drawn as transparent instrument panels, NOT as cards, so they are not mistaken for shops of the layout ---- */
+    function overlay(id, g, title, st, href, tip, inner) {
+      const hd = 20, c = 'nd ovl' + (st === 'low' ? ' problem' : '');
+      return '<g class="' + c + '" data-node="' + id + '" data-href="' + href + '" data-shop="" data-tip="' + X(tip).replace(/"/g, '&quot;') + '">' +
+        '<rect class="obk" x="' + g.x + '" y="' + g.y + '" width="' + g.w + '" height="' + g.h + '" rx="3"/>' +
+        '<path class="ohd" d="M' + g.x + ' ' + g.y + ' h' + g.w + ' v' + hd + ' h-' + g.w + ' z"/>' +
+        '<circle cx="' + (g.x + 12) + '" cy="' + (g.y + 10) + '" r="3.5" fill="' + TINT[st] + '"/>' +
+        '<text x="' + (g.x + 22) + '" y="' + (g.y + 14) + '" class="otl">' + X(title) + '</text>' +
+        '<text x="' + (g.x + g.w - 8) + '" y="' + (g.y + 14) + '" class="otr" text-anchor="end">' + (g.w >= 270 ? 'OVERLAY · NOT A SHOP' : 'OVERLAY') + '</text>' + inner + '</g>';
+    }
+    const seg3 = (x, y2, w, a, b, c3) => { const t = Math.max(1, a + b + c3), wa = (w * a) / t, wb = (w * b) / t; return '<rect x="' + x + '" y="' + y2 + '" width="' + w + '" height="7" rx="3.5" style="fill:var(--track)"/><rect x="' + x + '" y="' + y2 + '" width="' + wa.toFixed(1) + '" height="7" rx="3.5" fill="var(--ok)"/><rect x="' + (x + wa).toFixed(1) + '" y="' + y2 + '" width="' + wb.toFixed(1) + '" height="7" fill="var(--cyan)"/><rect x="' + (x + wa + wb).toFixed(1) + '" y="' + y2 + '" width="' + ((w * c3) / t).toFixed(1) + '" height="7" rx="3.5" fill="var(--watch)"/>'; };
+    const ringO = (cx, cy, r, pctv, st, main, sub) => { const C = 2 * Math.PI * r; return '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="none" style="stroke:var(--track)" stroke-width="5"/><circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="none" stroke="' + TINT[st] + '" stroke-width="5" stroke-linecap="round" stroke-dasharray="' + (C * Math.max(0, Math.min(1, pctv / 100))).toFixed(1) + ' ' + C.toFixed(1) + '" transform="rotate(-90 ' + cx + ' ' + cy + ')"/>' + tx(cx, cy + 3, main, 'on', 'text-anchor="middle"') + tx(cx, cy + 14, sub, 'os', 'text-anchor="middle"'); };
+    const chip = (x, y2, w, label2, val, st) => '<rect x="' + x + '" y="' + y2 + '" width="' + w + '" height="16" rx="2" fill="none" stroke="' + TINT[st] + '" stroke-opacity=".6"/>' + tx(x + 6, y2 + 11.5, label2, 'os') + tx(x + w - 6, y2 + 11.5, val, 'on2', 'text-anchor="end" style="fill:' + TINT[st] + '"');
+    function amrOverlay(g) {
+      const H = Sim.amrHealth(S), ind = H.rows[0], jv = H.rows[1], bst = ind.battery >= 50 ? 'ok' : ind.battery >= 30 ? 'watch' : 'low';
+      const row = (r, label2, y2) => tx(g.x + 10, y2 + 7, label2, 'os') + seg3(g.x + 56, y2, 112, r.avail, r.busy, r.charging) + tx(g.x + 176, y2 + 7, (r.avail + r.busy) + '/' + r.total, 'on2');
+      const lowAll = ind.low + jv.low, late = ind.late + jv.late, utilTxt = f0(ind.util) + '%';
+      return overlay('amrhealth', g, 'AMR FLEET HEALTH', H.status, '#/amr', 'AMR fleet health · indoor and JV fleets: units available or busy (green + blue) vs charging (amber), average battery, low-battery units, utilisation and late routes. Red: a late route, 3+ low batteries or under 60% available. Overlay on the plant map; it is not a shop.',
+        row(ind, 'INDOOR', g.y + 32) + row(jv, 'JV', g.y + 52) +
+        '<g class="lg">' + '<rect x="' + (g.x + 56) + '" y="' + (g.y + 68) + '" width="6" height="6" fill="var(--ok)"/>' + tx(g.x + 65, g.y + 74, 'idle', 'os') + '<rect x="' + (g.x + 90) + '" y="' + (g.y + 68) + '" width="6" height="6" fill="var(--cyan)"/>' + tx(g.x + 99, g.y + 74, 'busy', 'os') + '<rect x="' + (g.x + 126) + '" y="' + (g.y + 68) + '" width="6" height="6" fill="var(--watch)"/>' + tx(g.x + 135, g.y + 74, 'charging', 'os') + '</g>' +
+        ringO(g.x + g.w - 40, g.y + 56, 22, ind.battery, bst, f0(ind.battery) + '%', 'batt') +
+        chip(g.x + 10, g.y + 96, 80, 'LOW BATT', String(lowAll), lowAll >= 3 ? 'low' : lowAll >= 1 ? 'watch' : 'ok') + chip(g.x + 96, g.y + 96, 80, 'LATE RTE', String(late), late ? 'low' : 'ok') + chip(g.x + 182, g.y + 96, 90, 'UTIL', utilTxt, ind.util > 85 ? 'watch' : 'ok') +
+        tx(g.x + 10, g.y + 124, 'missions ' + ind.done + '/' + ind.planned + ' indoor · ' + jv.done + '/' + jv.planned + ' JV', 'os'));
+    }
+    function kanbanOverlay(g) {
+      const k = S.kanban, st = Sim.kanbanStatus(k), wide = g.w >= 200;
+      const lanes = S.lineside.slice(0, 5);
+      if (!wide) {
+        return overlay('kanbanhealth', g, 'KANBAN', st, '#/lineside', 'Kanban transfer health (narrow view)', ringO(g.x + g.w / 2, g.y + 52, 24, k.onTimePct, st, f0(k.onTimePct) + '%', 'on time') + tx(g.x + 10, g.y + 100, 'open ' + f0(k.open), 'on2') + tx(g.x + 10, g.y + 116, 'overdue ' + f0(k.overdue), 'on2', 'style="fill:' + TINT[k.overdue >= 4 ? 'low' : k.overdue >= 2 ? 'watch' : 'ok'] + '"'));
+      }
+      const lw = (g.w - 20 - (lanes.length - 1) * 4) / lanes.length;
+      return overlay('kanbanhealth', g, 'KANBAN TRANSFERS', st, '#/lineside', 'Kanban transfer health · pull signals: on-time rate, open and overdue signals, average wait; lanes = key line-side materials coloured by their stock status. Red: 4+ overdue or on-time under 85%. Overlay on the plant map; it is not a shop.',
+        ringO(g.x + 44, g.y + 56, 24, k.onTimePct, st, f0(k.onTimePct) + '%', 'on time') +
+        [['OPEN SIGNALS', f0(k.open), 'ok'], ['OVERDUE', f0(k.overdue), k.overdue >= 4 ? 'low' : k.overdue >= 2 ? 'watch' : 'ok'], ['AVG WAIT', f0(k.avgWaitMin) + ' min', k.avgWaitMin > 30 ? 'watch' : 'ok'], ['CARDS IN LOOP', f0(k.cards), 'ok']].map((r, i) =>
+          tx(g.x + 84, g.y + 36 + i * 16, r[0], 'os') + tx(g.x + g.w - 10, g.y + 36 + i * 16, r[1], 'on2', 'text-anchor="end" style="fill:' + TINT[r[2]] + '"')).join('') +
+        lanes.map((l, i) => { const ls2 = Sim.linesideStatus(l), lx = g.x + 10 + i * (lw + 4); return '<rect x="' + lx + '" y="' + (g.y + 98) + '" width="' + lw + '" height="22" rx="2" fill="' + TINT[ls2] + '" fill-opacity=".14" stroke="' + TINT[ls2] + '" stroke-opacity=".7"/>' + tx(lx + lw / 2, g.y + 112, fit(l.name.replace(/\s*\(.*$/, '').split(' ')[0], lw - 4, 5.6).toUpperCase(), 'os', 'text-anchor="middle" style="fill:' + TINT[ls2] + '"'); }).join(''));
+    }
+
+    /* the four light blocks of the drawing: unnamed there. They hold an overlay or a logistics widget only if you assign one; otherwise they stay placeholders. */
+    const placed = new Set(); let top3Taken = false;
     ['yard', 'top1', 'top2', 'top3'].forEach((slot) => {
-      const g = G[slot], bind = (SL[slot] && SL[slot].bind) || 'none', lbl = (SL[slot] && SL[slot].label) || '';
+      if (slot === 'top3' && top3Taken) return;
+      let g = G[slot];
+      const bind = (SL[slot] && SL[slot].bind) || 'none', lbl = (SL[slot] && SL[slot].label) || '';
+      if (bind === 'amr') { out.push(amrOverlay(g)); return; }
+      if (bind === 'kanban') {
+        if (slot === 'top2' && (!SL.top3 || SL.top3.bind === 'none' || SL.top3.bind === undefined)) { g = { x: G.top2.x, y: G.top2.y, w: G.top3.x + G.top3.w - G.top2.x, h: G.top2.h }; top3Taken = true; }
+        out.push(kanbanOverlay(g)); return;
+      }
       if (!HREF[bind]) {
-        out.push('<g class="nd blk k-empty" data-tip="Not named in the plant drawing. You can name it or put truck parking & bays / motorpool / shipment here under Interfaces → Plant setup → Plant layout."><rect class="bk" x="' + g.x + '" y="' + g.y + '" width="' + g.w + '" height="' + g.h + '" rx="12"/>' +
+        out.push('<g class="nd blk k-empty" data-tip="Not named in the plant drawing. You can name it or put truck parking & bays / motorpool / shipment / AMR health / kanban health here under Interfaces → Plant setup → Plant layout."><rect class="bk" x="' + g.x + '" y="' + g.y + '" width="' + g.w + '" height="' + g.h + '" rx="12"/>' +
           tx(g.x + g.w / 2, g.y + g.h / 2 + (lbl ? 0 : -3), lbl || 'unnamed block', 'bt', 'text-anchor="middle"') + (lbl ? '' : tx(g.x + g.w / 2, g.y + g.h / 2 + 12, 'not in drawing', 'sm', 'text-anchor="middle"')) + '</g>');
         return;
       }

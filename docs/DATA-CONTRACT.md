@@ -53,6 +53,7 @@ Time values: `eta` = minutes from now, or `etaAt` = ISO-8601 timestamp (converte
 | `amr.unit` / `jv.unit` | one unit or an array | upsert by `id` (what an MQTT per-robot topic sends) |
 | `jvstock` | `{ "JV1": 72, "JV2": {buf:68, units?, hours?, cap?}, … }` | keyed by the JV names configured in Plant setup (case-insensitive); an unknown name is rejected with the list of configured names |
 | `quality` | `{rejected, quarantined, spf}` | spf = % |
+| `kanban` | `{cards, open, overdue, avgWaitMin, onTimePct}` | kanban pull signals: cards in the loop, signals open now, of which overdue, average wait (min), on-time rate (%). Drives the KANBAN TRANSFERS overlay on the plant map |
 | `kpi` | `{jis, stockAcc}` | % |
 | `finished` | `{onTime, shipOnTime, units?, shipRate?}` | % ; `units` = finished vehicles waiting, `shipRate` = vehicles/min dispatched (for hours of finished-vehicle inventory) |
 | `deliveries` | `{total, onTime}` | |
@@ -98,3 +99,5 @@ Animated markers are the carriers (AMR = circle, tow truck = small train); how m
 Names, which blocks hold which widget (truck parking & bays / motorpool / shipment / none) and the carrier type (AMR or tow) of each source are set under **Interfaces -> Plant setup -> Plant layout** (`plant.slots` in the config).
 The four unnamed light blocks (`plant.slots.<yard|top1|top2|top3>`) default to `bind: "none"` (placeholders). Truck parking & bays, motorpool and shipment are not in the plant drawing, so they appear in a separate LOGISTICS AREAS strip; assigning one to a block (`bind: yard | motorpool | shipment`) draws it there marked as an assumed position until `confirmed: true`.
 Only the transfer statuses (EGTM = Engine -> Assembly, IMM-A = Bumper -> Assembly) and the JV AMR routes feed the flow colours; press -> weld has no data feed yet.
+
+The two light overlays on the plant map (AMR fleet health, kanban transfer health) are bound with `plant.slots.<slot>.bind` = `amr` or `kanban` (defaults: the block beside JV and the first tall block; kanban spans both tall blocks when the second is unused).

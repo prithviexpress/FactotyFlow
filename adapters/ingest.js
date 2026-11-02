@@ -5,7 +5,7 @@
  * (see `L = S.live` guards in public/sim.js). Domains with no feed keep simulating (MIXED mode).
  * Payload shapes are documented in docs/DATA-CONTRACT.md.
  */
-const DOMAINS = ['build', 'line', 'shops', 'parts', 'yard', 'trucks', 'transfers', 'lineside', 'amr', 'jv', 'jvstock', 'quality', 'kpi', 'finished', 'deliveries'];
+const DOMAINS = ['build', 'line', 'shops', 'parts', 'yard', 'trucks', 'transfers', 'lineside', 'amr', 'jv', 'jvstock', 'quality', 'kpi', 'finished', 'deliveries', 'kanban'];
 const SHOP_KEYS = ['press', 'weld', 'paint', 'engine', 'bumper', 'assembly'];
 const BUFFER_KEYS = ['press', 'weldA', 'weldB', 'paintA', 'paintB', 'engine', 'bumper'];
 const BUFFER_ALIAS = { weld: ['weldA', 'weldB'], paint: ['paintA', 'paintB'] };   // older feeds send one buffer for both lines
@@ -170,6 +170,13 @@ const APPLY = {
   kpi(S, p) { asObj(p, 'kpi'); for (const k of ['jis', 'stockAcc']) if (p[k] !== undefined) S.kpi[k] = need(p[k], k); },
   finished(S, p) { asObj(p, 'finished'); for (const k of ['onTime', 'shipOnTime', 'units', 'shipRate']) if (p[k] !== undefined) S.finished[k] = need(p[k], k); },
   deliveries(S, p) { asObj(p, 'deliveries'); for (const k of ['total', 'onTime']) if (p[k] !== undefined) S.deliveries[k] = need(p[k], k); },
+  kanban(S, p) {
+    asObj(p, 'kanban');
+    const v = {};
+    for (const k of ['cards', 'open', 'overdue', 'avgWaitMin', 'onTimePct']) if (p[k] !== undefined) v[k] = need(p[k], k);    // validate everything before changing anything
+    if (v.onTimePct !== undefined && (v.onTimePct < 0 || v.onTimePct > 100)) throw new IngestError('onTimePct must be between 0 and 100');
+    Object.assign(S.kanban, v);
+  },
   event(S, p) {
     asObj(p, 'event');
     S.events.unshift({ t: S.clock, msg: str(p.msg, '(no message)'), lvl: ['info', 'ok', 'watch', 'low'].includes(p.lvl) ? p.lvl : 'info' });

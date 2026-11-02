@@ -150,6 +150,7 @@
       finished: { onTime: 92, shipOnTime: 92, units: 176, shipRate: 1.8 },
       kpi: { jis: 98.4, stockAcc: 97.8 },
       deliveries: { total: 375, onTime: 345 },
+      kanban: { cards: 120, open: 18, overdue: 2, avgWaitMin: 14, onTimePct: 94 },
       transfers: [
         { id: 'eng', name: 'Engine → Assembly', icon: 'engine', p: 0.97, q: seedQ(12, 12), win: 12, rate: 0.25 },
         { id: 'bmp', name: 'Bumper → Assembly', icon: 'bumper', p: 0.88, q: seedQ(8, 6), win: 8, rate: 0.15, mod: 'bumperJam' },
@@ -250,12 +251,12 @@
   const MAX_JVS = 6;
   /* Plant block layout (slots). Empty label = automatic text for that block. `carrier` = how sequenced material moves from that block (amr | tow). */
   const DEFAULT_SLOTS = {
-    jv: { label: 'JV', carrier: 'tow' }, yard: { label: '', bind: 'none', confirmed: false }, egtm: { label: 'EGTM', carrier: 'amr' },
-    top1: { label: '', bind: 'none', confirmed: false }, imma: { label: 'IMM-A', carrier: 'amr' }, top2: { label: '', bind: 'none', confirmed: false }, top3: { label: '', bind: 'none', confirmed: false },
+    jv: { label: 'JV', carrier: 'tow' }, yard: { label: '', bind: 'amr', confirmed: false }, egtm: { label: 'EGTM', carrier: 'amr' },
+    top1: { label: '', bind: 'none', confirmed: false }, imma: { label: 'IMM-A', carrier: 'amr' }, top2: { label: '', bind: 'kanban', confirmed: false }, top3: { label: '', bind: 'none', confirmed: false },
     press: { label: 'PRESS A/B', carrier: 'tow' }, weldB: { label: 'WELD B' }, weldA: { label: 'WELD A' }, paintB: { label: 'PAINT B' }, paintA: { label: 'PAINT A' },
     asmB: { label: 'ASSEMBLY B' }, asmA: { label: 'ASSEMBLY A' }
   };
-  const SLOT_BINDS = ['yard', 'motorpool', 'shipment', 'none'], CARRIERS = ['amr', 'tow'];
+  const SLOT_BINDS = ['yard', 'motorpool', 'shipment', 'amr', 'kanban', 'none'], CARRIERS = ['amr', 'tow'];
   /** assembly line A / B counts: pushed per line when available, otherwise the total split in half */
   function lineSplit(S) {
     const b = S.build, A = b.lineA, B = b.lineB;
@@ -566,6 +567,15 @@
     if (!L.finished) S.finished.units = clamp(S.finished.units + (running ? S.build.rate * m * 0.5 : 0) - S.finished.shipRate * m * 0.5 + (176 - S.finished.units) * 0.03 * tick + (R() - 0.5) * 2 * tick, 20, 400);
     if (!L.finished) S.finished.shipOnTime = clamp(S.finished.shipOnTime + (92 - S.finished.shipOnTime) * 0.02 * tick + (R() - 0.5) * 0.5 * tick, 80, 100);
 
+    /* kanban pull signals: more open / overdue when line-side stock is low or the bumper shop is jammed */
+    if (!L.kanban) {
+      const k = S.kanban, lowN = S.lineside.filter((l) => linesideStatus(l) === 'low').length, watchN = S.lineside.filter((l) => linesideStatus(l) === 'watch').length, jam = S.mods.bumperJam > 0 ? 1 : 0;
+      k.open = clamp(k.open + (10 + lowN * 4 + watchN * 2 + jam * 5 - k.open) * 0.05 * tick + (R() - 0.5) * 1.2 * tick, 0, k.cards);
+      k.overdue = clamp(k.overdue + (Math.round(k.open * 0.08 + lowN * 0.7 + jam * 2) - k.overdue) * 0.1 * tick + (R() - 0.5) * 0.5 * tick, 0, k.open);
+      k.avgWaitMin = clamp(k.avgWaitMin + (8 + k.overdue * 2.2 - k.avgWaitMin) * 0.05 * tick + (R() - 0.5) * 0.8 * tick, 2, 90);
+      k.onTimePct = clamp(100 - (k.overdue / Math.max(1, k.open)) * 100 * 1.1, 40, 100);
+    }
+
     /* history samples */
     S.sampleAcc += m;
     while (S.sampleAcc >= SAMPLE_MIN) {
@@ -579,10 +589,23 @@
     return S;
   }
 
+  /* ---------- movement health (overlay on the plant map) ---------- */
+  /** AMR fleets (indoor + JV): availability, battery, utilisation, late routes -> one status */
+  function amrHealth(S) {
+    const rows = ['amr', 'jv'].map((k) => {
+      const v = fleetView(S[k]), late = S[k].routes.filter((r) => routeStatus(r.ema * 100) === 'low').length, slow = S[k].routes.filter((r) => routeStatus(r.ema * 100) === 'watch').length;
+      return Object.assign({ key: k, late, slow, availPct: ((v.avail + v.busy) / Math.max(1, v.total)) * 100 }, v);
+    });
+    const low = rows.some((r) => r.late > 0 || r.low >= 3 || r.availPct < 60), watch = rows.some((r) => r.low >= 1 || r.slow > 0 || r.util > 85);
+    return { rows, status: low ? 'low' : watch ? 'watch' : 'ok' };
+  }
+  /** kanban pull signals: red when several are overdue or the on-time rate drops */
+  const kanbanStatus = (k) => (k.overdue >= 4 || k.onTimePct < 85 ? 'low' : k.overdue >= 2 || k.onTimePct < 93 ? 'watch' : 'ok');
+
   /* ---------- hand a domain back to the simulator (fresh simulated data) ---------- */
   const DOMAIN_KEYS = {
     build: ['build'], line: ['line'], shops: ['shops'], parts: ['parts'], yard: ['yard', 'trucks'], trucks: ['trucks'],
-    transfers: ['transfers'], lineside: ['lineside'], amr: ['amr'], jv: ['jv'], jvstock: ['jvSites'], quality: ['quality'], kpi: ['kpi'],
+    transfers: ['transfers'], lineside: ['lineside'], amr: ['amr'], jv: ['jv'], kanban: ['kanban'], jvstock: ['jvSites'], quality: ['quality'], kpi: ['kpi'],
     finished: ['finished'], deliveries: ['deliveries']
   };
   function resetDomain(S, domain) {
@@ -644,7 +667,7 @@
   }
 
   return {
-    createState, step, inject, resetDomain, raiseAlert, clearAlert, pruneAlerts, reconcileAlerts, LEVELS, inventoryView, hourStatus, setPlant, lineSplit, DEFAULT_SLOTS, SLOT_BINDS, CARRIERS, DEFAULT_TERMS, DEFAULT_JVS, MAX_JVS, TARGET_H, coverage, partStatus, bufferStatus, linesideStatus, routeStatus,
+    createState, step, inject, resetDomain, amrHealth, kanbanStatus, raiseAlert, clearAlert, pruneAlerts, reconcileAlerts, LEVELS, inventoryView, hourStatus, setPlant, lineSplit, DEFAULT_SLOTS, SLOT_BINDS, CARRIERS, DEFAULT_TERMS, DEFAULT_JVS, MAX_JVS, TARGET_H, coverage, partStatus, bufferStatus, linesideStatus, routeStatus,
     nextAction, fleetView, fmtClock, makeTrucks, SHOP_NAMES, RISK_MIN
   };
 });

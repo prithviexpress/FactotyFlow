@@ -62,7 +62,7 @@
     ['motorpool', 'Finished-vehicle yard', 'e.g. Motorpool'], ['parking', 'Truck waiting area', 'e.g. Truck parking'], ['jis', 'JIS KPI label', 'JIS = Just-In-Sequence (parts in vehicle order). Use "JIT adherence" only if you measure time windows, not sequence']];
   const SLOT_ROWS = [['jv', 'JV zone', 'carrier'], ['yard', 'Block beside JV', 'bind'], ['egtm', 'Tall block (EGTM)', 'carrier'], ['top1', 'Top-right wide block', 'bind'], ['imma', 'Block below it (IMM-A)', 'carrier'],
     ['top2', 'Tall block 1', 'bind'], ['top3', 'Tall block 2', 'bind'], ['press', 'Press', 'carrier'], ['weldB', 'Weld line B', ''], ['weldA', 'Weld line A', ''], ['paintB', 'Paint line B', ''], ['paintA', 'Paint line A', ''], ['asmB', 'Assembly line B', ''], ['asmA', 'Assembly line A', '']];
-  const BIND_LABEL = { yard: 'Truck parking & bays', motorpool: 'Motorpool', shipment: 'Shipment', none: 'Nothing (placeholder)' };
+  const BIND_LABEL = { amr: 'AMR fleet health (overlay)', kanban: 'Kanban transfer health (overlay)', yard: 'Truck parking & bays', motorpool: 'Motorpool', shipment: 'Shipment', none: 'Nothing (placeholder)' };
   function layoutHTML(p) {
     const sl = p.slots || {};
     return '<div class="layout"><b>Plant layout</b> <small>name of each block on the plant map. Empty = automatic text. "Carrier" is how sequenced material leaves that block: AMR or tow truck.</small><div class="lgrid">' +

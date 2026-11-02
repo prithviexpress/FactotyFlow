@@ -194,6 +194,7 @@
       '<span><i class="bg-ok"></i>Normal</span><span><i class="bg-watch"></i>Watch</span><span><i class="bg-low"></i>Low / Risk</span>' +
       '<span><svg viewBox="0 0 40 10"><path d="M0 5H34" stroke="var(--seq)" stroke-width="2.2" stroke-dasharray="2 4" stroke-linecap="round"/><path d="M32 1l7 4-7 4z" fill="var(--seq)"/></svg>Sequenced flow</span>' +
       '<span><i class="asm"></i>Assumed</span>' +
+      '<span><i class="ov"></i>Overlay (not a shop)</span>' +
       '<span><svg viewBox="0 0 12 10"><circle cx="6" cy="5" r="4" class="cr"/><circle cx="6" cy="5" r="1.5" class="cr2"/></svg>AMR</span>' +
       '<span><svg viewBox="0 0 16 10"><rect x="1" y="2" width="8" height="6" rx="1.5" class="cr"/><rect x="9.5" y="3" width="5.5" height="4.4" rx="1.2" class="cr2"/></svg>Tow</span>');
   }
