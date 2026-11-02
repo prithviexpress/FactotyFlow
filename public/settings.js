@@ -65,7 +65,7 @@
   const BIND_LABEL = { amr: 'AMR fleet health (overlay)', kanban: 'Kanban transfer health (overlay)', yard: 'Truck parking & bays', motorpool: 'Motorpool', shipment: 'Shipment', none: 'Nothing (placeholder)' };
   function layoutHTML(p) {
     const sl = p.slots || {};
-    return '<div class="layout"><b>Plant layout</b> <small>name of each block on the plant map. Empty = automatic text. "Carrier" is how sequenced material leaves that block: AMR or tow truck.</small><div class="lgrid">' +
+    return '<div class="layout"><b>Plant layout</b> <button type="button" class="tbtn" data-act="swapov" data-tip="Swap the AMR and kanban overlays between their blocks">\u21c4 swap AMR / kanban</button> <small>name of each block on the plant map. Empty = automatic text. "Carrier" is how sequenced material leaves that block: AMR or tow truck.</small><div class="lgrid">' +
       SLOT_ROWS.map((r) => {
         const s = sl[r[0]] || {};
         return '<div class="lrow"><span>' + r[1] + '</span><input data-slot="' + r[0] + '.label" maxlength="24" value="' + esc(s.label || '') + '" placeholder="automatic">' +
@@ -318,6 +318,10 @@
         msg('Unsaved changes', 'watch');
       }
       else if (act === 'srctpl') showTemplate(b.closest('.srow'));
+      else if (act === 'swapov') {
+        const sel = (k) => root.querySelector('[data-slot="' + k + '.bind"]'), a = ['yard', 'top1', 'top2', 'top3'].filter((k) => sel(k) && (sel(k).value === 'amr' || sel(k).value === 'kanban'));
+        if (a.length === 2) { const t = sel(a[0]).value; sel(a[0]).value = sel(a[1]).value; sel(a[1]).value = t; msg('Unsaved changes', 'watch'); } else msg('Both overlays must be placed in a block first', 'low');
+      }
       else if (act === 'altest') testAlerts(b.dataset.kind, b);
       else if (act === 'logopick') window.FFApp.pickLogo();
       else if (act === 'logorm') window.FFApp.removeLogo();

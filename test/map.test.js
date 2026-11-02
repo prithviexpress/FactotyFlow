@@ -75,13 +75,26 @@ test('a widget you place in an unnamed block is marked ASSUMED POSITION until co
   assert.equal(cfg.plant.slots.top2.confirmed, true); assert.equal(cfg.plant.slots.top3.confirmed, false);
 });
 
-test('overlays: kanban spans the two tall blocks unless the second is used; both can be moved or removed', () => {
+test('overlays: AMR spans the two tall blocks and kanban sits beside JV; either can be moved or removed', () => {
   const S = Sim.createState();
   let r = global.window.FFMap.render(S, ctx(S));
-  assert.ok(r.nodes.includes('data-node="kanbanhealth"'));
+  assert.ok(r.nodes.includes('data-node="kanbanhealth"') && r.nodes.includes('data-node="amrhealth"'));
+  const pos = (id) => { const m = r.nodes.match(new RegExp('data-node="' + id + '"[\\s\\S]*?<rect class="obk" x="(\\d+)" y="\\d+" width="(\\d+)"')); return { x: +m[1], w: +m[2] }; };
+  assert.equal(pos('kanbanhealth').x, 291);                                                    // beside JV (the large block)
+  assert.deepEqual(pos('amrhealth'), { x: 897, w: 247 });                                      // both tall blocks, top right
   Sim.setPlant(S, { slots: { top3: { bind: 'shipment' }, yard: { bind: 'none' } } });
   r = global.window.FFMap.render(S, ctx(S));
-  assert.ok(r.nodes.includes('data-node="top3"') && r.nodes.includes('>KANBAN<') && !r.nodes.includes('AMR FLEET HEALTH'));      // narrow kanban view; AMR overlay removed
+  assert.ok(r.nodes.includes('data-node="top3"') && r.nodes.includes('>AMR<') && !r.nodes.includes('KANBAN TRANSFERS'));      // narrow AMR view; kanban removed
+});
+
+test('overlay swap: configs saved with the old defaults are migrated, user arrangements are kept', () => {
+  const old = Cfg.normalize({ plant: { slots: { yard: { bind: 'amr' }, top2: { bind: 'kanban' } } } });
+  assert.equal(old.plant.slots.yard.bind, 'kanban'); assert.equal(old.plant.slots.top2.bind, 'amr');
+  const v2 = Cfg.normalize({ plant: { layoutVersion: 2, slots: { yard: { bind: 'amr' }, top2: { bind: 'kanban' } } } });
+  assert.equal(v2.plant.slots.yard.bind, 'amr'); assert.equal(v2.plant.slots.top2.bind, 'kanban');             // chosen after the swap: untouched
+  const own = Cfg.normalize({ plant: { slots: { yard: { bind: 'motorpool' }, top2: { bind: 'kanban' } } } });
+  assert.equal(own.plant.slots.yard.bind, 'motorpool'); assert.equal(own.plant.slots.top2.bind, 'kanban');
+  assert.equal(Cfg.normalize({}).plant.slots.yard.bind, 'kanban');
 });
 
 test('movement health: AMR status rules and kanban status rules', () => {

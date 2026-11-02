@@ -34,7 +34,7 @@ function defaults() {
   for (const d of IDS) domains[d] = blank();
   return {
     staleSec: 60, sources: {}, mqtt: { url: '', username: '', password: '', qos: 0 },
-    plant: { jvs: Sim.DEFAULT_JVS.slice(), terms: Object.assign({}, Sim.DEFAULT_TERMS), slots: JSON.parse(JSON.stringify(Sim.DEFAULT_SLOTS)), place: '', lat: null, lon: null },
+    plant: { jvs: Sim.DEFAULT_JVS.slice(), terms: Object.assign({}, Sim.DEFAULT_TERMS), slots: JSON.parse(JSON.stringify(Sim.DEFAULT_SLOTS)), layoutVersion: 2, place: '', lat: null, lon: null },
     alerts: {
       weather: { enabled: false, intervalMin: 10, gustKmh: 60, rainMmH: 10, tempHighC: 40, tempLowC: 0, lookaheadH: 3, url: '' },
       traffic: { enabled: false, provider: 'tomtom', key: '', radiusKm: 8, minDelaySec: 300, intervalMin: 5, url: '' },
@@ -71,6 +71,10 @@ function normalize(raw) {
     if (Array.isArray(a.feeds)) cfg.alerts.feeds = a.feeds.map((f) => ({ name: String(f.name || '').trim(), url: String(f.url || '').trim(), intervalMin: num(f.intervalMin, 10), headers: f.headers && typeof f.headers === 'object' ? f.headers : {}, root: String(f.root || '').trim(), fields: f.fields && typeof f.fields === 'object' ? f.fields : {}, kind: String(f.kind || 'event'), enabled: f.enabled !== false }));
   }
   if (raw.plant) {
+    // layout v2 swapped the two overlays (kanban beside JV, AMR top right). A config saved with the old defaults is migrated; any other arrangement is the user's own and is kept.
+    if (Number(raw.plant.layoutVersion || 1) < 2 && raw.plant.slots && raw.plant.slots.yard && raw.plant.slots.top2 && raw.plant.slots.yard.bind === 'amr' && raw.plant.slots.top2.bind === 'kanban') {
+      raw = Object.assign({}, raw, { plant: Object.assign({}, raw.plant, { slots: Object.assign({}, raw.plant.slots, { yard: Object.assign({}, raw.plant.slots.yard, { bind: 'kanban' }), top2: Object.assign({}, raw.plant.slots.top2, { bind: 'amr' }) }) }) });
+    }
     if (raw.plant.slots && typeof raw.plant.slots === 'object') {
       for (const k of Object.keys(Sim.DEFAULT_SLOTS)) {
         const s = raw.plant.slots[k]; if (!s || typeof s !== 'object') continue;

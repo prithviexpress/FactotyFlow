@@ -165,13 +165,18 @@
     const chip = (x, y2, w, label2, val, st) => '<rect x="' + x + '" y="' + y2 + '" width="' + w + '" height="16" rx="2" fill="none" stroke="' + TINT[st] + '" stroke-opacity=".6"/>' + tx(x + 6, y2 + 11.5, label2, 'os') + tx(x + w - 6, y2 + 11.5, val, 'on2', 'text-anchor="end" style="fill:' + TINT[st] + '"');
     function amrOverlay(g) {
       const H = Sim.amrHealth(S), ind = H.rows[0], jv = H.rows[1], bst = ind.battery >= 50 ? 'ok' : ind.battery >= 30 ? 'watch' : 'low';
-      const row = (r, label2, y2) => tx(g.x + 10, y2 + 7, label2, 'os') + seg3(g.x + 56, y2, 112, r.avail, r.busy, r.charging) + tx(g.x + 176, y2 + 7, (r.avail + r.busy) + '/' + r.total, 'on2');
-      const lowAll = ind.low + jv.low, late = ind.late + jv.late, utilTxt = f0(ind.util) + '%';
-      return overlay('amrhealth', g, 'AMR FLEET HEALTH', H.status, '#/amr', 'AMR fleet health · indoor and JV fleets: units available or busy (green + blue) vs charging (amber), average battery, low-battery units, utilisation and late routes. Red: a late route, 3+ low batteries or under 60% available. Overlay on the plant map; it is not a shop.',
+      const lowAll = ind.low + jv.low, late = ind.late + jv.late, tip = 'AMR fleet health · indoor and JV fleets: units available or busy (green + blue) vs charging (amber), average battery, low-battery units, utilisation and late routes. Red: a late route, 3+ low batteries or under 60% available. Overlay on the plant map; it is not a shop.';
+      if (g.w < 200) {                                    // narrow view (when the second tall block is used for something else)
+        return overlay('amrhealth', g, 'AMR', H.status, '#/amr', tip, ringO(g.x + g.w / 2, g.y + 52, 24, ind.battery, bst, f0(ind.battery) + '%', 'batt') +
+          tx(g.x + 10, g.y + 94, 'low batt ' + lowAll, 'on2', 'style="fill:' + TINT[lowAll >= 3 ? 'low' : lowAll >= 1 ? 'watch' : 'ok'] + '"') + tx(g.x + 10, g.y + 110, 'late rte ' + late, 'on2', 'style="fill:' + TINT[late ? 'low' : 'ok'] + '"') + tx(g.x + 10, g.y + 126, 'up ' + (ind.avail + ind.busy) + '/' + ind.total, 'os'));
+      }
+      const bw = g.w >= 270 ? 112 : 84, cx = g.x + 56 + bw + 8, cwid = (g.w - 20 - 12) / 3;
+      const row = (r, label2, y2) => tx(g.x + 10, y2 + 7, label2, 'os') + seg3(g.x + 56, y2, bw, r.avail, r.busy, r.charging) + tx(cx, y2 + 7, (r.avail + r.busy) + '/' + r.total, 'on2');
+      return overlay('amrhealth', g, 'AMR FLEET HEALTH', H.status, '#/amr', tip,
         row(ind, 'INDOOR', g.y + 32) + row(jv, 'JV', g.y + 52) +
-        '<g class="lg">' + '<rect x="' + (g.x + 56) + '" y="' + (g.y + 68) + '" width="6" height="6" fill="var(--ok)"/>' + tx(g.x + 65, g.y + 74, 'idle', 'os') + '<rect x="' + (g.x + 90) + '" y="' + (g.y + 68) + '" width="6" height="6" fill="var(--cyan)"/>' + tx(g.x + 99, g.y + 74, 'busy', 'os') + '<rect x="' + (g.x + 126) + '" y="' + (g.y + 68) + '" width="6" height="6" fill="var(--watch)"/>' + tx(g.x + 135, g.y + 74, 'charging', 'os') + '</g>' +
-        ringO(g.x + g.w - 40, g.y + 56, 22, ind.battery, bst, f0(ind.battery) + '%', 'batt') +
-        chip(g.x + 10, g.y + 96, 80, 'LOW BATT', String(lowAll), lowAll >= 3 ? 'low' : lowAll >= 1 ? 'watch' : 'ok') + chip(g.x + 96, g.y + 96, 80, 'LATE RTE', String(late), late ? 'low' : 'ok') + chip(g.x + 182, g.y + 96, 90, 'UTIL', utilTxt, ind.util > 85 ? 'watch' : 'ok') +
+        '<g class="lg"><rect x="' + (g.x + 56) + '" y="' + (g.y + 68) + '" width="6" height="6" fill="var(--ok)"/>' + tx(g.x + 65, g.y + 74, 'idle', 'os') + '<rect x="' + (g.x + 90) + '" y="' + (g.y + 68) + '" width="6" height="6" fill="var(--cyan)"/>' + tx(g.x + 99, g.y + 74, 'busy', 'os') + '<rect x="' + (g.x + 126) + '" y="' + (g.y + 68) + '" width="6" height="6" fill="var(--watch)"/>' + tx(g.x + 135, g.y + 74, 'charging', 'os') + '</g>' +
+        ringO(g.x + g.w - 38, g.y + 54, 22, ind.battery, bst, f0(ind.battery) + '%', 'batt') +
+        chip(g.x + 10, g.y + 96, cwid, 'LOW BATT', String(lowAll), lowAll >= 3 ? 'low' : lowAll >= 1 ? 'watch' : 'ok') + chip(g.x + 16 + cwid, g.y + 96, cwid, 'LATE RTE', String(late), late ? 'low' : 'ok') + chip(g.x + 22 + 2 * cwid, g.y + 96, cwid, 'UTIL', f0(ind.util) + '%', ind.util > 85 ? 'watch' : 'ok') +
         tx(g.x + 10, g.y + 124, 'missions ' + ind.done + '/' + ind.planned + ' indoor · ' + jv.done + '/' + jv.planned + ' JV', 'os'));
     }
     function kanbanOverlay(g) {
@@ -194,10 +199,9 @@
       if (slot === 'top3' && top3Taken) return;
       let g = G[slot];
       const bind = (SL[slot] && SL[slot].bind) || 'none', lbl = (SL[slot] && SL[slot].label) || '';
-      if (bind === 'amr') { out.push(amrOverlay(g)); return; }
-      if (bind === 'kanban') {
-        if (slot === 'top2' && (!SL.top3 || SL.top3.bind === 'none' || SL.top3.bind === undefined)) { g = { x: G.top2.x, y: G.top2.y, w: G.top3.x + G.top3.w - G.top2.x, h: G.top2.h }; top3Taken = true; }
-        out.push(kanbanOverlay(g)); return;
+      if (bind === 'amr' || bind === 'kanban') {
+        if (slot === 'top2' && (!SL.top3 || SL.top3.bind === 'none' || SL.top3.bind === undefined)) { g = { x: G.top2.x, y: G.top2.y, w: G.top3.x + G.top3.w - G.top2.x, h: G.top2.h }; top3Taken = true; }   // the two tall blocks act as one when the second is unused
+        out.push(bind === 'amr' ? amrOverlay(g) : kanbanOverlay(g)); return;
       }
       if (!HREF[bind]) {
         out.push('<g class="nd blk k-empty" data-tip="Not named in the plant drawing. You can name it or put truck parking & bays / motorpool / shipment / AMR health / kanban health here under Interfaces → Plant setup → Plant layout."><rect class="bk" x="' + g.x + '" y="' + g.y + '" width="' + g.w + '" height="' + g.h + '" rx="12"/>' +
