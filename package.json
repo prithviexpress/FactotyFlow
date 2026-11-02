@@ -1,7 +1,7 @@
 {
   "name": "factoryflow",
   "version": "1.0.0",
-  "description": "Live automotive logistics control tower dashboard",
+  "description": "Live material flow control tower dashboard",
   "scripts": {
     "start": "node server.js",
     "test": "node --test --test-timeout=30000 test/*.test.js"

@@ -109,3 +109,11 @@ test('plant setup is validated, saved and applied to the live state', async () =
   assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')).plant.jvs, ['Seats Co', 'Cockpit Co']);
   await app.close();
 });
+
+test('dashboard heading is configurable and defaults to MATERIAL FLOW CONTROL TOWER', () => {
+  const S = require('../public/sim.js').createState();
+  assert.equal(S.setup.terms.title, 'MATERIAL FLOW CONTROL TOWER');
+  assert.equal(Cfg.normalize({}).plant.terms.title, 'MATERIAL FLOW CONTROL TOWER');
+  assert.deepEqual(Cfg.validate(Cfg.normalize({ plant: { terms: { title: 'PLANT 01 MATERIAL FLOW TOWER' } } })), []);
+  assert.ok(Cfg.validate(Cfg.normalize({ plant: { terms: { title: 'x'.repeat(49) } } })).some((e) => /title.*48/.test(e)));
+});

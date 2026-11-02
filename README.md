@@ -1,4 +1,4 @@
-# FactoryFlow — Automotive Logistics Control Tower
+# FactoryFlow — Material Flow Control Tower
 
 A live, interactive version of the control-tower dashboard (plant map, line risk, inbound trucks,
 in-plant transfers, line-side stock, quality, AMR fleets). No dependencies, no build step.

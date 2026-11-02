@@ -250,7 +250,7 @@
 
   /* ---------- plant setup: JV names + terminology (configurable) ---------- */
   const DEFAULT_JVS = ['JV1', 'JV2', 'JV3', 'JV4'];
-  const DEFAULT_TERMS = { bay: 'Bay', bays: 'Bays', atBay: 'At bay', motorpool: 'Motorpool', parking: 'Truck parking', jis: 'JIS accuracy' };
+  const DEFAULT_TERMS = { title: 'MATERIAL FLOW CONTROL TOWER', bay: 'Bay', bays: 'Bays', atBay: 'At bay', motorpool: 'Motorpool', parking: 'Truck parking', jis: 'JIS accuracy' };
   const MAX_JVS = 6;
   /** sequenced material routes drawn as dotted lines on the plant map; each has carriers in flight, missions today and an on-time rate */
   const SEQFLOWS = [

@@ -110,7 +110,7 @@ function validate(cfg) {
   if (!jvs.length || jvs.length > Sim.MAX_JVS) errs.push('JV names: between 1 and ' + Sim.MAX_JVS + ' names are required');
   if (jvs.some((n) => !n || n.length > 24)) errs.push('JV names must be 1\u201324 characters');
   if (new Set(jvs.map((n) => n.toLowerCase())).size !== jvs.length) errs.push('JV names must be unique');
-  for (const k of Object.keys(cfg.plant.terms)) if (!cfg.plant.terms[k] || cfg.plant.terms[k].length > 32) errs.push('terminology "' + k + '" must be 1\u201332 characters');
+  for (const k of Object.keys(cfg.plant.terms)) { const max = k === 'title' ? 48 : 32; if (!cfg.plant.terms[k] || cfg.plant.terms[k].length > max) errs.push('terminology "' + k + '" must be 1\u2013' + max + ' characters'); }
   const Vals = require('./values');
   const tokens = [];
   for (const n of Object.keys(cfg.sources)) {

@@ -58,7 +58,7 @@
       '<div class="tres"></div></div></div>';
   }
 
-  const TERM_FIELDS = [['bay', 'Bay (singular)', 'what you call a receiving dock'], ['bays', 'Bays (plural)', ''], ['atBay', 'Status: truck at bay', 'e.g. "At bay"'],
+  const TERM_FIELDS = [['title', 'Dashboard heading', 'shown in the top bar and the browser tab'], ['bay', 'Bay (singular)', 'what you call a receiving dock'], ['bays', 'Bays (plural)', ''], ['atBay', 'Status: truck at bay', 'e.g. "At bay"'],
     ['motorpool', 'Finished-vehicle yard', 'e.g. Motorpool'], ['parking', 'Truck waiting area', 'e.g. Truck parking'], ['jis', 'JIS KPI label', 'JIS = Just-In-Sequence (parts in vehicle order). Use "JIT adherence" only if you measure time windows, not sequence']];
   const SLOT_ROWS = [['jv', 'JV zone', 'carrier'], ['yard', 'Block beside JV', 'bind'], ['egtm', 'Tall block (EGTM)', 'carrier'], ['top1', 'Top-right wide block', 'bind'], ['imma', 'Block below it (IMM-A)', 'carrier'],
     ['top2', 'Tall block 1', 'bind'], ['top3', 'Tall block 2', 'bind'], ['press', 'Press', 'carrier'], ['weldB', 'Weld line B', ''], ['weldA', 'Weld line A', ''], ['paintB', 'Paint line B', ''], ['paintA', 'Paint line A', ''], ['asmB', 'Assembly line B', ''], ['asmA', 'Assembly line A', '']];

@@ -123,6 +123,7 @@
     return '<a class="bell' + (crit ? ' crit' : n ? ' warn' : '') + '" data-href="#/alerts"' + tipA(n ? n + ' active alert' + (n > 1 ? 's' : '') : 'No active alerts') + '>' + ico('bell') + (n ? '<b>' + n + '</b>' : '') + '</a>';
   }
   function renderHeader() {
+    try { if (document.title !== T('title')) document.title = T('title'); } catch (e) { /* ignore */ }
     const d = new Date();
     const shift = S.clock >= 360 && S.clock < 840 ? 'A' : S.clock >= 840 && S.clock < 1320 ? 'B' : 'C';
     const date = DAYS[d.getDay()] + ', ' + String(d.getDate()).padStart(2, '0') + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear();
@@ -133,7 +134,7 @@
       : '<span class="badge live" data-href="#/sources"' + tipA('All domains are fed by real systems.') + '>LIVE</span>';
     if (stale) badge += '<span class="badge stale" data-href="#/sources"' + tipA('No recent data for: ' + S.stale.join(', ') + ' (showing last known values)') + '>STALE: ' + S.stale.join(', ') + '</span>';
     setHTML($('#hdr'),
-      logoHTML() + '<h1>AUTOMOTIVE LOGISTICS CONTROL TOWER</h1>' +
+      logoHTML() + '<h1>' + esc(T('title')) + '</h1>' +
       '<div class="meta"><span>' + S.plant + '</span><i></i><span>Shift ' + shift + '</span><i></i><span>' + Sim.fmtClock(S.clock) + ' IST</span><i></i></div>' +
       badge + '<span class="sp"></span>' +
       '<a class="more cfg" data-href="#/settings"' + tipA('Interfaces: endpoints, sources, alerts, plant setup, logo') + '>\u2699</a>' +
