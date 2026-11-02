@@ -10,27 +10,22 @@ const V = require('../adapters/values.js');
 
 const ctx = (S) => ({ T: (k) => S.setup.terms[k], f0: Math.round, ui: { shop: 'all' }, IV: Sim.inventoryView(S) });
 
-test('block layout renders the drawing\'s blocks, the JV tiles, the sequence bus and carriers; logistics sit apart', () => {
+test('block layout renders the drawing\'s blocks, the JV tiles, the sequence bus and carriers; vacant blocks, no logistics strip', () => {
   const S = Sim.createState(); Sim.setPlant(S, { jvs: ['JV1', 'JV2', 'JV3', 'JV4'] });
   const r = global.window.FFMap.render(S, ctx(S));
   for (const id of ['jvzone', 'egtm', 'imma', 'press', 'weldB', 'weldA', 'paintB', 'paintA', 'asmB', 'asmA']) assert.ok(r.nodes.includes('data-node="' + id + '"'), id);
   for (const n of ['JV1', 'JV2', 'JV3', 'JV4']) assert.ok(r.nodes.includes('>' + n + '<'), n);
   assert.ok(r.nodes.includes('ASSEMBLY A') && r.nodes.includes('ASSEMBLY B') && r.nodes.includes('PRESS A/B'));
-  // the unnamed light blocks of the drawing stay placeholders; truck parking / motorpool / shipment are in a separate, labelled strip
-  // vacant blocks: AMR fleet health and kanban transfer health overlays (a different look from shop cards); one spare block stays a placeholder
-  assert.equal((r.nodes.match(/unnamed block/g) || []).length, 1);
-  assert.ok(r.nodes.includes('AMR FLEET HEALTH') && r.nodes.includes('KANBAN TRANSFERS') && r.nodes.includes('OVERLAY'));
-  assert.equal((r.nodes.match(/class="nd ovl/g) || []).length, 2);
-  assert.ok(!/class="nd blk[^"]*"[^>]*data-node="(amrhealth|kanbanhealth)"/.test(r.nodes));          // overlays are not drawn as blocks / cards
-  assert.ok(r.nodes.includes('LOGISTICS AREAS') && r.nodes.includes('not positioned'));
-  for (const id of ['logi-yard', 'logi-motorpool', 'logi-shipment']) assert.ok(r.nodes.includes('data-node="' + id + '"'), id);
+  // the four light blocks are vacant (for messages); AMR / kanban overlays and the logistics strip are gone from the drawing
+  assert.equal((r.nodes.match(/>VACANT</g) || []).length, 4);
+  assert.ok(!r.nodes.includes('data-node="amrhealth"') && !r.nodes.includes('data-node="kanbanhealth"') && !r.nodes.includes('LOGISTICS AREAS') && !r.nodes.includes('logi-'));
   assert.ok(!r.nodes.includes('ASSUMED POSITION'));
   assert.match(r.flows, /class="seq/); assert.match(r.flows, /animateMotion/); assert.match(r.flows, /id="rt-jv-b"/);
   // assembly A: down the gap between paint (x<=573) and assembly (x>=581), along the lane under A, then up into A at the same x as B's drops (mirror)
-  assert.match(r.flows, /id="rt-jv-wb" d="M230,138 V151 H200 V164"/); assert.match(r.flows, /id="rt-jv-wa" d="M230,138 V151 H287 V294 H200 V282"/);      // JV also feeds weld B (from the top) and weld A (from underneath: down the weld / paint gap, along the lane under A, up into it)
-  assert.match(r.flows, /id="rt-jv-a" d="M230,138 V151 H577 V294 H600 V282"/); assert.match(r.flows, /id="rt-eg-a" d="M626,138 V151 H577 V294 H700 V282"/);
-  assert.match(r.flows, /id="rt-im-a" d="M784,138 V151 H577 V294 H860 V282"/); assert.ok(!r.flows.includes('H1148'));
-  assert.ok(r.flows.includes('M600,294 V282') && r.flows.includes('M700,151 V164'));
+  assert.match(r.flows, /id="rt-jv-wb" d="M230,156 V169 H200 V182"/); assert.match(r.flows, /id="rt-jv-wa" d="M230,156 V169 H287 V332 H200 V320"/);      // JV also feeds weld B (from the top) and weld A (from underneath: down the weld / paint gap, along the lane under A, up into it)
+  assert.match(r.flows, /id="rt-jv-a" d="M230,156 V169 H577 V332 H600 V320"/); assert.match(r.flows, /id="rt-eg-a" d="M626,156 V169 H577 V332 H700 V320"/);
+  assert.match(r.flows, /id="rt-im-a" d="M784,156 V169 H577 V332 H860 V320"/); assert.ok(!r.flows.includes('H1148'));
+  assert.ok(r.flows.includes('M600,332 V320') && r.flows.includes('M700,169 V182'));
   S.line.stopped = true; S.line.reason = 'x';
   assert.ok(!global.window.FFMap.render(S, ctx(S)).flows.includes('animateMotion'));          // carriers stop with the line
 });
@@ -61,42 +56,49 @@ test('A/B buffers: shops feed accepts per-line keys and the older single weld / 
   assert.ok(errs.some((e) => /top1.*it can show/.test(e)) && errs.some((e) => /egtm.*amr or tow/.test(e)) && errs.some((e) => /jv.*24 characters/.test(e)));
 });
 
-test('a widget you place in an unnamed block is marked ASSUMED POSITION until confirmed, and leaves the logistics strip', () => {
+test('a widget you place in an unnamed block is marked ASSUMED POSITION until confirmed, ', () => {
   const S = Sim.createState();
   const count = (str) => (str.match(/ASSUMED POSITION/g) || []).length;
   Sim.setPlant(S, { slots: { top1: { bind: 'motorpool' } } });
   let r = global.window.FFMap.render(S, ctx(S));
   assert.equal(count(r.nodes), 1); assert.ok(r.nodes.includes('k-light assumed'));
-  assert.ok(!r.nodes.includes('data-node="logi-motorpool"') && r.nodes.includes('data-node="logi-yard"'));   // moved out of the strip
   Sim.setPlant(S, { slots: { top1: { bind: 'motorpool', confirmed: true } } });
   r = global.window.FFMap.render(S, ctx(S));
   assert.equal(count(r.nodes), 0); assert.ok(r.nodes.includes('data-tip="Motorpool \u00b7 position confirmed.'));
   Sim.setPlant(S, { slots: { yard: { bind: 'yard' }, top1: { bind: 'motorpool' }, top2: { bind: 'shipment' } } });
-  assert.ok(!global.window.FFMap.render(S, ctx(S)).nodes.includes('LOGISTICS AREAS'));                       // everything placed: no strip
+  assert.equal((global.window.FFMap.render(S, ctx(S)).nodes.match(/>VACANT</g) || []).length, 1);                 // only top3 is left vacant
   const cfg = Cfg.normalize({ plant: { slots: { top2: { confirmed: 'true' }, top3: { confirmed: false } } } });
   assert.equal(cfg.plant.slots.top2.confirmed, true); assert.equal(cfg.plant.slots.top3.confirmed, false);
 });
 
 test('overlays: AMR spans the two tall blocks and kanban sits beside JV; either can be moved or removed', () => {
-  const S = Sim.createState();
+  const S = Sim.createState(); Sim.setPlant(S, { slots: { yard: { bind: 'kanban' }, top2: { bind: 'amr' } } });
   let r = global.window.FFMap.render(S, ctx(S));
   assert.ok(r.nodes.includes('data-node="kanbanhealth"') && r.nodes.includes('data-node="amrhealth"'));
   const pos = (id) => { const m = r.nodes.match(new RegExp('data-node="' + id + '"[\\s\\S]*?<rect class="obk" x="(\\d+)" y="\\d+" width="(\\d+)"')); return { x: +m[1], w: +m[2] }; };
   assert.equal(pos('kanbanhealth').x, 291);                                                    // beside JV (the large block)
   assert.deepEqual(pos('amrhealth'), { x: 897, w: 247 });                                      // both tall blocks, top right
-  Sim.setPlant(S, { slots: { top3: { bind: 'shipment' }, yard: { bind: 'none' } } });
+  Sim.setPlant(S, { slots: { top2: { bind: 'amr' }, top3: { bind: 'shipment' }, yard: { bind: 'none' } } });
   r = global.window.FFMap.render(S, ctx(S));
   assert.ok(r.nodes.includes('data-node="top3"') && r.nodes.includes('>AMR<') && !r.nodes.includes('KANBAN TRANSFERS'));      // narrow AMR view; kanban removed
 });
 
-test('overlay swap: configs saved with the old defaults are migrated, user arrangements are kept', () => {
+test('overlays moved out of the drawing: configs saved with the old placement are migrated, a v3 choice is kept, vacant blocks carry a message', () => {
   const old = Cfg.normalize({ plant: { slots: { yard: { bind: 'amr' }, top2: { bind: 'kanban' } } } });
-  assert.equal(old.plant.slots.yard.bind, 'kanban'); assert.equal(old.plant.slots.top2.bind, 'amr');
-  const v2 = Cfg.normalize({ plant: { layoutVersion: 2, slots: { yard: { bind: 'amr' }, top2: { bind: 'kanban' } } } });
-  assert.equal(v2.plant.slots.yard.bind, 'amr'); assert.equal(v2.plant.slots.top2.bind, 'kanban');             // chosen after the swap: untouched
-  const own = Cfg.normalize({ plant: { slots: { yard: { bind: 'motorpool' }, top2: { bind: 'kanban' } } } });
-  assert.equal(own.plant.slots.yard.bind, 'motorpool'); assert.equal(own.plant.slots.top2.bind, 'kanban');
-  assert.equal(Cfg.normalize({}).plant.slots.yard.bind, 'kanban');
+  assert.equal(old.plant.slots.yard.bind, 'none'); assert.equal(old.plant.slots.top2.bind, 'none');
+  const v2 = Cfg.normalize({ plant: { layoutVersion: 2, slots: { yard: { bind: 'kanban' }, top2: { bind: 'amr' } } } });
+  assert.equal(v2.plant.slots.yard.bind, 'none'); assert.equal(v2.plant.slots.top2.bind, 'none');
+  const v3 = Cfg.normalize({ plant: { layoutVersion: 3, slots: { yard: { bind: 'kanban' }, top2: { bind: 'amr' } } } });
+  assert.equal(v3.plant.slots.yard.bind, 'kanban'); assert.equal(v3.plant.slots.top2.bind, 'amr');
+  const own = Cfg.normalize({ plant: { slots: { yard: { bind: 'motorpool' } } } });
+  assert.equal(own.plant.slots.yard.bind, 'motorpool');
+  assert.equal(Cfg.normalize({}).plant.slots.yard.bind, 'none');
+  const msg = Cfg.normalize({ plant: { layoutVersion: 3, slots: { top1: { text: 'Safety day <b>Friday</b> 10:00' } } } });
+  assert.equal(msg.plant.slots.top1.text, 'Safety day <b>Friday</b> 10:00');
+  assert.ok(Cfg.validate(Cfg.normalize({ plant: { layoutVersion: 3, slots: { top1: { text: 'x'.repeat(161) } } } })).some((e) => /message must be at most 160/.test(e)));
+  const S = Sim.createState(); Sim.setPlant(S, msg.plant);
+  const r = global.window.FFMap.render(S, ctx(S));
+  assert.ok(r.nodes.includes('Safety day') && !r.nodes.includes('<b>Friday'));                                  // shown and escaped
 });
 
 test('movement health: AMR status rules and kanban status rules', () => {
@@ -128,12 +130,12 @@ test('every route line is dynamic: carriers = in flight, idle lines dim, late ro
   for (const id of Object.keys(S.seqflows)) { S.seqflows[id].active = 0; }
   let r = global.window.FFMap.render(S, ctx(S));
   assert.equal((r.flows.match(/animateMotion/g) || []).length, 0);                       // nothing in flight -> no carriers
-  assert.ok(r.flows.includes('class="seq idle" d="M600,151 V164"'));                     // and the lines are dimmed
+  assert.ok(r.flows.includes('class="seq idle" d="M600,169 V182"'));                     // and the lines are dimmed
   S.seqflows.jvWB.active = 2; S.seqflows.eg_x = undefined; delete S.seqflows.eg_x;
   r = global.window.FFMap.render(S, ctx(S));
   assert.equal(count(r.flows, 'jv-wb'), 2);                                              // two carriers on JV -> Weld B
-  assert.ok(r.flows.includes('class="seq" d="M200,151 V164" marker-end') || r.flows.includes('class="seq" d="M200,151 V164"'));
-  assert.ok(r.flows.includes('class="seq idle" d="M287,151 V294 H200"'));                // JV -> Weld A still idle
+  assert.ok(r.flows.includes('class="seq" d="M200,169 V182" marker-end') || r.flows.includes('class="seq" d="M200,169 V182"'));
+  assert.ok(r.flows.includes('class="seq idle" d="M287,169 V332 H200"'));                // JV -> Weld A still idle
   S.seqflows.jvWB.onTimePct = 60;
   r = global.window.FFMap.render(S, ctx(S));
   assert.ok(r.flows.includes('seq late')); assert.ok(r.flows.includes('JV \u2192 Weld B: 2 in flight')); assert.ok(r.nodes.includes('LATE'));

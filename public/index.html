@@ -52,14 +52,13 @@
     <div class="vbox" id="v-a"></div>
     <div class="vbox" id="v-b"></div>
     <div class="vbox" id="v-c"></div>
-    <div class="vbox risk" id="p-risk"></div>
   </section>
   <nav id="tabs"></nav>
   <section id="main">
     <div class="vbox" id="p-map">
       <div class="vh"><span class="vb flow">&#9658;</span><h2>PLANT FLOW</h2><span class="vsub">material routes, buffers and movement health</span>
         <a class="more" data-href="#/inventory">Inventory hours &rsaquo;</a><div class="legend" id="map-legend"></div></div>
-      <svg id="map" viewBox="0 0 1152 384" preserveAspectRatio="xMidYMid meet">
+      <svg id="map" viewBox="0 0 1152 340" preserveAspectRatio="xMinYMid meet">
         <defs>
           <marker id="ah-blue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#29b6ff"/></marker>
           <marker id="ah-green" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#22e07a"/></marker>
@@ -74,13 +73,14 @@
           <pattern id="hatch" width="9" height="9" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="9" style="stroke:var(--hatch)" stroke-width="1.4"/></pattern>
           <pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse"><path id="map-grid" d="M24 0H0V24" fill="none" stroke-width=".6"/></pattern>
         </defs>
-        <rect id="map-bg" width="1152" height="384"/>
-        <rect width="1152" height="384" fill="url(#grid)"/>
+        <rect id="map-bg" width="1152" height="340"/>
+        <rect width="1152" height="340" fill="url(#grid)"/>
         <g id="roads"></g>
         <g id="flows"></g>
         <g id="nodes"></g>
       </svg>
     </div>
+    <div class="vbox" id="p-act"></div>
   </section>
   <section id="page"></section>
   <footer id="foot"></footer>

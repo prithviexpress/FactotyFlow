@@ -8,24 +8,26 @@
   const X = (s) => String(s === undefined || s === null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const tx = (x, y, s, cls, extra) => '<text x="' + x + '" y="' + y + '" class="' + (cls || '') + '" ' + (extra || '') + '>' + X(s) + '</text>';
 
-  /* ---- geometry (viewBox 1152 x 384) ---- */
-  const R1 = { y: 6, h: 132 }, R2B = { y: 164, h: 56 }, R2A = { y: 226, h: 56 };
+  /* ---- geometry (viewBox 1152 x 346): the logistics strip is gone, so the blocks use the whole height ---- */
+  const R1 = { y: 6, h: 150 }, R1B = R1.y + R1.h, R2B = { y: R1B + 26, h: 66 }, R2A = { y: R1B + 26 + 72, h: 66 }, HALF = (R1.h - 8) / 2, VB_H = R2A.y + R2A.h + 20;
   const G = {
     jv: { x: 8, y: R1.y, w: 275, h: R1.h }, yard: { x: 291, y: R1.y, w: 282, h: R1.h }, egtm: { x: 581, y: R1.y, w: 90, h: R1.h },
-    top1: { x: 679, y: R1.y, w: 210, h: 62 }, imma: { x: 679, y: 76, w: 210, h: 62 }, top2: { x: 897, y: R1.y, w: 120, h: R1.h }, top3: { x: 1025, y: R1.y, w: 119, h: R1.h },
-    press: { x: 8, y: R2B.y, w: 134, h: 118 }, weldB: { x: 160, y: R2B.y, w: 123, h: R2B.h }, weldA: { x: 160, y: R2A.y, w: 123, h: R2A.h },
+    top1: { x: 679, y: R1.y, w: 210, h: HALF }, imma: { x: 679, y: R1.y + HALF + 8, w: 210, h: HALF }, top2: { x: 897, y: R1.y, w: 120, h: R1.h }, top3: { x: 1025, y: R1.y, w: 119, h: R1.h },
+    press: { x: 8, y: R2B.y, w: 134, h: R2A.y + R2A.h - R2B.y }, weldB: { x: 160, y: R2B.y, w: 123, h: R2B.h }, weldA: { x: 160, y: R2A.y, w: 123, h: R2A.h },
     paintB: { x: 291, y: R2B.y, w: 282, h: R2B.h }, paintA: { x: 291, y: R2A.y, w: 282, h: R2A.h },
     asmB: { x: 581, y: R2B.y, w: 563, h: R2B.h }, asmA: { x: 581, y: R2A.y, w: 563, h: R2A.h }
   };
-  const BUS_Y = 151, CH_X = 577, A_BOT = 294;      // top bus lane; the gap between paint and assembly; the lane under assembly A (mirror of the bus above B)
-  const ROUTES = {                                  // sequenced-material paths. B: along the bus, drop into assembly B from the TOP.
+  const tk = (d) => d.replace(/\{R1B\}/g, R1B).replace(/\{B2\}/g, R2B.y).replace(/\{A2B\}/g, R2A.y + R2A.h).replace(/\{PB\}/g, R2B.y + R2B.h / 2).replace(/\{PA\}/g, R2A.y + R2A.h / 2);
+  const BUS_Y = R1B + 13, CH_X = 577, A_BOT = R2A.y + R2A.h + 12;      // top bus lane; the gap between paint and assembly; the lane under assembly A (mirror of the bus above B)
+  const ROUTES0 = {                                  // sequenced-material paths. B: along the bus, drop into assembly B from the TOP.
                                                     // A: along the bus, down the gap between paint and assembly, then along the lane UNDER assembly A and up into it (mirror of B).
-    'jv-wb': 'M230,138 V' + BUS_Y + ' H200 V164', 'jv-wa': 'M230,138 V' + BUS_Y + ' H287 V' + A_BOT + ' H200 V282',
-    'jv-b': 'M230,138 V' + BUS_Y + ' H600 V164', 'jv-a': 'M230,138 V' + BUS_Y + ' H' + CH_X + ' V' + A_BOT + ' H600 V282',
-    'eg-b': 'M626,138 V' + BUS_Y + ' H700 V164', 'eg-a': 'M626,138 V' + BUS_Y + ' H' + CH_X + ' V' + A_BOT + ' H700 V282',
-    'im-b': 'M784,138 V' + BUS_Y + ' H860 V164', 'im-a': 'M784,138 V' + BUS_Y + ' H' + CH_X + ' V' + A_BOT + ' H860 V282',
-    'pr-wb': 'M142,192 H158', 'pr-wa': 'M142,254 H158'
+    'jv-wb': 'M230,{R1B} V' + BUS_Y + ' H200 V{B2}', 'jv-wa': 'M230,{R1B} V' + BUS_Y + ' H287 V' + A_BOT + ' H200 V{A2B}',
+    'jv-b': 'M230,{R1B} V' + BUS_Y + ' H600 V{B2}', 'jv-a': 'M230,{R1B} V' + BUS_Y + ' H' + CH_X + ' V' + A_BOT + ' H600 V{A2B}',
+    'eg-b': 'M626,{R1B} V' + BUS_Y + ' H700 V{B2}', 'eg-a': 'M626,{R1B} V' + BUS_Y + ' H' + CH_X + ' V' + A_BOT + ' H700 V{A2B}',
+    'im-b': 'M784,{R1B} V' + BUS_Y + ' H860 V{B2}', 'im-a': 'M784,{R1B} V' + BUS_Y + ' H' + CH_X + ' V' + A_BOT + ' H860 V{A2B}',
+    'pr-wb': 'M142,{PB} H158', 'pr-wa': 'M142,{PA} H158'
   };
+  const ROUTES = {}; Object.keys(ROUTES0).forEach((k) => { ROUTES[k] = tk(ROUTES0[k]); });
   const approxLen = (d) => { let x = 0, y = 0, len = 0; (d.match(/[MHV][^MHV]*/g) || []).forEach((c) => { const t = c[0], v = parseFloat(c.slice(1)); if (t === 'M') { const m = c.slice(1).split(','); x = +m[0]; y = +m[1]; } else if (t === 'H') { len += Math.abs(v - x); x = v; } else { len += Math.abs(v - y); y = v; } }); return len || 1; };
 
   const fit = (s, w, px) => { s = String(s === undefined || s === null ? '' : s); const max = Math.max(3, Math.floor(w / (px || 9))); return s.length > max ? s.slice(0, max - 1) + '…' : s; };
@@ -214,8 +216,11 @@
         out.push(bind === 'amr' ? amrOverlay(g) : kanbanOverlay(g)); return;
       }
       if (!HREF[bind]) {
-        out.push('<g class="nd blk k-empty" data-tip="Not named in the plant drawing. You can name it or put truck parking & bays / motorpool / shipment / AMR health / kanban health here under Interfaces → Plant setup → Plant layout."><rect class="bk" x="' + g.x + '" y="' + g.y + '" width="' + g.w + '" height="' + g.h + '" rx="12"/>' +
-          tx(g.x + g.w / 2, g.y + g.h / 2 + (lbl ? 0 : -3), lbl || 'unnamed block', 'bt', 'text-anchor="middle"') + (lbl ? '' : tx(g.x + g.w / 2, g.y + g.h / 2 + 12, 'not in drawing', 'sm', 'text-anchor="middle"')) + '</g>');
+        const msg = (SL[slot] && SL[slot].text) || '', shownMsg = msg || 'Reserved for messages', per = Math.max(8, Math.floor((g.w - 22) / 6.1)), lines = [];
+        shownMsg.split(/\s+/).filter(Boolean).forEach((wd) => { const l = lines[lines.length - 1]; if (l !== undefined && (l + ' ' + wd).length <= per) lines[lines.length - 1] = l + ' ' + wd; else lines.push(wd.slice(0, per)); });
+        const room = Math.max(1, Math.floor((g.h - 40) / 14)), shown = lines.slice(0, room); if (lines.length > room) shown[room - 1] = shown[room - 1].slice(0, per - 1) + '…';
+        out.push('<g class="nd blk k-empty" data-tip="' + X(msg ? 'Message block: ' + msg : 'Vacant block, reserved for messages / information. Write a message for it under Interfaces → Plant setup → Plant layout (or put truck parking, motorpool, shipment, AMR health or kanban health here).').replace(/"/g, '&quot;') + '"><rect class="bk" x="' + g.x + '" y="' + g.y + '" width="' + g.w + '" height="' + g.h + '" rx="8"/>' +
+          tx(g.x + 12, g.y + 20, lbl || 'VACANT', 'bt') + shown.map((l, i) => tx(g.x + 12, g.y + 40 + i * 14, l, 'sm')).join('') + '</g>');
         return;
       }
       placed.add(bind);
@@ -257,50 +262,23 @@
         pill(g.x + g.w - 12, g.y + 27, f0(pct) + '%', st, 'end') }));
     });
 
-    /* ---- logistics areas: not part of the plant drawing, so shown apart from it ---- */
-    const strip = ['yard', 'motorpool', 'shipment'].filter((b) => !placed.has(b));
-    if (strip.length) {
-      const zx = 4, zy = 304, zw = 1144, zh = 76, n = strip.length, cw = (zw - 16 - (n - 1) * 8) / n, cy = zy + 22, ch = 48;
-      let cards = '';
-      strip.forEach((b, i) => {
-        const g = { x: zx + 8 + i * (cw + 8), y: cy, w: cw, h: ch }, id = 'logi-' + b;
-        let inner, st, nm;
-        if (b === 'yard') {
-          const waiting = Math.max(0, y.arrived - y.docked), full = y.occupied >= y.docks;
-          st = full ? 'low' : waiting >= 6 || y.occupied / y.docks > 0.92 ? 'watch' : 'ok'; nm = (SL.yard.label || (T('parking') + ' & ' + T('bays'))).toUpperCase();
-          inner = tx(g.x + 16, g.y + 17, fit(nm, g.w - 150, 8.4), 'bt') + pill(g.x + g.w - 10, g.y + 3, waiting + ' waiting', waiting >= 6 ? 'low' : waiting >= 3 ? 'watch' : 'ok', 'end') +
-            tx(g.x + 16, g.y + 31, y.expected + ' parked · ' + y.arrived + ' arrived · ' + y.docked + ' ' + T('atBay').toLowerCase() + ' · ' + y.received + ' received', 'sm') +
-            bar(g.x + 16, g.y + g.h - 9, g.w - 150, (y.occupied / Math.max(1, y.docks)) * 100, st) + tx(g.x + g.w - 12, g.y + g.h - 5, y.occupied + ' / ' + y.docks + ' ' + T('bays').toLowerCase(), 'bn2', 'text-anchor="end"');
-        } else if (b === 'motorpool') {
-          const f = S.finished, h = IV.finished.hours; st = f.onTime >= 90 ? 'ok' : f.onTime >= 85 ? 'watch' : 'low'; nm = T('motorpool').toUpperCase();
-          inner = tx(g.x + 16, g.y + 17, fit(nm, g.w - 120, 8.4), 'bt') + pill(g.x + g.w - 10, g.y + 3, f0(f.onTime) + '% on time', st, 'end') +
-            tx(g.x + 16, g.y + 39, f0(f.units), 'bn2') + tx(g.x + 16 + String(f0(f.units)).length * 9 + 6, g.y + 39, 'vehicles' + (h !== null ? ' · ' + hh(h) + ' of stock' : '') + ' · dispatch ' + (f.shipRate || 0).toFixed(1) + ' / min', 'sm');
-        } else {
-          const so = S.finished.shipOnTime; st = so >= 90 ? 'ok' : so >= 85 ? 'watch' : 'low'; nm = 'SHIPMENT';
-          inner = tx(g.x + 16, g.y + 17, nm, 'bt') + pill(g.x + g.w - 10, g.y + 3, f0(so) + '% on time', st, 'end') + tx(g.x + 16, g.y + 39, f0(so) + '%', 'bn2') + bar(g.x + 60, g.y + 33, g.w - 76, so, st);
-        }
-        cards += block({ id: id, kind: 'logi', st, href: HREF[b], tip: nm + ' · not part of the plant drawing, so it is not drawn at a position. Assign it to a block under Interfaces → Plant setup → Plant layout if you want it there.', x: g.x, y: g.y, w: g.w, h: g.h, inner });
-      });
-      out.push('<g class="logi-zone"><rect class="zone" x="' + zx + '" y="' + zy + '" width="' + zw + '" height="' + zh + '" rx="14"/>' +
-        '<text x="' + (zx + 14) + '" y="' + (zy + 15) + '" class="zl">LOGISTICS AREAS</text><text x="' + (zx + 132) + '" y="' + (zy + 15) + '" class="zs">not positioned: these are not in the plant drawing</text>' + cards + '</g>');
-    }
-
     /* ---- flows: dotted sequence lines + carriers. Every route is a data point (seqflows): carriers = in flight, lines dim when nothing uses them ---- */
     const stop = S.line.stopped ? ' stopped' : '';
     const act = (rid) => { const f = SF[FLOWOF[rid]]; return f ? f.active : 0; };
     const SEGS = [
-      ['M230,138 V' + BUS_Y, 0, ['jv-b', 'jv-a', 'jv-wb', 'jv-wa']], ['M626,138 V' + BUS_Y, 0, ['eg-b', 'eg-a']], ['M784,138 V' + BUS_Y, 0, ['im-b', 'im-a']],
-      ['M200,' + BUS_Y + ' H230', 0, ['jv-wb']], ['M200,' + BUS_Y + ' V164', 1, ['jv-wb']],                                                  // JV -> weld B (straight down onto it)
+      ['M230,{R1B} V' + BUS_Y, 0, ['jv-b', 'jv-a', 'jv-wb', 'jv-wa']], ['M626,{R1B} V' + BUS_Y, 0, ['eg-b', 'eg-a']], ['M784,{R1B} V' + BUS_Y, 0, ['im-b', 'im-a']],
+      ['M200,' + BUS_Y + ' H230', 0, ['jv-wb']], ['M200,' + BUS_Y + ' V{B2}', 1, ['jv-wb']],                                                  // JV -> weld B (straight down onto it)
       ['M230,' + BUS_Y + ' H860', 0, ['jv-b', 'jv-a', 'jv-wa', 'eg-b', 'eg-a', 'im-b', 'im-a']],                                          // the sequence bus
-      ['M287,' + BUS_Y + ' V' + A_BOT + ' H200', 0, ['jv-wa']], ['M200,' + A_BOT + ' V282', 1, ['jv-wa']],                               // JV -> weld A: down the weld / paint gap, along the lane under weld A, up into it (mirror of weld B)
-      ['M600,' + BUS_Y + ' V164', 1, ['jv-b']], ['M700,' + BUS_Y + ' V164', 1, ['eg-b']], ['M860,' + BUS_Y + ' V164', 1, ['im-b']],       // drops into assembly B
+      ['M287,' + BUS_Y + ' V' + A_BOT + ' H200', 0, ['jv-wa']], ['M200,' + A_BOT + ' V{A2B}', 1, ['jv-wa']],                               // JV -> weld A: down the weld / paint gap, along the lane under weld A, up into it (mirror of weld B)
+      ['M600,' + BUS_Y + ' V{B2}', 1, ['jv-b']], ['M700,' + BUS_Y + ' V{B2}', 1, ['eg-b']], ['M860,' + BUS_Y + ' V{B2}', 1, ['im-b']],       // drops into assembly B
       ['M' + CH_X + ',' + BUS_Y + ' V' + A_BOT + ' H860', 0, ['jv-a', 'eg-a', 'im-a']],                                                   // down the paint / assembly gap, lane under assembly A
-      ['M600,' + A_BOT + ' V282', 1, ['jv-a']], ['M700,' + A_BOT + ' V282', 1, ['eg-a']], ['M860,' + A_BOT + ' V282', 1, ['im-a']],       // up into assembly A (mirror of B)
-      ['M142,192 H158', 1, ['pr-wb']], ['M142,254 H158', 1, ['pr-wa']]
+      ['M600,' + A_BOT + ' V{A2B}', 1, ['jv-a']], ['M700,' + A_BOT + ' V{A2B}', 1, ['eg-a']], ['M860,' + A_BOT + ' V{A2B}', 1, ['im-a']],       // up into assembly A (mirror of B)
+      ['M142,{PB} H158', 1, ['pr-wb']], ['M142,{PA} H158', 1, ['pr-wa']]
     ];
     const FLABEL = {}; Sim.SEQFLOWS.forEach((f) => { FLABEL[f.id] = f.label; });
     const tipOf = (rids) => rids.map((r) => { const f = SF[FLOWOF[r]]; return f ? FLABEL[FLOWOF[r]] + ': ' + f.active + ' in flight · ' + f.missions + ' missions today · ' + Math.round(f.onTimePct) + '% on time' : ''; }).join(' | ');
     const seg = (d, arrow, users) => {
+      d = tk(d);
       const live = users.reduce((a, r) => a + act(r), 0) > 0, late = users.some((r) => SF[FLOWOF[r]] && SF[FLOWOF[r]].onTimePct < 78);
       return '<path class="seqbg' + (live ? '' : ' idle') + '" d="' + d + '"/><path class="seq' + stop + (live ? '' : ' idle') + (late ? ' late' : '') + '" d="' + d + '"' + (arrow ? ' marker-end="url(#ah-seq)"' : '') + '/>' +
         '<path class="seqhit" d="' + d + '" data-tip="' + X(tipOf(users)).replace(/"/g, '&quot;') + '"/>';

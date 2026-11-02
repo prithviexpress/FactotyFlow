@@ -69,6 +69,7 @@
       SLOT_ROWS.map((r) => {
         const s = sl[r[0]] || {};
         return '<div class="lrow"><span>' + r[1] + '</span><input data-slot="' + r[0] + '.label" maxlength="24" value="' + esc(s.label || '') + '" placeholder="automatic">' +
+          (r[2] === 'bind' ? '<input data-slot="' + r[0] + '.text" maxlength="160" value="' + esc(s.text || '') + '" placeholder="message shown while the block is vacant" data-tip="Shown inside the block when it is set to Nothing (placeholder): shift notes, announcements, safety messages.">' : '') +
           (r[2] === 'bind' ? '<label class="cfm" data-tip="Tick once this position and use match your plant drawing. Until then the block is marked ASSUMED POSITION on the map."><input type="checkbox" data-slot="' + r[0] + '.confirmed"' + (s.confirmed ? ' checked' : '') + '> confirmed</label><select data-slot="' + r[0] + '.bind">' + Object.keys(BIND_LABEL).map((b) => '<option value="' + b + '"' + (s.bind === b ? ' selected' : '') + '>' + BIND_LABEL[b] + '</option>').join('') + '</select>' : '') +
           (r[2] === 'carrier' ? '<select data-slot="' + r[0] + '.carrier"><option value="amr"' + (s.carrier === 'amr' ? ' selected' : '') + '>AMR</option><option value="tow"' + (s.carrier === 'tow' ? ' selected' : '') + '>Tow truck</option></select>' : '') + '</div>';
       }).join('') + '</div></div>';

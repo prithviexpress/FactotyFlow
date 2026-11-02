@@ -595,11 +595,6 @@ table.rt .pn .ic{font-size:26px}
 
 #map-legend{gap:10px}#map-legend span{font-size:11.5px}
 
-/* ---- logistics areas strip (not part of the plant drawing) ---- */
-.logi-zone .zone{fill:var(--sunk);fill-opacity:.55;stroke:var(--line);stroke-width:1.2;stroke-dasharray:3 5}
-.logi-zone .zl{font-size:11px;font-weight:800;letter-spacing:1.2px;fill:var(--ink2)}
-.logi-zone .zs{font-size:10.5px;fill:var(--ink3);font-style:italic}
-.nd.blk.k-logi .bk{fill:var(--card)}
 
 /* ---- movement-health overlays: instrument-panel look, deliberately unlike the shop cards ---- */
 .ovl .obk{fill:none;stroke:var(--cyan);stroke-opacity:.55;stroke-width:1.2}
@@ -707,3 +702,27 @@ table.rt .pn .ic{font-size:26px}
 #kpis .kpi .chev{display:none}
 #kpis .kpi>div:last-child{min-width:0}
 #kpis .kpi .mini{width:90px}
+
+/* ---- v3: three verticals across the full width; plant flow left, actionable items right ---- */
+#verticals{grid-template-columns:1fr 1.2fr 1.05fr}
+#main{grid-template-columns:minmax(0,1fr) 420px;gap:8px}
+#p-map{display:flex}
+#p-map #map{background:transparent}
+#p-act{border-color:var(--edge,var(--line))}
+.nd.blk.k-empty text.sm{fill:var(--ink2);font-size:12px}
+.nd.blk.k-empty text.bt{fill:var(--ink3)}
+.ag{padding:6px 8px 8px;gap:5px;overflow-y:auto}
+.agrp{border:1px solid var(--line);border-left-width:5px;border-radius:5px;background:var(--panel2);padding:3px 6px 4px}
+.agrp.ok{border-left-color:var(--ok)}.agrp.watch{border-left-color:var(--watch)}.agrp.low{border-left-color:var(--low)}
+.agh{display:flex;align-items:center;gap:7px;font-size:12px;letter-spacing:.6px;min-height:20px}
+.agh b{flex:1;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gn{display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;background:var(--edge);color:var(--ink);font-size:10.5px;font-weight:800;flex:none}
+.cnt{min-width:22px;text-align:center;border-radius:9px;font-size:11.5px;font-weight:800;padding:0 6px;color:#06150d;background:var(--ok)}
+.cnt.watch{background:var(--watch);color:#201600}.cnt.low{background:var(--low);color:#fff}
+.ai{display:flex;align-items:center;gap:7px;font-size:12.5px;padding:2px 2px 2px 4px;border-top:1px solid var(--line);cursor:pointer;min-width:0}
+.ai:hover{background:var(--panel)}
+.ai>span{min-width:0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ai b{font-weight:700}.ai small{font-size:11.5px;color:var(--ink2);margin-left:6px}
+.ai.none{cursor:default;color:var(--ink2);font-size:12px}.ai.none:hover{background:none}
+.ai.more2{font-size:11.5px;color:var(--cyan);justify-content:flex-end}
+[data-theme="light"] .cnt{color:#fff}[data-theme="light"] .cnt.watch{color:#2a1d00}

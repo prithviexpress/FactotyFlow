@@ -262,8 +262,8 @@
   ];
   /* Plant block layout (slots). Empty label = automatic text for that block. `carrier` = how sequenced material moves from that block (amr | tow). */
   const DEFAULT_SLOTS = {
-    jv: { label: 'JV', carrier: 'tow' }, yard: { label: '', bind: 'kanban', confirmed: false }, egtm: { label: 'EGTM', carrier: 'amr' },
-    top1: { label: '', bind: 'none', confirmed: false }, imma: { label: 'IMM-A', carrier: 'amr' }, top2: { label: '', bind: 'amr', confirmed: false }, top3: { label: '', bind: 'none', confirmed: false },
+    jv: { label: 'JV', carrier: 'tow' }, yard: { label: '', bind: 'none', confirmed: false }, egtm: { label: 'EGTM', carrier: 'amr' },
+    top1: { label: '', bind: 'none', confirmed: false }, imma: { label: 'IMM-A', carrier: 'amr' }, top2: { label: '', bind: 'none', confirmed: false }, top3: { label: '', bind: 'none', confirmed: false },
     press: { label: 'PRESS A/B', carrier: 'tow' }, weldB: { label: 'WELD B' }, weldA: { label: 'WELD A' }, paintB: { label: 'PAINT B' }, paintA: { label: 'PAINT A' },
     asmB: { label: 'ASSEMBLY B' }, asmA: { label: 'ASSEMBLY A' }
   };

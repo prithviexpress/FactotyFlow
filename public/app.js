@@ -273,18 +273,62 @@
         '<div class="is"><span>' + (r.hours !== null ? (r.hours < 10 ? r.hours.toFixed(1) : f0(r.hours)) + ' h of stock' : 'stock —') + '</span><span class="' + r.rst + '">' + (r.p !== null ? f0(r.p) + '% on time to assembly' : 'no route data') + '</span>' + (r.ln ? '<span class="' + r.lst + '">line-side ' + statusLabel[r.lst] + '</span>' : '<span class="mut">line-side —</span>') + '</div></div>').join('') + '</div>');
   }
 
-  /* line risk: the small tile */
-  function renderRisk() {
-    const list = sortedParts(), top = list.slice(0, 3), m = top.length ? Sim.coverage(top[0]) : 9999, st = Sim.partStatus(m), el = $('#p-risk');
-    el.className = 'vbox risk ' + (st === 'low' ? '' : st);
-    const scope = ui.shop === 'all' ? '' : ' · ' + ui.shop.toUpperCase();
-    setHTML(el,
-      '<div class="vh"><span class="vb">!</span><h2>LINE RISK' + scope + '</h2><span class="vr">next 120 min</span></div>' +
-      '<div class="vbody"><div class="banner ' + (st === 'low' ? '' : st) + '"><span style="color:' + COL[st] + '">' + ico(st === 'ok' ? 'target' : 'warn') + '</span><b>EARLIEST SHORTAGE <em style="color:' + COL[st] + '">' + (m < 9000 ? f0(m) + ' MIN' : '—') + '</em></b></div>' +
-      (top.length ? top.map((p) => { const c = Sim.coverage(p), ps = Sim.partStatus(c), a = Sim.nextAction(S, p);
-        return '<div class="rr"' + tipA(esc(p.name) + ' — ' + f0(p.stock) + ' pcs at ' + p.rate + ' pcs/min. ' + (p.pending ? 'Inbound ' + esc(p.pending.ref) + ' ETA ' + clockOf(S.clock + p.pending.eta) : 'No inbound planned') + '. Owner: ' + esc(a.owner)) + '><span class="cov ' + ps + '">' + f0(c) + ' min</span><span class="rn"><b>' + esc(fitStr(p.name, 22)) + '</b><small>' + esc(fitStr(a.text, 30)) + '</small></span></div>'; }).join('')
-        : '<div class="empty">No tracked parts for this shop.</div>') +
-      '<a class="more" data-href="' + (ui.shop === 'all' ? '#/parts' : '#/shop/' + ui.shop) + '">All parts ›</a></div>');
+  /* ---------- actionable items: one section, grouped by what the shift lead has to act on ---------- */
+  const SEV = { low: 0, watch: 1 };
+  function actionGroups() {
+    const y = S.yard, bays = T('bays').toLowerCase(), bay = T('bay').toLowerCase();
+    const it = (st, t, d, href) => ({ st, t, d: d || '', href });
+    const G = [];
+    /* 1 line risks */
+    const L = [];
+    if (S.line.stopped) L.push(it('low', 'Line stopped', S.line.reason || 'component missing', '#/events'));
+    if (S.line.missing > 0) L.push(it('watch', 'Line running without ' + S.line.missing + ' component' + (S.line.missing > 1 ? 's' : ''), S.parts.filter((p) => p.stock <= 0 && p.critical === false).map((p) => p.name).slice(0, 3).join(', '), '#/parts'));
+    sortedParts().forEach((p) => { const c = Sim.coverage(p), ps = Sim.partStatus(c); if (ps === 'ok') return; const a = Sim.nextAction(S, p); L.push(it(ps, p.name + ' · ' + f0(c) + ' min cover', a.text + ' · ' + a.owner, '#/parts')); });
+    G.push({ n: 1, title: 'LINE RISKS', empty: 'No part is short in the next ' + Sim.RISK_MIN + ' min', items: L });
+    /* 2 truck delays */
+    const T2 = [];
+    S.trucks.forEach((t) => {
+      if (t.status === 'arrived') { const w = S.clock - (t.arrivedAt !== null && t.arrivedAt !== undefined ? t.arrivedAt : t.sched); if (w >= 20) T2.push({ w, o: it(w >= 45 ? 'low' : 'watch', t.id + ' · waiting ' + f0(w) + ' min at the gate', t.sup + ' · ' + t.mat, '#/inbound') }); }
+      else if (t.status === 'scheduled' && t.sched !== null && t.sched !== undefined && S.clock - t.sched >= 10) { const w = S.clock - t.sched; T2.push({ w, o: it(w >= 30 ? 'low' : 'watch', t.id + ' · ' + f0(w) + ' min past ETA ' + clockOf(t.sched), t.sup + ' · ' + t.mat + ' · call the carrier', '#/inbound') }); }
+    });
+    G.push({ n: 2, title: 'TRUCK DELAYS', empty: 'No truck is late or held at the gate', items: T2.sort((a, b) => b.w - a.w).map((x) => x.o) });
+    /* 3 bay not available */
+    const waiting = Math.max(0, y.arrived - y.docked), free = Math.max(0, y.docks - y.occupied), B = [];
+    if (free === 0) B.push(it('low', 'No ' + bay + ' free · all ' + y.docks + ' ' + bays + ' occupied', waiting + ' truck' + (waiting === 1 ? '' : 's') + ' waiting at the gate · release a ' + bay, '#/inbound'));
+    else if (free <= Math.max(1, Math.round(y.docks * 0.08))) B.push(it('watch', 'Only ' + free + ' ' + (free === 1 ? bay : bays) + ' free', waiting + ' waiting · ' + y.occupied + ' / ' + y.docks + ' in use', '#/inbound'));
+    if (y.g2d > 45) B.push(it(y.g2d > 60 ? 'low' : 'watch', 'Gate-to-' + bay + ' ' + f0(y.g2d) + ' min', 'above the 45 min target', '#/inbound'));
+    G.push({ n: 3, title: (T('bay') + ' NOT AVAILABLE').toUpperCase(), empty: free + ' ' + (free === 1 ? bay : bays) + ' free', items: B });
+    /* 4 AMR stoppages */
+    const A = [], H = Sim.amrHealth(S), nm = { amr: 'Indoor AMR', jv: 'JV AMR' };
+    H.rows.forEach((r) => {
+      S[r.key].routes.forEach((q) => { const pc = q.ema * 100, st = Sim.routeStatus(pc); if (st !== 'ok') A.push(it(st, nm[r.key] + ' · ' + q.name + ' ' + (st === 'low' ? 'late' : 'slow'), f0(pc) + '% on time', '#/amr')); });
+      if (r.low >= 1) A.push(it(r.low >= 3 ? 'low' : 'watch', nm[r.key] + ' · ' + r.low + ' unit' + (r.low > 1 ? 's' : '') + ' low on battery', f0(r.battery) + '% average · send to charge', '#/amr'));
+      if (r.availPct < 60) A.push(it('low', nm[r.key] + ' · only ' + f0(r.availPct) + '% of the fleet available', r.charging + ' charging', '#/amr'));
+    });
+    G.push({ n: 4, title: 'AMR STOPPAGES', empty: 'All AMR routes moving, batteries fine', items: A.sort((a, b) => SEV[a.st] - SEV[b.st]) });
+    /* 5 supply at risk (JV / in-house) */
+    const SP = jvRows().map((r) => ({ r, k: 'JV' })).concat(inhouseRows().map((r) => ({ r, k: 'In-house' }))).filter((x) => x.r.st !== 'ok')
+      .map((x) => it(x.r.st, x.k + ' · ' + x.r.name + ' buffer ' + f0(x.r.buf) + '%', (x.r.hours !== null ? x.r.hours.toFixed(1) + ' h of stock' : '') + (x.r.rp !== undefined && x.r.rp !== null ? ' · route ' + f0(x.r.rp) + '% on time' : x.r.p !== null && x.r.p !== undefined ? ' · ' + f0(x.r.p) + '% on time to assembly' : ''), x.k === 'JV' ? '#/amr' : '#/shop/' + (x.r.id === 'ip' || x.r.id === 'tm' ? 'assembly' : x.r.id)));
+    G.push({ n: 5, title: 'JV / IN-HOUSE SUPPLY', empty: 'All buffers and routes within limits', items: SP.sort((a, b) => SEV[a.st] - SEV[b.st]) });
+    /* 6 internal deliveries and kanban */
+    const D = [];
+    S.transfers.forEach((t) => { const pc = (t.q.reduce((a, c) => a + c, 0) / t.q.length) * 100; if (pc < 90) D.push(it(pc < 78 ? 'low' : 'watch', t.name + ' · ' + f0(pc) + '% on time', 'internal delivery', '#/transfers')); });
+    if (S.kanban.overdue >= 2) D.push(it(S.kanban.overdue >= 4 ? 'low' : 'watch', 'Kanban · ' + f0(S.kanban.overdue) + ' overdue signals', 'average wait ' + f0(S.kanban.avgWaitMin) + ' min', '#/lineside'));
+    G.push({ n: 6, title: 'INTERNAL DELIVERIES / KANBAN', empty: 'Deliveries and kanban on time', items: D.sort((a, b) => SEV[a.st] - SEV[b.st]) });
+    return G;
+  }
+  const ROW_BUDGET = 9;                 // rows the panel can show: one per group first, spare rows go to the groups with most items, in order
+  function renderActions() {
+    const gs = actionGroups(), total = gs.reduce((a, g) => a + g.items.length, 0), red = gs.some((g) => g.items.some((i) => i.st === 'low')), el = $('#p-act');
+    el.classList.toggle('problem', red);
+    const shown = {}; let spare = ROW_BUDGET - gs.length; gs.forEach((g) => { shown[g.n] = Math.min(1, g.items.length); });
+    for (let again = true; again && spare > 0;) { again = false; gs.forEach((g) => { if (spare > 0 && shown[g.n] < g.items.length) { shown[g.n]++; spare--; again = true; } }); }
+    setHTML(el, '<div class="vh"><span class="vb">!</span><h2>ACTIONABLE ITEMS</h2><span class="vr ' + (red ? 'low' : total ? 'watch' : 'ok') + '">' + (total ? total + ' open' : 'all clear') + '</span></div><div class="vbody ag">' +
+      gs.map((g) => {
+        const worstSt = g.items.some((i) => i.st === 'low') ? 'low' : g.items.length ? 'watch' : 'ok', k = shown[g.n];
+        return '<div class="agrp ' + worstSt + '"><div class="agh"><span class="gn">' + g.n + '</span><b>' + esc(g.title) + '</b><span class="cnt ' + worstSt + '"' + (g.items.length > k ? tipA((g.items.length - k) + ' more not shown: open the first item for the full list') : '') + '>' + (g.items.length || '✓') + '</span></div>' +
+          (g.items.length ? g.items.slice(0, k).map((i) => '<div class="ai ' + i.st + '" data-href="' + i.href + '"' + tipA(esc(i.t) + (i.d ? ' — ' + esc(i.d) : '')) + '><i class="sd ' + i.st + '"></i><span><b>' + esc(i.t) + '</b>' + (i.d ? '<small>' + esc(i.d) + '</small>' : '') + '</span></div>').join('') : '<div class="ai none"><span>' + esc(g.empty) + '</span></div>') + '</div>';
+      }).join('') + '</div>');
   }
 
   /* ---------- footer ---------- */
@@ -363,7 +407,7 @@
     }
     lastRoute = null;
     PROB = problems();
-    renderKpis(); renderTabs(); renderMap(); renderRisk(); renderVA(); renderVB(); renderVC(); renderFoot();
+    renderKpis(); renderTabs(); renderMap(); renderActions(); renderVA(); renderVB(); renderVC(); renderFoot();
     flagPanel('#v-a', PROB.inbound); flagPanel('#v-b', PROB.jv); flagPanel('#v-c', PROB.inhouse);
   }
   addEventListener('hashchange', render);

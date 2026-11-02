@@ -35,7 +35,7 @@ function defaults() {
   for (const d of IDS) domains[d] = blank();
   return {
     staleSec: 60, sources: {}, mqtt: { url: '', username: '', password: '', qos: 0 },
-    plant: { jvs: Sim.DEFAULT_JVS.slice(), terms: Object.assign({}, Sim.DEFAULT_TERMS), slots: JSON.parse(JSON.stringify(Sim.DEFAULT_SLOTS)), layoutVersion: 2, place: '', lat: null, lon: null },
+    plant: { jvs: Sim.DEFAULT_JVS.slice(), terms: Object.assign({}, Sim.DEFAULT_TERMS), slots: JSON.parse(JSON.stringify(Sim.DEFAULT_SLOTS)), layoutVersion: 3, place: '', lat: null, lon: null },
     alerts: {
       weather: { enabled: false, intervalMin: 10, gustKmh: 60, rainMmH: 10, tempHighC: 40, tempLowC: 0, lookaheadH: 3, url: '' },
       traffic: { enabled: false, provider: 'tomtom', key: '', radiusKm: 8, minDelaySec: 300, intervalMin: 5, url: '' },
@@ -76,6 +76,13 @@ function normalize(raw) {
     if (Number(raw.plant.layoutVersion || 1) < 2 && raw.plant.slots && raw.plant.slots.yard && raw.plant.slots.top2 && raw.plant.slots.yard.bind === 'amr' && raw.plant.slots.top2.bind === 'kanban') {
       raw = Object.assign({}, raw, { plant: Object.assign({}, raw.plant, { slots: Object.assign({}, raw.plant.slots, { yard: Object.assign({}, raw.plant.slots.yard, { bind: 'kanban' }), top2: Object.assign({}, raw.plant.slots.top2, { bind: 'amr' }) }) }) });
     }
+    // layout v3 moved the AMR / kanban overlays out of the plant drawing (their blocks are vacant, for messages). A config that still has the old default placement is migrated; the overlays stay available as a choice.
+    if (Number(raw.plant.layoutVersion || 1) < 3 && raw.plant.slots) {
+      const sl = JSON.parse(JSON.stringify(raw.plant.slots)), a = sl.yard, b = sl.top2;
+      if (a && (a.bind === 'kanban' || a.bind === 'amr')) a.bind = 'none';
+      if (b && (b.bind === 'amr' || b.bind === 'kanban')) b.bind = 'none';
+      raw = Object.assign({}, raw, { plant: Object.assign({}, raw.plant, { slots: sl }) });
+    }
     if (raw.plant.terms && raw.plant.terms.jis !== undefined && raw.plant.terms.jit === undefined) {      // the KPI label was called jis before; the old default is dropped, a custom label is kept
       const old = String(raw.plant.terms.jis).trim();
       if (old && old !== 'JIS accuracy') cfg.plant.terms.jit = old;
@@ -83,7 +90,7 @@ function normalize(raw) {
     if (raw.plant.slots && typeof raw.plant.slots === 'object') {
       for (const k of Object.keys(Sim.DEFAULT_SLOTS)) {
         const s = raw.plant.slots[k]; if (!s || typeof s !== 'object') continue;
-        for (const f of ['label', 'bind', 'carrier']) if (s[f] !== undefined) cfg.plant.slots[k][f] = String(s[f]).trim();
+        for (const f of ['label', 'bind', 'carrier', 'text']) if (s[f] !== undefined) cfg.plant.slots[k][f] = String(s[f]).trim();
         if (s.confirmed !== undefined) cfg.plant.slots[k].confirmed = s.confirmed === true || s.confirmed === 'true';
       }
     }
@@ -129,6 +136,7 @@ function validate(cfg) {
   if (new Set(tokens).size !== tokens.length) errs.push('two sources share the same token');
   for (const k of Object.keys(cfg.plant.slots)) {
     const s = cfg.plant.slots[k];
+    if (s.text && s.text.length > 160) errs.push('layout block "' + k + '": message must be at most 160 characters');
     if (s.label && s.label.length > 24) errs.push('layout block "' + k + '": label must be at most 24 characters');
     if (s.bind !== undefined && !Sim.SLOT_BINDS.includes(s.bind)) errs.push('layout block "' + k + '": it can show: ' + Sim.SLOT_BINDS.join(', '));
     if (s.carrier !== undefined && !Sim.CARRIERS.includes(s.carrier)) errs.push('layout block "' + k + '": carrier must be amr or tow');
