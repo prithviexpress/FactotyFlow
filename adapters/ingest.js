@@ -167,7 +167,11 @@ const APPLY = {
     asObj(p, 'quality');
     for (const k of ['rejected', 'quarantined', 'spf']) if (p[k] !== undefined) S.quality[k] = need(p[k], k);
   },
-  kpi(S, p) { asObj(p, 'kpi'); for (const k of ['jis', 'stockAcc']) if (p[k] !== undefined) S.kpi[k] = need(p[k], k); },
+  kpi(S, p) {
+    asObj(p, 'kpi');
+    if (p.jis !== undefined && p.jit === undefined) p = Object.assign({}, p, { jit: p.jis });        // older feeds call it jis
+    for (const k of ['jit', 'stockAcc']) if (p[k] !== undefined) S.kpi[k] = need(p[k], k);
+  },
   finished(S, p) { asObj(p, 'finished'); for (const k of ['onTime', 'shipOnTime', 'units', 'shipRate']) if (p[k] !== undefined) S.finished[k] = need(p[k], k); },
   deliveries(S, p) { asObj(p, 'deliveries'); for (const k of ['total', 'onTime']) if (p[k] !== undefined) S.deliveries[k] = need(p[k], k); },
   kanban(S, p) {

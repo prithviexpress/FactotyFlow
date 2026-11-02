@@ -1,16 +1,16 @@
 # Data contract
 
 **Best for real systems: one POST per source system** (`POST /api/source/<name>`). Define sources on the Interfaces page (name, token, which values it *owns*);
-each post carries many values as one JSON object, nested keys are path segments (or use `"kpi/jis": 98.4` directly):
+each post carries many values as one JSON object, nested keys are path segments (or use `"kpi/jit": 98.4` directly):
 
 ```bash
 curl -X POST http://host:8080/api/source/mes -H "Authorization: Bearer $MES_TOKEN" -H "Content-Type: application/json" \
-  -d '{"build":{"plan":920,"actual":766,"rate":1.9}, "kpi":{"jis":98.4}, "shops":{"press":{"buf":82},"bumper":{"buf":42}}, "line":{"stopped":0}}'
+  -d '{"build":{"plan":920,"actual":766,"rate":1.9}, "kpi":{"jit":98.4}, "shops":{"press":{"buf":82},"bumper":{"buf":42}}, "line":{"stopped":0}}'
 curl -X POST http://host:8080/api/source/wms -H "Authorization: Bearer $WMS_TOKEN" -H "Content-Type: application/json" \
   -d '{"parts":{"P-BMP-F":{"stock":28,"rate":1.27,"inbound":{"qty":160,"eta":25}}}, "lineside":{"bumper-b-h-lh":{"usable":42}}}'
 ```
 * **All-or-nothing:** every value is validated first (unit, range, ownership); if any fails, nothing is applied and the response lists *all* problems. Applied posts are one consistent snapshot, counted once per domain.
-* **Ownership:** a source may only write the prefixes it owns (`build`, `kpi/jis`, `shops/*/buf` …); anything else → `403`. A source's token does not work for other sources.
+* **Ownership:** a source may only write the prefixes it owns (`build`, `kpi/jit`, `shops/*/buf` …); anything else → `403`. A source's token does not work for other sources.
 * **Health:** the Data sources page and `GET /api/health` (`posters`) show last post, posts, values per post, rejected count and last error per source; a source silent longer than its *stale after* (default the global `staleSec`) is flagged STALE.
 * Send only what changed, or everything; there is no required cadence.
 * Arrays are not accepted in a source post (use keyed objects: `{"parts":{"P1":{…}}}`); use `/api/ingest/<domain>` for list-style bulk loads.
@@ -55,7 +55,7 @@ Time values: `eta` = minutes from now, or `etaAt` = ISO-8601 timestamp (converte
 | `quality` | `{rejected, quarantined, spf}` | spf = % |
 | `seqflows` | `{ jvB: {active, missions, onTimePct}, jvA, jvWB, jvWA, egB, egA, imB, imA, prWB, prWA }` | the dotted routes on the plant map: carriers (AMR / tow) in flight, missions today, on-time %. JV feeds Assembly B and A and Weld B and A; EGTM and IMM-A feed Assembly B and A; Press feeds Weld B and A. Per value: `seqflows/<flow>/active|missions|onTimePct`. Simulated until fed |
 | `kanban` | `{cards, open, overdue, avgWaitMin, onTimePct}` | kanban pull signals: cards in the loop, signals open now, of which overdue, average wait (min), on-time rate (%). Drives the KANBAN TRANSFERS overlay on the plant map |
-| `kpi` | `{jis, stockAcc}` | % |
+| `kpi` | `{jit, stockAcc}` | % ; `jis` is still accepted as the old name of `jit` |
 | `finished` | `{onTime, shipOnTime, units?, shipRate?}` | % ; `units` = finished vehicles waiting, `shipRate` = vehicles/min dispatched (for hours of finished-vehicle inventory) |
 | `deliveries` | `{total, onTime}` | |
 | `event` | `{msg, lvl: info\|ok\|watch\|low}` | appends to the event log; does not flip a domain live |
@@ -75,11 +75,11 @@ and keeps its last value (it is never silently re-simulated).
 ## Plant setup (names) — Interfaces page → *Plant setup*, or `plant` in `adapters.config.json`
 
 ```json
-"plant": { "jvs": ["JV1","JV2","JV3","JV4"], "terms": { "bay":"Bay", "bays":"Bays", "atBay":"At bay", "motorpool":"Motorpool", "parking":"Truck parking", "jis":"JIS accuracy" } }
+"plant": { "jvs": ["JV1","JV2","JV3","JV4"], "terms": { "bay":"Bay", "bays":"Bays", "atBay":"At bay", "motorpool":"Motorpool", "parking":"Truck parking", "jit":"JIT accuracy" } }
 ```
 * `jvs` (1–6 unique names, ≤24 chars): one node on the plant map, one buffer-hours entry, one JV AMR route (`<name> → Assembly`) each. There are no central stores / kitting / supermarket positions.
 * `terms`: wording used on the dashboard. Data field names do not change (`docked` = at bay, `docks` = number of bays, `yard` = truck parking, `finished` = motorpool).
-* **JIS** = Just-In-Sequence (parts delivered in the exact order of the vehicles on the line). If your plant measures delivery *time windows* (JIT), set `terms.jis` to e.g. `JIT adherence` — and feed the matching measurement into `kpi.jis`.
+* **JIT** = Just-In-Time: the share of deliveries that arrived within their delivery window (not early, not late). Feed it as `kpi/jit` (the old name `kpi/jis` still works). If your plant also tracks sequence accuracy, that is a separate number.
 
 ## Hours of inventory (`#/inventory`, `GET /api/inventory`)
 

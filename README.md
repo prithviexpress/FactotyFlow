@@ -14,7 +14,7 @@ Weld and paint are now two lines each (`weldA`, `weldB`, `paintA`, `paintB`); as
 
 ## Look & feel, logo, alerts
 
-* **Red glow:** any tile, panel or map node with a problem gets a pulsing red outline; hover a KPI tile to see why. Rules: line stopped or logistics stops today; any part under 30 min of cover; 6+ trucks waiting for a bay or all bays full; internal deliveries on time < 85%; JIS < 95%; gate-to-bay > 45 min; stock accuracy < 95%; a delayed transfer route; LOW line-side stock; single-piece flow < 90%; a late AMR route or 3+ low-battery AMRs; any shop/JV/motorpool node in the red. Thresholds are in `problems()` in `public/app.js`.
+* **Red glow:** any tile, panel or map node with a problem gets a pulsing red outline; hover a KPI tile to see why. Rules: line stopped or logistics stops today; any part under 30 min of cover; 6+ trucks waiting for a bay or all bays full; internal deliveries on time < 85%; JIT < 95%; gate-to-bay > 45 min; stock accuracy < 95%; a delayed transfer route; LOW line-side stock; single-piece flow < 90%; a late AMR route or 3+ low-battery AMRs; any shop/JV/motorpool node in the red. Thresholds are in `problems()` in `public/app.js`.
 * **Dark / light theme:** the sun/moon button in the top bar (remembered per browser).
 * **Logo:** click the logo box in the top bar (or **Interfaces → Branding → Browse**). PNG, JPG, SVG, WEBP or GIF, max 1 MB. With the server it is stored next to the config file and shown on every screen; without a server it is kept in that browser only.
 * **Top bar:** no DEMO badge. MIXED DATA / LIVE / STALE badges still appear when real feeds are connected; the footer says "Simulated data" while everything is simulated.

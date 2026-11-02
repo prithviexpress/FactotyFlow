@@ -160,7 +160,7 @@
     const risk = atRiskCount();
     const onSite = Math.max(0, y.arrived - y.received);
     const del = S.deliveries, delPct = (del.onTime / del.total) * 100;
-    const jc = kcls(S.kpi.jis, 98, 95), sc = kcls(S.kpi.stockAcc, 98, 95);
+    const jc = kcls(S.kpi.jit, 98, 95), sc = kcls(S.kpi.stockAcc, 98, 95);
     const html = [
       kpi('car', 'var(--iconmap)', 'TODAY BUILD', '(Plan vs Actual)', f0(b.actual) + ' | ' + b.plan,
         '<div style="display:flex;align-items:center;gap:6px"><div class="mini"><b style="width:' + pct.toFixed(1) + '%"></b></div><span class="ok" style="font-size:14px;font-weight:700">' + f0(pct) + '%</span></div>',
@@ -171,7 +171,7 @@
         { alert: PROB.trucks, href: '#/inbound', tip: 'Trucks arrived at gate and not yet received.' }),
       kpi('forklift', COL.cy, 'INTERNAL DELIVERIES', 'ON TIME', '<span class="' + kcls(delPct, 92, 85) + '">' + f0(delPct) + '%</span>', '<div class="sub">(' + del.onTime + ' / ' + del.total + ')</div>',
         { alert: PROB.deliveries, href: '#/transfers', tip: 'Cumulative on-time internal deliveries this shift.' }),
-      kpi('target', COL.cy, T('jis').toUpperCase(), '(last 2 hrs)', '<span class="' + jc + '">' + f1(S.kpi.jis) + '%</span>', '', { alert: PROB.jis, href: '#/quality', tip: T('jis') + ' over the last 2 hours. JIS = Just-In-Sequence: parts delivered in the exact order of the vehicles on the line (not merely on time).' }),
+      kpi('target', COL.cy, T('jit').toUpperCase(), '(last 2 hrs)', '<span class="' + jc + '">' + f1(S.kpi.jit) + '%</span>', '', { alert: PROB.jit, href: '#/quality', tip: T('jit') + ' over the last 2 hours. JIT = Just-In-Time: share of deliveries that arrived within their delivery window (not early, not late).' }),
       kpi('stop', COL.low, 'LOGISTICS LINE STOPS', '(today)', '<span class="' + (S.line.stops ? 'low' : 'ok') + '">' + pad2(S.line.stops) + '</span>',
         S.line.stopped ? '<div class="sub low">' + S.line.reason + '</div>' : '',
         { alert: PROB.stops, href: '#/events', tip: S.line.stopped ? 'LINE STOPPED — ' + S.line.reason : 'Line stops caused by logistics (shortages) today. Stopped time: ' + f1(S.line.stoppedMin) + ' min' }),
@@ -356,7 +356,7 @@
     P.trucks = wait >= 6 ? wait + ' trucks waiting for a ' + T('bay').toLowerCase() : y.occupied >= y.docks ? 'All ' + bays + ' occupied' : null;
     const dp = (S.deliveries.onTime / Math.max(1, S.deliveries.total)) * 100;
     P.deliveries = dp < 85 ? 'On-time rate ' + f0(dp) + '% (below 85%)' : null;
-    P.jis = S.kpi.jis < 95 ? T('jis') + ' ' + f1(S.kpi.jis) + '% (below 95%)' : null;
+    P.jit = S.kpi.jit < 95 ? T('jit') + ' ' + f1(S.kpi.jit) + '% (below 95%)' : null;
     P.bay = y.g2d > 45 ? 'Gate-to-' + T('bay').toLowerCase() + ' time ' + f0(y.g2d) + ' min (above 45)' : null;
     P.stock = S.kpi.stockAcc < 95 ? 'Stock accuracy ' + f1(S.kpi.stockAcc) + '% (below 95%)' : null;
     P.inbound = P.trucks || P.bay || (y.turn > 90 ? 'Truck turnaround ' + f0(y.turn) + ' min (above 90)' : null);

@@ -102,10 +102,10 @@ test('plant setup is validated, saved and applied to the live state', async () =
   const put = (b) => fetch(base + '/api/config', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ config: b }) });
   assert.equal((await put({ plant: { jvs: ['X', 'x'] } })).status, 400);                  // duplicate
   assert.equal((await put({ plant: { jvs: [] } })).status, 400);
-  const r = await put({ plant: { jvs: ['Seats Co', 'Cockpit Co'], terms: { bay: 'Bay', jis: 'JIT adherence' } } });
+  const r = await put({ plant: { jvs: ['Seats Co', 'Cockpit Co'], terms: { bay: 'Bay', jit: 'JIT adherence' } } });
   assert.equal(r.status, 200);
   assert.deepEqual(app.state.setup.jvs, ['Seats Co', 'Cockpit Co']);
-  assert.equal(app.state.setup.terms.jis, 'JIT adherence');
+  assert.equal(app.state.setup.terms.jit, 'JIT adherence');
   assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')).plant.jvs, ['Seats Co', 'Cockpit Co']);
   await app.close();
 });

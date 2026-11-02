@@ -22,7 +22,7 @@ const DOMAIN_INFO = [
   { id: 'jv', label: 'JV AMR fleet (routes named after the configured JVs)', source: 'Fleet manager', item: 'jv.unit', sample: { units: [{ id: 'JV-01', state: 'idle', battery: 64 }], routes: [{ name: 'JV1 → Assembly', missions: 32, onTimePct: 97 }], planned: 118 } },
   { id: 'jvstock', label: 'JV buffer stock (one entry per configured JV)', source: 'JV systems', sample: { JV1: { buf: 72, units: 86 }, JV2: 68, JV3: { buf: 55, hours: 0.9 }, JV4: 80 } },
   { id: 'quality', label: 'Rejected / quarantined parts, SPF adherence', source: 'QMS', sample: { rejected: 16, quarantined: 24, spf: 91 } },
-  { id: 'kpi', label: 'JIS (just-in-sequence) accuracy & stock accuracy (%)', source: 'MES / WMS', sample: { jis: 98.4, stockAcc: 97.8 } },
+  { id: 'kpi', label: 'JIT (just-in-time) accuracy & stock accuracy (%)', source: 'MES / WMS', sample: { jit: 98.4, stockAcc: 97.8 } },
   { id: 'finished', label: 'Motorpool stock & shipment on-time (%)', source: 'Motorpool / dispatch', sample: { onTime: 92, shipOnTime: 92, units: 176, shipRate: 1.8 } },
   { id: 'kanban', label: 'Kanban pull signals (cards, open, overdue, wait, on-time %)', source: 'Kanban / WMS', sample: { cards: 120, open: 18, overdue: 2, avgWaitMin: 14, onTimePct: 94 } },
   { id: 'seqflows', label: 'Sequenced material routes (carriers in flight, missions, on-time %) per route', source: 'Fleet manager / tow control', sample: { jvB: { active: 1, missions: 46, onTimePct: 96 }, jvWB: { active: 1, missions: 31, onTimePct: 97 }, egA: { active: 1, missions: 50, onTimePct: 97 }, prWB: { active: 1, missions: 88, onTimePct: 98 } } },
@@ -76,6 +76,10 @@ function normalize(raw) {
     if (Number(raw.plant.layoutVersion || 1) < 2 && raw.plant.slots && raw.plant.slots.yard && raw.plant.slots.top2 && raw.plant.slots.yard.bind === 'amr' && raw.plant.slots.top2.bind === 'kanban') {
       raw = Object.assign({}, raw, { plant: Object.assign({}, raw.plant, { slots: Object.assign({}, raw.plant.slots, { yard: Object.assign({}, raw.plant.slots.yard, { bind: 'kanban' }), top2: Object.assign({}, raw.plant.slots.top2, { bind: 'amr' }) }) }) });
     }
+    if (raw.plant.terms && raw.plant.terms.jis !== undefined && raw.plant.terms.jit === undefined) {      // the KPI label was called jis before; the old default is dropped, a custom label is kept
+      const old = String(raw.plant.terms.jis).trim();
+      if (old && old !== 'JIS accuracy') cfg.plant.terms.jit = old;
+    }
     if (raw.plant.slots && typeof raw.plant.slots === 'object') {
       for (const k of Object.keys(Sim.DEFAULT_SLOTS)) {
         const s = raw.plant.slots[k]; if (!s || typeof s !== 'object') continue;
@@ -116,7 +120,7 @@ function validate(cfg) {
   for (const n of Object.keys(cfg.sources)) {
     const s = cfg.sources[n];
     if (!/^[a-z0-9_-]{1,24}$/.test(n)) errs.push('source "' + n + '": name must be 1\u201324 characters of a-z, 0-9, - or _');
-    if (!s.owns.length) errs.push('source "' + n + '": list at least one value it owns (e.g. build, kpi/jis)');
+    if (!s.owns.length) errs.push('source "' + n + '": list at least one value it owns (e.g. build, kpi/jit)');
     for (const pre of s.owns) if (!Vals.prefixValid(pre)) errs.push('source "' + n + '": "' + pre + '" matches no data point (see the Data points page)');
     if (!/^\$\{\w+\}$/.test(s.token) && s.token.length < 16) errs.push('source "' + n + '": token must be at least 16 characters (or a ${ENV_VAR} reference)');
     if (s.token) tokens.push(s.token);

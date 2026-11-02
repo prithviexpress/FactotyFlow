@@ -79,7 +79,7 @@ def('Motorpool & dispatch', 'finished', 'finished/units', 'Vehicles waiting in t
 def('Motorpool & dispatch', 'finished', 'finished/shipRate', 'Dispatch rate from the motorpool', 'vehicles/min', NUM, 1.8, field((S) => S.finished, 'shipRate', { min: 0, max: 20 }));
 def('Motorpool & dispatch', 'finished', 'finished/onTime', 'Motorpool on-time', '%', NUM, 92, field((S) => S.finished, 'onTime', pct));
 def('Motorpool & dispatch', 'finished', 'finished/shipOnTime', 'Shipment on-time', '%', NUM, 92, field((S) => S.finished, 'shipOnTime', pct));
-def('KPIs', 'kpi', 'kpi/jis', 'JIS accuracy, last 2 h (just-in-sequence)', '%', NUM, 98.4, field((S) => S.kpi, 'jis', pct));
+def('KPIs', 'kpi', 'kpi/jit', 'JIT accuracy, last 2 h (deliveries within their time window; older name: kpi/jis)', '%', NUM, 98.4, field((S) => S.kpi, 'jit', pct));
 def('KPIs', 'kpi', 'kpi/stockAcc', 'Stock accuracy (cycle count)', '%', NUM, 97.8, field((S) => S.kpi, 'stockAcc', pct));
 def('KPIs', 'deliveries', 'deliveries/total', 'Internal deliveries today (total)', 'jobs', NUM, 375, field((S) => S.deliveries, 'total', cnt));
 def('KPIs', 'deliveries', 'deliveries/onTime', 'Internal deliveries today (on time)', 'jobs', NUM, 345, field((S) => S.deliveries, 'onTime', cnt));
@@ -210,8 +210,10 @@ function parseBody(text) {
 }
 
 /* ---------- resolve / apply ---------- */
+/** older names that still work: kpi/jis was renamed kpi/jit */
+const canonPath = (p) => { const s = String(p).replace(/^\/+|\/+$/g, ''); return /^kpi\/jis$/i.test(s) ? 'kpi/jit' : s; };
 function resolve(S, path) {
-  const segs = String(path).replace(/^\/+|\/+$/g, '').split('/').map((x) => decodeURIComponent(x));
+  const segs = canonPath(path).replace(/^\/+|\/+$/g, '').split('/').map((x) => decodeURIComponent(x));
   for (const d of R) {
     const ps = d.path.split('/');
     if (ps.length !== segs.length) continue;
@@ -237,13 +239,13 @@ function apply(S, path, raw) {
   const e = entityFor(S, d, id);
   d.set(S, v, e);
   if (!d.viaIngest) Ing.touch(S, d.domain);
-  return { path: path.replace(/^\/+/, ''), value: v, unit: d.unit };
+  return { path: canonPath(path), value: v, unit: d.unit };
 }
 function read(S, path) {
   const { d, id } = resolve(S, path);
   const K = d.ent && ENT[d.ent], e = d.ent ? K.find(S, id) : undefined;
   if (d.ent && !e) throw new ValueError('unknown ' + (d.entName || d.ent) + ' "' + id + '". Valid: ' + K.list(S).join(', '), 404);
-  return { path, value: d.get(S, e), unit: d.unit };
+  return { path: canonPath(path), value: d.get(S, e), unit: d.unit };
 }
 /** validate a path + value without applying it (used for atomic batches) */
 function check(S, path, raw) {
@@ -261,7 +263,7 @@ function flatten(obj, prefix, out) {
   out = out || []; prefix = prefix || '';
   if (!obj || typeof obj !== 'object' || Array.isArray(obj)) throw new ValueError('a source post must be a JSON object of values (arrays are not supported; use a keyed object, e.g. {"parts": {"P1": {"stock": 28}}})');
   for (const k of Object.keys(obj)) {
-    const p = prefix ? prefix + '/' + k : k, v = obj[k];
+    const p = canonPath(prefix ? prefix + '/' + k : k), v = obj[k];
     if (v !== null && typeof v === 'object' && !Array.isArray(v)) flatten(v, p, out);
     else if (Array.isArray(v)) throw new ValueError(p + ': arrays are not supported in a source post');
     else out.push({ path: p, v });
@@ -270,12 +272,12 @@ function flatten(obj, prefix, out) {
 }
 /** does a source that owns `prefixes` (e.g. ["build","shops/press","kpi/jis"]) may write `path`? ("*" matches any one segment) */
 function owns(prefixes, path) {
-  const ps = String(path).split('/');
-  return (prefixes || []).some((pre) => { const q = String(pre).replace(/^\/+|\/+$/g, '').split('/'); return q.length <= ps.length && q.every((s, i) => s === '*' || s.toLowerCase() === ps[i].toLowerCase()); });
+  const ps = canonPath(path).split('/');
+  return (prefixes || []).some((pre) => { const q = canonPath(pre).replace(/^\/+|\/+$/g, '').split('/'); return q.length <= ps.length && q.every((s, i) => s === '*' || s.toLowerCase() === ps[i].toLowerCase()); });
 }
 /** a prefix is valid when it is the start of at least one registered path */
 function prefixValid(pre) {
-  const q = String(pre).replace(/^\/+|\/+$/g, '').split('/');
+  const q = canonPath(pre).split('/');
   return !!q[0] && R.some((d) => { const ps = d.path.split('/'); return q.length <= ps.length && q.every((s, i) => s === '*' || /^\{.+\}$/.test(ps[i]) || s.toLowerCase() === ps[i].toLowerCase()); });
 }
 const rank = (it) => (/\/(total|plan|docks)$/.test(it.path) ? 0 : 1);     // totals before the values that must not exceed them
@@ -336,4 +338,4 @@ function catalog(S, base) {
   return { base, count: inputs.length, inputs, derived: DERIVED.map((x) => ({ value: x[0], how: x[1] })) };
 }
 
-module.exports = { catalog, apply, applyMany, validateMany, flatten, owns, prefixValid, read, check, resolve, domainOf, parseBody, coerce, ValueError, REGISTRY: R, DERIVED, slug };
+module.exports = { canonPath, catalog, apply, applyMany, validateMany, flatten, owns, prefixValid, read, check, resolve, domainOf, parseBody, coerce, ValueError, REGISTRY: R, DERIVED, slug };

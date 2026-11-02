@@ -6,7 +6,7 @@
   const DOMAINS = [
     ['build', 'Build counters (plan / actual)'], ['line', 'Line status & stops'], ['shops', 'Shop & store buffers'], ['parts', 'Parts stock, rate, inbound'],
     ['yard', 'Truck parking / bay counters'], ['trucks', 'Inbound truck list'], ['transfers', 'In-plant transfer jobs'], ['lineside', 'Line-side stock'],
-    ['amr', 'Indoor AMR fleet'], ['jv', 'JV AMR fleet'], ['jvstock', 'JV buffer stock'], ['quality', 'Rejections / quarantine / SPF'], ['kpi', 'JIS (just-in-sequence) & stock accuracy'],
+    ['amr', 'Indoor AMR fleet'], ['jv', 'JV AMR fleet'], ['jvstock', 'JV buffer stock'], ['quality', 'Rejections / quarantine / SPF'], ['kpi', 'JIT (just-in-time) & stock accuracy'],
     ['finished', 'Motorpool stock & shipment'], ['deliveries', 'Internal delivery totals']
   ];
 
@@ -184,7 +184,7 @@
     const q = S.quality, spfSt = q.spf >= 95 ? 'ok' : q.spf >= 90 ? 'watch' : 'low';
     return frame('quality', 'Quality, Single-Piece Flow & Rejections', 'Today',
       cards([card('Rejected parts', q.rejected, 'low', H.f1((q.rejected / Math.max(1, S.build.actual)) * 100) + '% of build'), card('Quarantined', q.quarantined, 'watch', 'under investigation'),
-        card('SPF adherence', H.f0(q.spf) + '%', spfSt, 'target 95%'), card(TM(S, 'jis') + ' (2 h)', H.f1(S.kpi.jis) + '%', S.kpi.jis >= 98 ? 'ok' : 'watch'), card('Stock accuracy', H.f1(S.kpi.stockAcc) + '%', S.kpi.stockAcc >= 98 ? 'ok' : 'watch')]) +
+        card('SPF adherence', H.f0(q.spf) + '%', spfSt, 'target 95%'), card(TM(S, 'jit') + ' (2 h)', H.f1(S.kpi.jit) + '%', S.kpi.jit >= 98 ? 'ok' : 'watch'), card('Stock accuracy', H.f1(S.kpi.stockAcc) + '%', S.kpi.stockAcc >= 98 ? 'ok' : 'watch')]) +
       '<div class="two">' + sect('Rejections per 5 min', big(H, 'rej', S.hist.rej, S.hist.t, { color: 'var(--low)', unit: ' pcs' })) +
       sect('Single-piece flow adherence', big(H, 'spf', S.hist.spf, S.hist.t, { color: H.COL[spfSt], unit: '%', min: 60, max: 100, target: 95, grid: [60, 80, 100] })) + '</div>');
   }

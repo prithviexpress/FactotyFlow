@@ -148,7 +148,7 @@
         g2d: 32, turn: 68
       },
       finished: { onTime: 92, shipOnTime: 92, units: 176, shipRate: 1.8 },
-      kpi: { jis: 98.4, stockAcc: 97.8 },
+      kpi: { jit: 98.4, stockAcc: 97.8 },
       deliveries: { total: 375, onTime: 345 },
       kanban: { cards: 120, open: 18, overdue: 2, avgWaitMin: 14, onTimePct: 94 },
       seqflows: { jvB: { active: 1, missions: 46, onTimePct: 96 }, jvA: { active: 1, missions: 44, onTimePct: 95 }, jvWB: { active: 1, missions: 31, onTimePct: 97 }, jvWA: { active: 0, missions: 29, onTimePct: 96 },
@@ -250,7 +250,7 @@
 
   /* ---------- plant setup: JV names + terminology (configurable) ---------- */
   const DEFAULT_JVS = ['JV1', 'JV2', 'JV3', 'JV4'];
-  const DEFAULT_TERMS = { title: 'MATERIAL FLOW CONTROL TOWER', bay: 'Bay', bays: 'Bays', atBay: 'At bay', motorpool: 'Motorpool', parking: 'Truck parking', jis: 'JIS accuracy' };
+  const DEFAULT_TERMS = { title: 'MATERIAL FLOW CONTROL TOWER', bay: 'Bay', bays: 'Bays', atBay: 'At bay', motorpool: 'Motorpool', parking: 'Truck parking', jit: 'JIT accuracy' };
   const MAX_JVS = 6;
   /** sequenced material routes drawn as dotted lines on the plant map; each has carriers in flight, missions today and an on-time rate */
   const SEQFLOWS = [
@@ -506,7 +506,7 @@
     }
     if (L.line || L.parts) { /* live feed owns line status */ } else if (blocking && S.line.stopped === false) {
       S.line.stopped = true; S.line.reason = 'Shortage: ' + blocking.name; S.line.stops++;
-      S.kpi.jis = clamp(S.kpi.jis - 2.5, 80, 100);
+      S.kpi.jit = clamp(S.kpi.jit - 2.5, 80, 100);
       event(S, 'LINE STOP — ' + blocking.name + ' (' + blocking.loc + ') ran out', 'low');
     } else if (!blocking && S.line.stopped && S.line.reason && S.line.reason.indexOf('Shortage') === 0) {
       S.line.stopped = false;
@@ -571,7 +571,7 @@
     /* quality & KPIs */
     if (!L.quality) S.quality.spf = clamp(S.quality.spf + (91 - S.quality.spf) * 0.02 * tick + (R() - 0.5) * 0.7 * tick - (S.line.stopped ? 0.2 * tick : 0), 70, 99);
     if (!L.quality && R() < 0.04 * tick) S.quality.quarantined = Math.max(0, S.quality.quarantined + (R() < 0.55 ? 1 : -1));
-    if (!L.kpi) S.kpi.jis = clamp(S.kpi.jis + (98.4 - S.kpi.jis) * 0.02 * tick + (R() - 0.5) * 0.12 * tick, 80, 100);
+    if (!L.kpi) S.kpi.jit = clamp(S.kpi.jit + (98.4 - S.kpi.jit) * 0.02 * tick + (R() - 0.5) * 0.12 * tick, 80, 100);
     if (!L.kpi) S.kpi.stockAcc = clamp(S.kpi.stockAcc + (97.8 - S.kpi.stockAcc) * 0.02 * tick + (R() - 0.5) * 0.06 * tick, 90, 100);
     if (!L.finished) S.finished.units = clamp(S.finished.units + (running ? S.build.rate * m * 0.5 : 0) - S.finished.shipRate * m * 0.5 + (176 - S.finished.units) * 0.03 * tick + (R() - 0.5) * 2 * tick, 20, 400);
     if (!L.finished) S.finished.shipOnTime = clamp(S.finished.shipOnTime + (92 - S.finished.shipOnTime) * 0.02 * tick + (R() - 0.5) * 0.5 * tick, 80, 100);

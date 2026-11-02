@@ -59,7 +59,7 @@
   }
 
   const TERM_FIELDS = [['title', 'Dashboard heading', 'shown in the top bar and the browser tab'], ['bay', 'Bay (singular)', 'what you call a receiving dock'], ['bays', 'Bays (plural)', ''], ['atBay', 'Status: truck at bay', 'e.g. "At bay"'],
-    ['motorpool', 'Finished-vehicle yard', 'e.g. Motorpool'], ['parking', 'Truck waiting area', 'e.g. Truck parking'], ['jis', 'JIS KPI label', 'JIS = Just-In-Sequence (parts in vehicle order). Use "JIT adherence" only if you measure time windows, not sequence']];
+    ['motorpool', 'Finished-vehicle yard', 'e.g. Motorpool'], ['parking', 'Truck waiting area', 'e.g. Truck parking'], ['jit', 'JIT KPI label', 'JIT = Just-In-Time: deliveries within their time window']];
   const SLOT_ROWS = [['jv', 'JV zone', 'carrier'], ['yard', 'Block beside JV', 'bind'], ['egtm', 'Tall block (EGTM)', 'carrier'], ['top1', 'Top-right wide block', 'bind'], ['imma', 'Block below it (IMM-A)', 'carrier'],
     ['top2', 'Tall block 1', 'bind'], ['top3', 'Tall block 2', 'bind'], ['press', 'Press', 'carrier'], ['weldB', 'Weld line B', ''], ['weldA', 'Weld line A', ''], ['paintB', 'Paint line B', ''], ['paintA', 'Paint line A', ''], ['asmB', 'Assembly line B', ''], ['asmA', 'Assembly line A', '']];
   const BIND_LABEL = { amr: 'AMR fleet health (overlay)', kanban: 'Kanban transfer health (overlay)', yard: 'Truck parking & bays', motorpool: 'Motorpool', shipment: 'Shipment', none: 'Nothing (placeholder)' };
@@ -166,7 +166,7 @@
       '<span class="sstat" data-sstat="' + esc(name) + '"></span><button class="tbtn" data-act="srcdel">Remove</button></div>' +
       '<div class="sg"><label>Token <small>sent as <code>Authorization: Bearer \u2026</code>; \u2265 16 chars or <code>${ENV_VAR}</code>. Shown once on Generate, masked after saving.</small>' +
       '<span class="tokrow"><input data-s="token" type="password" value="' + esc(s.token || '') + '"><button class="tbtn" data-act="srcgen">Generate</button></span></label>' +
-      '<label>Owns <small>values this system may write: path prefixes, comma or line separated (e.g. <code>build</code>, <code>kpi/jis</code>, <code>parts</code>). Anything else is rejected with 403.</small>' +
+      '<label>Owns <small>values this system may write: path prefixes, comma or line separated (e.g. <code>build</code>, <code>kpi/jit</code>, <code>parts</code>). Anything else is rejected with 403.</small>' +
       '<textarea data-s="owns" rows="2" spellcheck="false">' + esc((s.owns || []).join(', ')) + '</textarea><div class="chips">' + chips + '</div></label>' +
       '<label>Stale after <small>seconds without a post (0 = global)</small><input data-s="staleSec" type="number" min="0" value="' + esc(s.staleSec || 0) + '"></label></div>' +
       '<div class="surl">POST <code>' + esc(location.origin) + '/api/source/' + esc(name) + '</code> <button class="tbtn" data-act="srctpl">Payload template \u25be</button></div><div class="stpl" hidden></div></div>';

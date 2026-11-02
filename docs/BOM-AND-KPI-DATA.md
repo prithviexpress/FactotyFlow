@@ -11,12 +11,12 @@ Everything below is the data you would need so the numbers can be **calculated**
 | **Build sequence** (`vehicle_sequence.csv`) | the vehicles about to be built, in order, with their variant | every minute | read-only feed from MES (REST push, or a read-only DB view) |
 | **Stock** (`stock.csv`) | pieces per part per position (inbound, bay, line-side, JV) and quality status | every few minutes | WMS feed / read-only DB view |
 | **Inbound** (`inbound_asn.csv`) | trucks and ASNs: what is coming, when | minutes | gate / ASN feed |
-| **Delivery events** (`delivery_events.csv`) | each sequenced delivery: called, due, delivered, sequence expected vs actual | continuous | MES / fleet manager; needed for JIS accuracy |
+| **Delivery events** (`delivery_events.csv`) | each delivery: called, due, delivered (sequence expected vs actual is optional) | continuous | MES / fleet manager; needed for JIT accuracy |
 
 ## Columns to consider
 
 **BOM master.** `plant, shop, line (A/B/both), station, model, variant_code (ALL or a trim / colour / drive-side / powertrain code), part_no, part_desc, rev, ecn_no, qty_per_vehicle, uom,
-supply_type (JIS | KANBAN | BULK | MILKRUN), source_type (JV | SUPPLIER | INTERNAL), source_name (JV1, press, supplier), dest_shop, dest_line, pack_qty, container_type, lineside_loc,
+supply_type (JIT | KANBAN | BULK | MILKRUN), source_type (JV | SUPPLIER | INTERNAL), source_name (JV1, press, supplier), dest_shop, dest_line, pack_qty, container_type, lineside_loc,
 min_qty (safety), max_qty, lead_time_min, critical (Y/N), status (ACTIVE | PENDING | OBSOLETE), valid_from, valid_to`.
 *Why the awkward ones matter:* `variant_code` makes consumption depend on the mix (a high-trim harness is not used by every vehicle); `rev` + `valid_from` stop an engineering change from being applied on the wrong day;
 `dest_shop/dest_line` tells the map which dotted route a part travels (JV to weld B, JV to assembly A, ...); `lead_time_min` is what turns coverage into "must be ordered by".
@@ -37,7 +37,7 @@ With the BOM, the sequence and the stock, per part per shop:
 * **Coverage (min)** = usable stock at line-side + bay ÷ that consumption rate; the dashboard's *earliest shortage*, *parts at risk*, next action and owner follow from it.
 * **Hours of inventory** at each position = pieces at the position ÷ consumption per hour.
 * **Line-side status** = usable ÷ `min_qty` (the current LOW / WATCH / OK rule).
-* **JIS accuracy** = deliveries with `result = OK` ÷ all sequenced deliveries in the window; **on-time %** per route = `delivered_ts <= due_ts`.
+* **JIT accuracy** = deliveries delivered within their window (`due_ts` tolerance, on time and not early) ÷ all deliveries in the window; **on-time %** per route = `delivered_ts <= due_ts`.
 * **Shop-wise BOM status**: a BOM line is *short* when coverage is below its `lead_time_min`, *at risk* below 2x, else *OK*; a shop's status is its worst critical line.
 
 What stays an input: build counts, line stops, quality counts, AMR and kanban numbers.
@@ -53,4 +53,4 @@ What stays an input: build counts, line stops, quality counts, AMR and kanban nu
 1. Where does the BOM live today: ERP, PLM or Excel? Does it carry variant codes, or only one BOM per model?
 2. Which system knows the build sequence, and how far ahead (the next 2 hours, a full shift)?
 3. Is stock split by position in the WMS, or only totals?
-4. How does your plant define JIS accuracy: per vehicle or per part?
+4. How does your plant define JIT accuracy: per delivery or per part line, and what is the allowed early / late tolerance?

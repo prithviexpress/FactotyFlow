@@ -1,7 +1,7 @@
 plant,shop,line,station,model,variant_code,part_no,part_desc,rev,ecn_no,qty_per_vehicle,uom,supply_type,source_type,source_name,dest_shop,dest_line,pack_qty,container_type,lineside_loc,min_qty,max_qty,lead_time_min,critical,status,valid_from,valid_to
-P01,assembly,A,ASY-08,MODEL-X,ALL,BMP-F-001,Bumper B/H (Front),C,,1,pcs,JIS,JV,JV1,assembly,A,4,rack,ASY-08,8,16,30,Y,ACTIVE,2026-01-01,
-P01,assembly,B,ASY-08,MODEL-X,ALL,BMP-F-001,Bumper B/H (Front),C,,1,pcs,JIS,JV,JV1,assembly,B,4,rack,ASY-08,8,16,30,Y,ACTIVE,2026-01-01,
-P01,assembly,A,ASY-04,MODEL-X,TRIM-HI,WH-210-HI,Wiring Harness (high trim),B,ECN-4471,1,pcs,JIS,SUPPLIER,Endurance,assembly,A,10,bin,ASY-04,20,60,90,Y,ACTIVE,2026-03-01,
-P01,assembly,A,ASY-04,MODEL-X,TRIM-HI,WH-210-HI,Wiring Harness (high trim),C,ECN-4602,1,pcs,JIS,SUPPLIER,Endurance,assembly,A,10,bin,ASY-04,20,60,90,Y,PENDING,2026-12-01,
+P01,assembly,A,ASY-08,MODEL-X,ALL,BMP-F-001,Bumper B/H (Front),C,,1,pcs,JIT,JV,JV1,assembly,A,4,rack,ASY-08,8,16,30,Y,ACTIVE,2026-01-01,
+P01,assembly,B,ASY-08,MODEL-X,ALL,BMP-F-001,Bumper B/H (Front),C,,1,pcs,JIT,JV,JV1,assembly,B,4,rack,ASY-08,8,16,30,Y,ACTIVE,2026-01-01,
+P01,assembly,A,ASY-04,MODEL-X,TRIM-HI,WH-210-HI,Wiring Harness (high trim),B,ECN-4471,1,pcs,JIT,SUPPLIER,Endurance,assembly,A,10,bin,ASY-04,20,60,90,Y,ACTIVE,2026-03-01,
+P01,assembly,A,ASY-04,MODEL-X,TRIM-HI,WH-210-HI,Wiring Harness (high trim),C,ECN-4602,1,pcs,JIT,SUPPLIER,Endurance,assembly,A,10,bin,ASY-04,20,60,90,Y,PENDING,2026-12-01,
 P01,weld,B,WLD-B-03,MODEL-X,ALL,FLR-PAN-01,Floor Pan,A,,1,pcs,KANBAN,INTERNAL,Press,weld,B,24,pallet,WLD-B-03,48,96,45,N,ACTIVE,2026-01-01,
-P01,assembly,A,ASY-02,MODEL-X,LHD,SEAT-DRV-LHD,Seat Set (Driver, LHD),A,,1,set,JIS,JV,JV2,assembly,A,2,rack,ASY-02,6,12,20,Y,ACTIVE,2026-01-01,
+P01,assembly,A,ASY-02,MODEL-X,LHD,SEAT-DRV-LHD,Seat Set (Driver, LHD),A,,1,set,JIT,JV,JV2,assembly,A,2,rack,ASY-02,6,12,20,Y,ACTIVE,2026-01-01,
