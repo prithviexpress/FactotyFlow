@@ -26,6 +26,7 @@ test('block layout renders the drawing\'s blocks, the JV tiles, the sequence bus
   assert.ok(!r.nodes.includes('ASSUMED POSITION'));
   assert.match(r.flows, /class="seq/); assert.match(r.flows, /animateMotion/); assert.match(r.flows, /id="rt-jv-b"/);
   // assembly A: down the gap between paint (x<=573) and assembly (x>=581), along the lane under A, then up into A at the same x as B's drops (mirror)
+  assert.match(r.flows, /id="rt-jv-wb" d="M230,138 V151 H200 V164"/); assert.match(r.flows, /id="rt-jv-wa" d="M230,138 V151 H287 V254 H283"/);          // JV also feeds weld B (straight down) and weld A (down the weld / paint gap)
   assert.match(r.flows, /id="rt-jv-a" d="M230,138 V151 H577 V294 H600 V282"/); assert.match(r.flows, /id="rt-eg-a" d="M626,138 V151 H577 V294 H700 V282"/);
   assert.match(r.flows, /id="rt-im-a" d="M784,138 V151 H577 V294 H860 V282"/); assert.ok(!r.flows.includes('H1148'));
   assert.ok(r.flows.includes('M600,294 V282') && r.flows.includes('M700,151 V164'));
@@ -118,4 +119,39 @@ test('kanban data point: simulated by default, pushable per value or as a group,
   assert.throws(() => V.apply(S, 'kanban/onTimePct', '120'), /out of range/);
   assert.throws(() => Ing.ingest(S, 'kanban', { onTimePct: 140 }), /between 0 and 100/);
   Ing.ingest(S, 'kanban', { open: 30, cards: 150 }); assert.equal(S.kanban.open, 30);
+});
+
+test('every route line is dynamic: carriers = in flight, idle lines dim, late routes turn red, hover shows the data', () => {
+  const S = Sim.createState();
+  const count = (str, rid) => (str.match(new RegExp('<mpath href="#rt-' + rid + '"/>', 'g')) || []).length;
+  for (const id of Object.keys(S.seqflows)) { S.seqflows[id].active = 0; }
+  let r = global.window.FFMap.render(S, ctx(S));
+  assert.equal((r.flows.match(/animateMotion/g) || []).length, 0);                       // nothing in flight -> no carriers
+  assert.ok(r.flows.includes('class="seq idle" d="M600,151 V164"'));                     // and the lines are dimmed
+  S.seqflows.jvWB.active = 2; S.seqflows.eg_x = undefined; delete S.seqflows.eg_x;
+  r = global.window.FFMap.render(S, ctx(S));
+  assert.equal(count(r.flows, 'jv-wb'), 2);                                              // two carriers on JV -> Weld B
+  assert.ok(r.flows.includes('class="seq" d="M200,151 V164" marker-end') || r.flows.includes('class="seq" d="M200,151 V164"'));
+  assert.ok(r.flows.includes('class="seq idle" d="M287,151 V254 H283"'));                // JV -> Weld A still idle
+  S.seqflows.jvWB.onTimePct = 60;
+  r = global.window.FFMap.render(S, ctx(S));
+  assert.ok(r.flows.includes('seq late')); assert.ok(r.flows.includes('JV \u2192 Weld B: 2 in flight')); assert.ok(r.nodes.includes('LATE'));
+  S.seqflows.jvWB.active = 9;
+  assert.equal(count(global.window.FFMap.render(S, ctx(S)).flows, 'jv-wb'), 3);          // at most 3 markers drawn per route
+});
+
+test('seqflows data point: simulated, validated, per-value endpoints', () => {
+  const S = Sim.createState();
+  for (let i = 0; i < 600; i++) Sim.step(S, 30);
+  for (const id of Object.keys(S.seqflows)) { const f = S.seqflows[id]; assert.ok(Number.isInteger(f.active) && f.active >= 0 && f.active <= 4 && f.onTimePct >= 0 && f.onTimePct <= 100 && f.missions >= 0, id); }
+  V.apply(S, 'seqflows/jvWB/active', '3'); V.apply(S, 'seqflows/jvWB/onTimePct', '88.5');
+  assert.equal(S.live.seqflows, true); assert.equal(S.seqflows.jvWB.active, 3);
+  for (let i = 0; i < 50; i++) Sim.step(S, 30);
+  assert.equal(S.seqflows.jvWB.active, 3);                                               // live: the simulator leaves it alone
+  assert.throws(() => V.apply(S, 'seqflows/jvWB/active', '2.5'), /whole number/);
+  assert.throws(() => V.apply(S, 'seqflows/nope/active', '1'), /unknown flow "nope"/);
+  assert.throws(() => Ing.ingest(S, 'seqflows', { jvB: { onTimePct: 120 } }), /between 0 and 100/);
+  assert.throws(() => Ing.ingest(S, 'seqflows', { jvB: { active: 1 }, zz: { active: 1 } }), /unknown flow "zz"/);
+  assert.equal(S.seqflows.jvB.active, Math.round(S.seqflows.jvB._a === undefined ? S.seqflows.jvB.active : S.seqflows.jvB.active));
+  Ing.ingest(S, 'seqflows', { jvB: { active: 2, missions: 99 } }); assert.equal(S.seqflows.jvB.missions, 99);
 });

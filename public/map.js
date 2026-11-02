@@ -20,6 +20,7 @@
   const BUS_Y = 151, CH_X = 577, A_BOT = 294;      // top bus lane; the gap between paint and assembly; the lane under assembly A (mirror of the bus above B)
   const ROUTES = {                                  // sequenced-material paths. B: along the bus, drop into assembly B from the TOP.
                                                     // A: along the bus, down the gap between paint and assembly, then along the lane UNDER assembly A and up into it (mirror of B).
+    'jv-wb': 'M230,138 V' + BUS_Y + ' H200 V164', 'jv-wa': 'M230,138 V' + BUS_Y + ' H287 V254 H283',
     'jv-b': 'M230,138 V' + BUS_Y + ' H600 V164', 'jv-a': 'M230,138 V' + BUS_Y + ' H' + CH_X + ' V' + A_BOT + ' H600 V282',
     'eg-b': 'M626,138 V' + BUS_Y + ' H700 V164', 'eg-a': 'M626,138 V' + BUS_Y + ' H' + CH_X + ' V' + A_BOT + ' H700 V282',
     'im-b': 'M784,138 V' + BUS_Y + ' H860 V164', 'im-a': 'M784,138 V' + BUS_Y + ' H' + CH_X + ' V' + A_BOT + ' H860 V282',
@@ -82,11 +83,11 @@
     const pctOf = (t) => (t ? (t.q.reduce((a, b) => a + b, 0) / t.q.length) * 100 : null);
     const jvPct = S.jv.routes.length ? S.jv.routes.reduce((a, r) => a + r.ema * 100, 0) / S.jv.routes.length : null;
     const jvLate = S.jv.routes.some((r) => Sim.routeStatus(r.ema * 100) === 'low');
+    const FLOWOF = { 'jv-b': 'jvB', 'jv-a': 'jvA', 'jv-wb': 'jvWB', 'jv-wa': 'jvWA', 'eg-b': 'egB', 'eg-a': 'egA', 'im-b': 'imB', 'im-a': 'imA', 'pr-wb': 'prWB', 'pr-wa': 'prWA' };
+    const SF = S.seqflows, grp = (ids) => { const v = ids.map((i) => SF[i]).filter(Boolean); return { pct: v.length ? v.reduce((a, x) => a + x.onTimePct, 0) / v.length : null, late: v.some((x) => x.onTimePct < 78), active: v.reduce((a, x) => a + x.active, 0) }; };
     const SRC = {
-      jv: { mode: (SL.jv.carrier || 'tow'), pct: jvPct, late: jvLate },
-      egtm: { mode: (SL.egtm.carrier || 'amr'), pct: pctOf(tr('eng')), late: pctOf(tr('eng')) < 78 },
-      imma: { mode: (SL.imma.carrier || 'amr'), pct: pctOf(tr('bmp')), late: pctOf(tr('bmp')) < 78 },
-      press: { mode: (SL.press.carrier || 'tow'), pct: null, late: false }
+      jv: Object.assign({ mode: SL.jv.carrier || 'tow' }, grp(['jvB', 'jvA', 'jvWB', 'jvWA'])), egtm: Object.assign({ mode: SL.egtm.carrier || 'amr' }, grp(['egB', 'egA'])),
+      imma: Object.assign({ mode: SL.imma.carrier || 'amr' }, grp(['imB', 'imA'])), press: Object.assign({ mode: SL.press.carrier || 'tow' }, grp(['prWB', 'prWA']))
     };
     const srcTag = (k, x, yy) => tag(x, yy, SRC[k].mode.toUpperCase() + (SRC[k].pct === null ? '' : ' · ' + Math.round(SRC[k].pct) + '%') + (SRC[k].late ? ' LATE' : ''), SRC[k].late);
 
@@ -275,31 +276,40 @@
         '<text x="' + (zx + 14) + '" y="' + (zy + 15) + '" class="zl">LOGISTICS AREAS</text><text x="' + (zx + 132) + '" y="' + (zy + 15) + '" class="zs">not positioned: these are not in the plant drawing</text>' + cards + '</g>');
     }
 
-    /* ---- flows: dotted sequence lines + carriers ---- */
+    /* ---- flows: dotted sequence lines + carriers. Every route is a data point (seqflows): carriers = in flight, lines dim when nothing uses them ---- */
     const stop = S.line.stopped ? ' stopped' : '';
-    const seg = (d, arrow) => '<path class="seqbg" d="' + d + '"/><path class="seq' + stop + '" d="' + d + '"' + (arrow ? ' marker-end="url(#ah-seq)"' : '') + '/>';
-    const busy = Sim.fleetView(S.amr).busy, jbusy = Sim.fleetView(S.jv).busy;
-    const count = { jv: Math.max(1, Math.min(3, Math.round(jbusy / 1.5))), egtm: Math.max(1, Math.min(3, Math.round(busy * 0.25))), imma: Math.max(1, Math.min(2, Math.round(busy * 0.15))) };
+    const act = (rid) => { const f = SF[FLOWOF[rid]]; return f ? f.active : 0; };
+    const SEGS = [
+      ['M230,138 V' + BUS_Y, 0, ['jv-b', 'jv-a', 'jv-wb', 'jv-wa']], ['M626,138 V' + BUS_Y, 0, ['eg-b', 'eg-a']], ['M784,138 V' + BUS_Y, 0, ['im-b', 'im-a']],
+      ['M200,' + BUS_Y + ' H230', 0, ['jv-wb']], ['M200,' + BUS_Y + ' V164', 1, ['jv-wb']],                                                  // JV -> weld B (straight down onto it)
+      ['M230,' + BUS_Y + ' H860', 0, ['jv-b', 'jv-a', 'jv-wa', 'eg-b', 'eg-a', 'im-b', 'im-a']],                                          // the sequence bus
+      ['M287,' + BUS_Y + ' V254 H283', 1, ['jv-wa']],                                                                                     // JV -> weld A (down the gap between weld and paint)
+      ['M600,' + BUS_Y + ' V164', 1, ['jv-b']], ['M700,' + BUS_Y + ' V164', 1, ['eg-b']], ['M860,' + BUS_Y + ' V164', 1, ['im-b']],       // drops into assembly B
+      ['M' + CH_X + ',' + BUS_Y + ' V' + A_BOT + ' H860', 0, ['jv-a', 'eg-a', 'im-a']],                                                   // down the paint / assembly gap, lane under assembly A
+      ['M600,' + A_BOT + ' V282', 1, ['jv-a']], ['M700,' + A_BOT + ' V282', 1, ['eg-a']], ['M860,' + A_BOT + ' V282', 1, ['im-a']],       // up into assembly A (mirror of B)
+      ['M142,192 H158', 1, ['pr-wb']], ['M142,254 H158', 1, ['pr-wa']]
+    ];
+    const FLABEL = {}; Sim.SEQFLOWS.forEach((f) => { FLABEL[f.id] = f.label; });
+    const tipOf = (rids) => rids.map((r) => { const f = SF[FLOWOF[r]]; return f ? FLABEL[FLOWOF[r]] + ': ' + f.active + ' in flight · ' + f.missions + ' missions today · ' + Math.round(f.onTimePct) + '% on time' : ''; }).join(' | ');
+    const seg = (d, arrow, users) => {
+      const live = users.reduce((a, r) => a + act(r), 0) > 0, late = users.some((r) => SF[FLOWOF[r]] && SF[FLOWOF[r]].onTimePct < 78);
+      return '<path class="seqbg' + (live ? '' : ' idle') + '" d="' + d + '"/><path class="seq' + stop + (live ? '' : ' idle') + (late ? ' late' : '') + '" d="' + d + '"' + (arrow ? ' marker-end="url(#ah-seq)"' : '') + '/>' +
+        '<path class="seqhit" d="' + d + '" data-tip="' + X(tipOf(users)).replace(/"/g, '&quot;') + '"/>';
+    };
     let carriers = '';
     function carrier(routeId, n, speed, mode, late, phase) {
-      const len = approxLen(ROUTES[routeId]), dur = Math.max(2, len / speed);
+      const len = approxLen(ROUTES[routeId]);
+      if (len < 40) return;                                              // too short to show a moving marker; the line itself lights up
+      const dur = Math.max(2, len / speed);
       for (let k = 0; k < n; k++) {
         const shape = mode === 'tow' ? '<rect x="-7" y="-3.6" width="10" height="7.2" rx="1.8" class="cr' + (late ? ' late' : '') + '"/><rect x="3.5" y="-2.6" width="6.5" height="5.2" rx="1.4" class="cr2' + (late ? ' late' : '') + '"/>' : '<circle r="5" class="cr' + (late ? ' late' : '') + '"/><circle r="2" class="cr2' + (late ? ' late' : '') + '"/>';
         carriers += '<g class="carrier">' + shape + (stop ? '' : '<animateMotion dur="' + dur.toFixed(1) + 's" begin="-' + ((dur * (k + phase)) / n).toFixed(2) + 's" repeatCount="indefinite" rotate="auto"><mpath href="#rt-' + routeId + '"/></animateMotion>') + '</g>';
       }
     }
-    const speed = (late) => (late ? 38 : 62);
-    carrier('jv-b', Math.max(1, Math.ceil(count.jv / 2)), speed(SRC.jv.late), SRC.jv.mode, SRC.jv.late, 0); carrier('jv-a', Math.max(1, Math.floor(count.jv / 2) || 1), speed(SRC.jv.late), SRC.jv.mode, SRC.jv.late, 0.5);
-    carrier('eg-b', 1, speed(SRC.egtm.late), SRC.egtm.mode, SRC.egtm.late, 0); carrier('eg-a', Math.max(1, count.egtm - 1), speed(SRC.egtm.late), SRC.egtm.mode, SRC.egtm.late, 0.5);
-    carrier('im-b', 1, speed(SRC.imma.late), SRC.imma.mode, SRC.imma.late, 0.2); carrier('im-a', Math.max(1, count.imma - 1), speed(SRC.imma.late), SRC.imma.mode, SRC.imma.late, 0.7);
+    const srcOf = (rid) => (rid.indexOf('jv') === 0 ? SRC.jv : rid.indexOf('eg') === 0 ? SRC.egtm : rid.indexOf('im') === 0 ? SRC.imma : SRC.press);
+    Object.keys(ROUTES).forEach((rid, i) => { const f = SF[FLOWOF[rid]], src = srcOf(rid), late = !!(f && f.onTimePct < 78); if (f && f.active > 0) carrier(rid, Math.min(3, f.active), late ? 38 : 62, src.mode, late, (i % 4) / 4); });
     const defs = '<defs>' + Object.keys(ROUTES).map((id) => '<path id="rt-' + id + '" d="' + ROUTES[id] + '" fill="none"/>').join('') + '</defs>';
-    const flows = defs +
-      seg('M230,138 V' + BUS_Y) + seg('M626,138 V' + BUS_Y) + seg('M784,138 V' + BUS_Y) +                                   // source drops onto the bus
-      seg('M230,' + BUS_Y + ' H860') +                                                                                     // the sequence bus
-      seg('M600,' + BUS_Y + ' V164', true) + seg('M700,' + BUS_Y + ' V164', true) + seg('M860,' + BUS_Y + ' V164', true) +  // drops into assembly B
-      seg('M' + CH_X + ',' + BUS_Y + ' V' + A_BOT + ' H860') +                                                             // down the gap between paint and assembly, then along the lane under assembly A
-      seg('M600,' + A_BOT + ' V282', true) + seg('M700,' + A_BOT + ' V282', true) + seg('M860,' + A_BOT + ' V282', true) +    // up into assembly A: mirror of the three drops into B
-      seg('M142,192 H158', true) + seg('M142,254 H158', true) + carriers;
+    const flows = defs + SEGS.map((sg) => seg(sg[0], sg[1], sg[2])).join('') + carriers;
     return { flows, nodes: out.join('') };
   }
 

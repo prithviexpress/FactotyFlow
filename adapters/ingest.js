@@ -5,7 +5,7 @@
  * (see `L = S.live` guards in public/sim.js). Domains with no feed keep simulating (MIXED mode).
  * Payload shapes are documented in docs/DATA-CONTRACT.md.
  */
-const DOMAINS = ['build', 'line', 'shops', 'parts', 'yard', 'trucks', 'transfers', 'lineside', 'amr', 'jv', 'jvstock', 'quality', 'kpi', 'finished', 'deliveries', 'kanban'];
+const DOMAINS = ['build', 'line', 'shops', 'parts', 'yard', 'trucks', 'transfers', 'lineside', 'amr', 'jv', 'jvstock', 'quality', 'kpi', 'finished', 'deliveries', 'kanban', 'seqflows'];
 const SHOP_KEYS = ['press', 'weld', 'paint', 'engine', 'bumper', 'assembly'];
 const BUFFER_KEYS = ['press', 'weldA', 'weldB', 'paintA', 'paintB', 'engine', 'bumper'];
 const BUFFER_ALIAS = { weld: ['weldA', 'weldB'], paint: ['paintA', 'paintB'] };   // older feeds send one buffer for both lines
@@ -176,6 +176,19 @@ const APPLY = {
     for (const k of ['cards', 'open', 'overdue', 'avgWaitMin', 'onTimePct']) if (p[k] !== undefined) v[k] = need(p[k], k);    // validate everything before changing anything
     if (v.onTimePct !== undefined && (v.onTimePct < 0 || v.onTimePct > 100)) throw new IngestError('onTimePct must be between 0 and 100');
     Object.assign(S.kanban, v);
+  },
+  seqflows(S, p) {
+    asObj(p, 'seqflows');
+    const ids = Object.keys(S.seqflows), upd = {};
+    for (const id of Object.keys(p)) {                 // validate everything first
+      if (!S.seqflows[id]) throw new IngestError('unknown flow "' + id + '" (valid: ' + ids.join(', ') + ')');
+      const o = asObj(p[id], id), v = {};
+      if (o.active !== undefined) { v.active = need(o.active, id + '.active'); if (v.active < 0 || v.active > 20 || !Number.isInteger(v.active)) throw new IngestError(id + '.active must be a whole number 0-20'); }
+      if (o.missions !== undefined) { v.missions = need(o.missions, id + '.missions'); if (v.missions < 0) throw new IngestError(id + '.missions must be 0 or more'); }
+      if (o.onTimePct !== undefined) { v.onTimePct = need(o.onTimePct, id + '.onTimePct'); if (v.onTimePct < 0 || v.onTimePct > 100) throw new IngestError(id + '.onTimePct must be between 0 and 100'); }
+      upd[id] = v;
+    }
+    for (const id of Object.keys(upd)) Object.assign(S.seqflows[id], upd[id], { _a: undefined });
   },
   event(S, p) {
     asObj(p, 'event');

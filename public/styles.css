@@ -613,3 +613,8 @@ table.rt .pn .ic{font-size:26px}
 .ovl .on2{font-size:11px;font-weight:700}
 .ovl.problem .obk{stroke:var(--low);stroke-opacity:1;stroke-width:2;filter:drop-shadow(0 0 6px var(--glow))}
 .legend .ov{display:inline-block;width:18px;height:11px;border:1.2px solid var(--cyan);border-top-width:4px;border-radius:2px}
+
+/* ---- dynamic route lines: lit while carriers are in flight, dimmed when idle; hover shows the route data ---- */
+.seq.idle{animation:none;opacity:.32}.seqbg.idle{opacity:.05}
+.seq.late{stroke:var(--low)}
+.seqhit{fill:none;stroke:transparent;stroke-width:12;pointer-events:stroke}

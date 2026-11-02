@@ -151,6 +151,9 @@
       kpi: { jis: 98.4, stockAcc: 97.8 },
       deliveries: { total: 375, onTime: 345 },
       kanban: { cards: 120, open: 18, overdue: 2, avgWaitMin: 14, onTimePct: 94 },
+      seqflows: { jvB: { active: 1, missions: 46, onTimePct: 96 }, jvA: { active: 1, missions: 44, onTimePct: 95 }, jvWB: { active: 1, missions: 31, onTimePct: 97 }, jvWA: { active: 0, missions: 29, onTimePct: 96 },
+        egB: { active: 1, missions: 52, onTimePct: 98 }, egA: { active: 1, missions: 50, onTimePct: 97 }, imB: { active: 0, missions: 37, onTimePct: 92 }, imA: { active: 1, missions: 35, onTimePct: 91 },
+        prWB: { active: 1, missions: 88, onTimePct: 98 }, prWA: { active: 1, missions: 86, onTimePct: 97 } },
       transfers: [
         { id: 'eng', name: 'Engine → Assembly', icon: 'engine', p: 0.97, q: seedQ(12, 12), win: 12, rate: 0.25 },
         { id: 'bmp', name: 'Bumper → Assembly', icon: 'bumper', p: 0.88, q: seedQ(8, 6), win: 8, rate: 0.15, mod: 'bumperJam' },
@@ -249,6 +252,12 @@
   const DEFAULT_JVS = ['JV1', 'JV2', 'JV3', 'JV4'];
   const DEFAULT_TERMS = { bay: 'Bay', bays: 'Bays', atBay: 'At bay', motorpool: 'Motorpool', parking: 'Truck parking', jis: 'JIS accuracy' };
   const MAX_JVS = 6;
+  /** sequenced material routes drawn as dotted lines on the plant map; each has carriers in flight, missions today and an on-time rate */
+  const SEQFLOWS = [
+    { id: 'jvB', label: 'JV \u2192 Assembly B' }, { id: 'jvA', label: 'JV \u2192 Assembly A' }, { id: 'jvWB', label: 'JV \u2192 Weld B' }, { id: 'jvWA', label: 'JV \u2192 Weld A' },
+    { id: 'egB', label: 'EGTM \u2192 Assembly B' }, { id: 'egA', label: 'EGTM \u2192 Assembly A' }, { id: 'imB', label: 'IMM-A \u2192 Assembly B' }, { id: 'imA', label: 'IMM-A \u2192 Assembly A' },
+    { id: 'prWB', label: 'Press \u2192 Weld B' }, { id: 'prWA', label: 'Press \u2192 Weld A' }
+  ];
   /* Plant block layout (slots). Empty label = automatic text for that block. `carrier` = how sequenced material moves from that block (amr | tow). */
   const DEFAULT_SLOTS = {
     jv: { label: 'JV', carrier: 'tow' }, yard: { label: '', bind: 'kanban', confirmed: false }, egtm: { label: 'EGTM', carrier: 'amr' },
@@ -567,6 +576,22 @@
     if (!L.finished) S.finished.units = clamp(S.finished.units + (running ? S.build.rate * m * 0.5 : 0) - S.finished.shipRate * m * 0.5 + (176 - S.finished.units) * 0.03 * tick + (R() - 0.5) * 2 * tick, 20, 400);
     if (!L.finished) S.finished.shipOnTime = clamp(S.finished.shipOnTime + (92 - S.finished.shipOnTime) * 0.02 * tick + (R() - 0.5) * 0.5 * tick, 80, 100);
 
+    /* sequenced material routes: carriers in flight follow the busy fleets and the line; on-time follows the AMR / transfer routes */
+    if (!L.seqflows) {
+      const jvBusy = fleetView(S.jv).busy, inBusy = fleetView(S.amr).busy, F = S.seqflows, up = running ? 1 : 0;
+      const jvPct = S.jv.routes.length ? S.jv.routes.reduce((a, r) => a + r.ema * 100, 0) / S.jv.routes.length : 95;
+      const tp = (id) => { const t = S.transfers.find((x) => x.id === id); return t ? (t.q.reduce((a, c) => a + c, 0) / t.q.length) * 100 : 95; };
+      const tgt = { jvB: jvBusy * 0.22, jvA: jvBusy * 0.22, jvWB: jvBusy * 0.18, jvWA: jvBusy * 0.14, egB: inBusy * 0.1, egA: inBusy * 0.09, imB: inBusy * 0.06, imA: inBusy * 0.06, prWB: 1.1, prWA: 1.0 };
+      const pct = { jvB: jvPct, jvA: jvPct - 1, jvWB: jvPct + 1, jvWA: jvPct, egB: tp('eng'), egA: tp('eng') - 1, imB: tp('bmp'), imA: tp('bmp') - 1, prWB: 98, prWA: 97 };
+      for (const id of Object.keys(F)) {
+        const f = F[id];
+        f._a = clamp((f._a === undefined ? f.active : f._a) + (tgt[id] * up - (f._a === undefined ? f.active : f._a)) * 0.2 * tick + (R() - 0.5) * 0.3 * tick, 0, 4);
+        f.active = Math.round(f._a);
+        if (f.active > 0 && R() < 0.12 * m * f.active) f.missions++;
+        f.onTimePct = clamp(f.onTimePct + (clamp(pct[id], 0, 100) - f.onTimePct) * 0.08 * tick + (R() - 0.5) * 0.4 * tick, 0, 100);
+      }
+    }
+
     /* kanban pull signals: more open / overdue when line-side stock is low or the bumper shop is jammed */
     if (!L.kanban) {
       const k = S.kanban, lowN = S.lineside.filter((l) => linesideStatus(l) === 'low').length, watchN = S.lineside.filter((l) => linesideStatus(l) === 'watch').length, jam = S.mods.bumperJam > 0 ? 1 : 0;
@@ -605,7 +630,7 @@
   /* ---------- hand a domain back to the simulator (fresh simulated data) ---------- */
   const DOMAIN_KEYS = {
     build: ['build'], line: ['line'], shops: ['shops'], parts: ['parts'], yard: ['yard', 'trucks'], trucks: ['trucks'],
-    transfers: ['transfers'], lineside: ['lineside'], amr: ['amr'], jv: ['jv'], kanban: ['kanban'], jvstock: ['jvSites'], quality: ['quality'], kpi: ['kpi'],
+    transfers: ['transfers'], lineside: ['lineside'], amr: ['amr'], jv: ['jv'], kanban: ['kanban'], seqflows: ['seqflows'], jvstock: ['jvSites'], quality: ['quality'], kpi: ['kpi'],
     finished: ['finished'], deliveries: ['deliveries']
   };
   function resetDomain(S, domain) {
@@ -667,7 +692,7 @@
   }
 
   return {
-    createState, step, inject, resetDomain, amrHealth, kanbanStatus, raiseAlert, clearAlert, pruneAlerts, reconcileAlerts, LEVELS, inventoryView, hourStatus, setPlant, lineSplit, DEFAULT_SLOTS, SLOT_BINDS, CARRIERS, DEFAULT_TERMS, DEFAULT_JVS, MAX_JVS, TARGET_H, coverage, partStatus, bufferStatus, linesideStatus, routeStatus,
+    createState, step, inject, resetDomain, SEQFLOWS, amrHealth, kanbanStatus, raiseAlert, clearAlert, pruneAlerts, reconcileAlerts, LEVELS, inventoryView, hourStatus, setPlant, lineSplit, DEFAULT_SLOTS, SLOT_BINDS, CARRIERS, DEFAULT_TERMS, DEFAULT_JVS, MAX_JVS, TARGET_H, coverage, partStatus, bufferStatus, linesideStatus, routeStatus,
     nextAction, fleetView, fmtClock, makeTrucks, SHOP_NAMES, RISK_MIN
   };
 });

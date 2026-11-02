@@ -25,6 +25,7 @@ const DOMAIN_INFO = [
   { id: 'kpi', label: 'JIS (just-in-sequence) accuracy & stock accuracy (%)', source: 'MES / WMS', sample: { jis: 98.4, stockAcc: 97.8 } },
   { id: 'finished', label: 'Motorpool stock & shipment on-time (%)', source: 'Motorpool / dispatch', sample: { onTime: 92, shipOnTime: 92, units: 176, shipRate: 1.8 } },
   { id: 'kanban', label: 'Kanban pull signals (cards, open, overdue, wait, on-time %)', source: 'Kanban / WMS', sample: { cards: 120, open: 18, overdue: 2, avgWaitMin: 14, onTimePct: 94 } },
+  { id: 'seqflows', label: 'Sequenced material routes (carriers in flight, missions, on-time %) per route', source: 'Fleet manager / tow control', sample: { jvB: { active: 1, missions: 46, onTimePct: 96 }, jvWB: { active: 1, missions: 31, onTimePct: 97 }, egA: { active: 1, missions: 50, onTimePct: 97 }, prWB: { active: 1, missions: 88, onTimePct: 98 } } },
   { id: 'deliveries', label: 'Internal deliveries (total / on time)', source: 'Intralogistics / TMS', sample: { total: 375, onTime: 345 } }
 ];
 const IDS = DOMAIN_INFO.map((d) => d.id);

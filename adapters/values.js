@@ -25,6 +25,7 @@ const ENT = {
   truck: { list: (S) => S.trucks.map((t) => t.id), find: (S, id) => { const t = S.trucks.find((x) => x.id === id); return t ? { id, o: t } : null; }, create: true },
   amrUnit: { list: (S) => S.amr.amrs.map((a) => a.id), find: (S, id) => { const a = S.amr.amrs.find((x) => x.id === id); return a ? { id, o: a } : null; }, create: true },
   jvUnit: { list: (S) => S.jv.amrs.map((a) => a.id), find: (S, id) => { const a = S.jv.amrs.find((x) => x.id === id); return a ? { id, o: a } : null; }, create: true },
+  flow: { list: (S) => Object.keys(S.seqflows), find: (S, id) => (S.seqflows[id] ? { id, o: S.seqflows[id] } : null) },
   amrRoute: { list: (S) => S.amr.routes.map((r) => slug(r.name)), find: (S, id) => { const r = S.amr.routes.find((x) => same(x.name, id)); return r ? { id: slug(r.name), o: r } : null; } },
   jvRoute: { list: (S) => S.jv.routes.map((r) => slug(r.key || r.name)), find: (S, id) => { const r = S.jv.routes.find((x) => same(x.key || x.name, id) || same(x.name, id)); return r ? { id: slug(r.key || r.name), o: r } : null; } }
 };
@@ -85,6 +86,12 @@ def('KPIs', 'deliveries', 'deliveries/onTime', 'Internal deliveries today (on ti
 def('Quality', 'quality', 'quality/rejected', 'Rejected parts today', 'pcs', NUM, 16, field((S) => S.quality, 'rejected', cnt));
 def('Quality', 'quality', 'quality/quarantined', 'Quarantined parts (under investigation)', 'pcs', NUM, 24, field((S) => S.quality, 'quarantined', cnt));
 def('Quality', 'quality', 'quality/spf', 'Single-piece flow adherence', '%', NUM, 91, field((S) => S.quality, 'spf', pct));
+
+// -- sequenced material routes (the dotted lines on the plant map)
+const FL = (k, label, unit, ex, o) => def('Sequenced flows', 'seqflows', 'seqflows/{flow}/' + k, label + ' (flow = ' + Sim.SEQFLOWS.map((f) => f.id).join(' | ') + ')', unit, NUM, ex, Object.assign({ ent: 'flow', entName: 'flow', get: (S, e) => e.o[k], set: (S, v, e) => { e.o[k] = v; e.o._a = undefined; } }, o));
+FL('active', 'Carriers (AMR / tow) in flight on the route', 'carriers', 1, { min: 0, max: 20, int: true });
+FL('missions', 'Missions completed today on the route', 'missions', 46, cnt);
+FL('onTimePct', 'Missions on time on the route', '%', 96, pct);
 
 // -- kanban pull signals (shown in the movement-health overlay on the plant map)
 def('Kanban', 'kanban', 'kanban/cards', 'Kanban cards / bins in the loop', 'cards', NUM, 120, field((S) => S.kanban, 'cards', { min: 1, int: true }));
@@ -161,6 +168,7 @@ const DERIVED = [
   ['Rejected % of build', 'quality/rejected ÷ build/actual'],
   ['JV node colour', 'worse of buffer status and route on-time status'],
   ['Kanban / AMR health status on the map', 'kanban: red at 4+ overdue or on-time < 85%, amber at 2+ overdue or < 93%. AMR: red at a late route, 3+ low batteries or < 60% available; amber at a slow route, any low battery or utilisation > 85%'],
+  ['Dotted-line activity on the map', 'a route line is lit while seqflows/<flow>/active > 0 on any route that uses it, and dimmed when nothing is in flight; the carrier markers equal active (max 3 drawn); LATE below 78% on time'],
   ['Sparklines / trends', 'sampled every 5 min from the live values above'],
   ['Clock, date, shift (A 06–14, B 14–22, C 22–06)', 'server clock'],
   ['LIVE / MIXED / DEMO and STALE badges', 'which domains received data, and how recently (staleSec on the Interfaces page)']

@@ -53,6 +53,7 @@ Time values: `eta` = minutes from now, or `etaAt` = ISO-8601 timestamp (converte
 | `amr.unit` / `jv.unit` | one unit or an array | upsert by `id` (what an MQTT per-robot topic sends) |
 | `jvstock` | `{ "JV1": 72, "JV2": {buf:68, units?, hours?, cap?}, … }` | keyed by the JV names configured in Plant setup (case-insensitive); an unknown name is rejected with the list of configured names |
 | `quality` | `{rejected, quarantined, spf}` | spf = % |
+| `seqflows` | `{ jvB: {active, missions, onTimePct}, jvA, jvWB, jvWA, egB, egA, imB, imA, prWB, prWA }` | the dotted routes on the plant map: carriers (AMR / tow) in flight, missions today, on-time %. JV feeds Assembly B and A and Weld B and A; EGTM and IMM-A feed Assembly B and A; Press feeds Weld B and A. Per value: `seqflows/<flow>/active|missions|onTimePct`. Simulated until fed |
 | `kanban` | `{cards, open, overdue, avgWaitMin, onTimePct}` | kanban pull signals: cards in the loop, signals open now, of which overdue, average wait (min), on-time rate (%). Drives the KANBAN TRANSFERS overlay on the plant map |
 | `kpi` | `{jis, stockAcc}` | % |
 | `finished` | `{onTime, shipOnTime, units?, shipRate?}` | % ; `units` = finished vehicles waiting, `shipRate` = vehicles/min dispatched (for hours of finished-vehicle inventory) |
@@ -94,8 +95,8 @@ Hours at a position = pieces at that position ÷ consumption per hour (`rate` ×
 ## Plant block layout (central flow)
 
 The map mirrors the plant's block arrangement: a JV zone (one tile per JV), a truck-parking / bays block, EGTM, motorpool, IMM-A, shipment, one spare block, press A/B, weld A/B, paint A/B and assembly A/B.
-The red dotted line is the **sequenced material flow**: JV, EGTM and IMM-A feed a bus that drops into assembly B from the top and runs down the gap between paint and assembly along a lane under assembly A and up into it with the same three drops (a mirror of B); the press feeds both weld lines.
-Animated markers are the carriers (AMR = circle, tow truck = small train); how many run follows the busy AMRs, they slow and turn red when that route is late, and stop when the line stops.
+The red dotted line is the **sequenced material flow**: JV, EGTM and IMM-A feed a bus that drops into assembly B from the top and runs down the gap between paint and assembly along a lane under assembly A and up into it with the same three drops (a mirror of B); JV also feeds weld B (straight down) and weld A (down the gap between weld and paint); the press feeds both weld lines.
+Animated markers are the carriers (AMR = circle, tow truck = small train): one marker per carrier in flight on that route (`seqflows/<flow>/active`, at most 3 drawn), slower and red when the route is under 78% on time, and stopped when the line stops. A route with nothing in flight is dimmed; hovering a line shows its numbers.
 Names, which blocks hold which widget (truck parking & bays / motorpool / shipment / none) and the carrier type (AMR or tow) of each source are set under **Interfaces -> Plant setup -> Plant layout** (`plant.slots` in the config).
 The four unnamed light blocks (`plant.slots.<yard|top1|top2|top3>`) default to `bind: "none"` (placeholders). Truck parking & bays, motorpool and shipment are not in the plant drawing, so they appear in a separate LOGISTICS AREAS strip; assigning one to a block (`bind: yard | motorpool | shipment`) draws it there marked as an assumed position until `confirmed: true`.
 Only the transfer statuses (EGTM = Engine -> Assembly, IMM-A = Bumper -> Assembly) and the JV AMR routes feed the flow colours; press -> weld has no data feed yet.
