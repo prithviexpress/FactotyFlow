@@ -33,6 +33,7 @@
   const fit = (s, w, px) => { s = String(s === undefined || s === null ? '' : s); const max = Math.max(3, Math.floor(w / (px || 9))); return s.length > max ? s.slice(0, max - 1) + '…' : s; };
   const cls = (g) => (g.h >= 120 && g.w >= 240 ? 'large' : g.h >= 120 ? 'tall' : 'wide');          // widgets adapt to the block they are placed in
   const status = (v) => Sim.bufferStatus(v);
+  const runTag = (S, key) => (S.shops[key] && S.shops[key].running !== undefined ? S.shops[key].running : undefined);
   const hh = (h) => (h === null || h === undefined ? '' : (h < 10 ? h.toFixed(1) : Math.round(h)) + ' h');
 
   const TINT = { ok: 'var(--ok)', watch: 'var(--watch)', low: 'var(--low)', none: 'var(--ink3)' };
@@ -74,7 +75,7 @@
       imma: 'IMM-A · shows the Bumper shop buffer and the Bumper → Assembly transfer route. Mapping IMM-A to the bumper shop is an assumption; confirm it matches your plant.',
       press: 'Press A/B · press buffer. Feeds weld lines A and B (sequenced, tow truck by default).',
       weldA: 'Weld line A · weld A buffer. JV material is unloaded from underneath (mirror of weld B, which takes it from the top).', weldB: 'Weld line B · weld B buffer', paintA: 'Paint line A · paint A buffer', paintB: 'Paint line B · paint B buffer',
-      asmA: 'Assembly line A · built vs plan' + (split.derived ? ' (half of the total until per-line counts are pushed)' : '') + '. JV / EGTM / IMM-A material reaches it through the gap between paint and assembly, then up into it from underneath (mirror of the drops into B).',
+      asmA: 'Assembly line A · built vs plan' + (split.derived ? ' (split estimated: half of the total until build/lineA and build/lineB are pushed)' : '') + '. JV / EGTM / IMM-A material reaches it through the gap between paint and assembly, then up into it from underneath (mirror of the drops into B).',
       asmB: 'Assembly line B · built vs plan' + (split.derived ? ' (half of the total until per-line counts are pushed)' : '') + '. Sequenced material drops in from the top.',
       jv: 'JV zone · one tile per JV (names in Plant setup): buffer hours and route on-time.'
     };
@@ -230,23 +231,24 @@
 
     /* ---- shop-style blocks ---- */
     function shop(slot, key, family, src, fallbackLabel) {
-      const g = G[slot], s = S.shops[key], st = status(s.buf), w = wip[key], tall = g.h > 100, nm = label(slot, fallbackLabel);
+      const g = G[slot], s = S.shops[key], bst = status(s.buf), run = runTag(S, key), st = run === false ? 'low' : bst, w = wip[key], tall = g.h > 100, nm = label(slot, fallbackLabel);
+      const rp = run === undefined ? '' : pill(g.x + 12, tall ? g.y + 50 : g.y + 25, run ? 'RUNNING' : 'STOPPED', run ? 'ok' : 'low'), dy = run === undefined ? 0 : tall ? 18 : 0;
       let inner;
       if (tall) {
-        inner = tx(g.x + 12, g.y + 22, fit(nm, g.w - 18, 8.4), 'bt') + pill(g.x + 12, g.y + 30, f0(s.buf) + '%', st) + tx(g.x + 12, g.y + 66, 'Buffer stock', 'sm') + tx(g.x + 12, g.y + 83, w && w.hours !== null ? hh(w.hours) : '—', 'bn2') +
+        inner = tx(g.x + 12, g.y + 22, fit(nm, g.w - 18, 8.4), 'bt') + pill(g.x + 12, g.y + 30, f0(s.buf) + '%', bst) + rp + tx(g.x + 12, g.y + 66 + dy, 'Buffer stock', 'sm') + tx(g.x + 12, g.y + 83 + dy, w && w.hours !== null ? hh(w.hours) : '—', 'bn2') +
           bar(g.x + 12, g.y + g.h - 30, g.w - 24, s.buf, st) + (src ? srcTag(src, g.x + 10, g.y + g.h - 22) : '');
       } else {
-        inner = tx(g.x + 12, g.y + 19, fit(nm, g.w - 66, 8.4), 'bt') + pill(g.x + g.w - 9, g.y + 4, f0(s.buf) + '%', st, 'end') + tx(g.x + 12, g.y + g.h - 21, 'Buffer' + (w && w.hours !== null ? ' · ' + hh(w.hours) : ''), 'sm') + bar(g.x + 12, g.y + g.h - 11, g.w - 24, s.buf, st);
+        inner = tx(g.x + 12, g.y + 19, fit(nm, g.w - 66, 8.4), 'bt') + pill(g.x + g.w - 9, g.y + 4, f0(s.buf) + '%', bst, 'end') + rp + tx(g.x + 12, g.y + g.h - (run === undefined ? 21 : 15), 'Buffer' + (w && w.hours !== null ? ' · ' + hh(w.hours) : ''), 'sm') + bar(g.x + 12, g.y + g.h - 11, g.w - 24, s.buf, bst);
       }
       out.push(block({ id: slot, kind: 'prod', tip: TIPS[slot], x: g.x, y: g.y, w: g.w, h: g.h, st, family, sel: sel(family), dim: dim(family), inner }));
     }
     shop('egtm', 'engine', 'engine', 'egtm', 'EGTM');
     shop('imma', 'bumper', 'bumper', 'imma', 'IMM-A');
     {
-      const g = G.press, s = S.shops.press, st = status(s.buf), w = wip.press;
+      const g = G.press, s = S.shops.press, bst = status(s.buf), run = runTag(S, 'press'), st = run === false ? 'low' : bst, w = wip.press, rp = run === undefined ? '' : pill(g.x + 12, g.y + 50, run ? 'RUNNING' : 'STOPPED', run ? 'ok' : 'low'), dy = run === undefined ? 0 : 18;
       out.push(block({ id: 'press', kind: 'prod', tip: TIPS.press, x: g.x, y: g.y, w: g.w, h: g.h, st, family: 'press', sel: sel('press'), dim: dim('press'), inner:
-        tx(g.x + 12, g.y + 22, fit(label('press', 'PRESS A/B'), g.w - 18, 8.4), 'bt') + pill(g.x + 12, g.y + 30, f0(s.buf) + '%', st) + tx(g.x + 12, g.y + 66, 'Buffer stock', 'sm') +
-        tx(g.x + 12, g.y + 83, w && w.hours !== null ? hh(w.hours) : '—', 'bn2') + bar(g.x + 12, g.y + g.h - 30, g.w - 24, s.buf, st) + srcTag('press', g.x + 10, g.y + g.h - 22) }));
+        tx(g.x + 12, g.y + 22, fit(label('press', 'PRESS A/B'), g.w - 18, 8.4), 'bt') + pill(g.x + 12, g.y + 30, f0(s.buf) + '%', bst) + rp + tx(g.x + 12, g.y + 66 + dy, 'Buffer stock', 'sm') +
+        tx(g.x + 12, g.y + 83 + dy, w && w.hours !== null ? hh(w.hours) : '—', 'bn2') + bar(g.x + 12, g.y + g.h - 30, g.w - 24, s.buf, bst) + srcTag('press', g.x + 10, g.y + g.h - 22) }));
     }
     shop('weldB', 'weldB', 'weld', null, 'WELD B'); shop('weldA', 'weldA', 'weld', null, 'WELD A');
     shop('paintB', 'paintB', 'paint', null, 'PAINT B'); shop('paintA', 'paintA', 'paint', null, 'PAINT A');
@@ -257,7 +259,7 @@
       const g = G[slot], d = split[L], pct = d.plan ? (d.actual / d.plan) * 100 : 0, st = stopped ? 'low' : 'ok', nm = label(slot, 'ASSEMBLY ' + L), bw = g.w - 330;
       out.push(block({ id: slot, kind: 'asm', tip: TIPS[slot], x: g.x, y: g.y, w: g.w, h: g.h, st, family: 'assembly', href: '#/shop/assembly', sel: sel('assembly'), dim: dim('assembly'), inner:
         tx(g.x + 16, g.y + 22, fit(nm, 190, 9), 'bt') + pill(g.x + 16 + Math.min(String(nm).length, 21) * 9 + 14, g.y + 8, stopped ? 'STOPPED' : 'RUNNING', stopped ? 'low' : 'ok') +
-        tx(g.x + 16, g.y + 47, f0(d.actual), 'bn') + tx(g.x + 16 + String(f0(d.actual)).length * 13 + 6, g.y + 46, '/ ' + d.plan + ' vehicles' + (split.derived ? ' (half of total)' : ''), 'sm') +
+        tx(g.x + 16, g.y + 47, f0(d.actual), 'bn') + tx(g.x + 16 + String(f0(d.actual)).length * 13 + 6, g.y + 46, '/ ' + d.plan + ' vehicles' + (split.derived ? ' · est.' : ''), 'sm') +
         '<rect x="' + (g.x + 250) + '" y="' + (g.y + 32) + '" width="' + bw + '" height="8" rx="4" style="fill:var(--track)"/><rect x="' + (g.x + 250) + '" y="' + (g.y + 32) + '" width="' + Math.max(0, Math.min(bw, (bw * pct) / 100)).toFixed(1) + '" height="8" rx="4" fill="' + TINT[st] + '"/>' +
         pill(g.x + g.w - 12, g.y + 27, f0(pct) + '%', st, 'end') }));
     });

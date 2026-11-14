@@ -40,9 +40,9 @@ Time values: `eta` = minutes from now, or `etaAt` = ISO-8601 timestamp (converte
 | Domain | Payload | Notes |
 |---|---|---|
 | `build` | `{plan, actual, rate?}` | rate = vehicles/min |
-| `build/lineA/plan, build/lineA/actual, build/lineB/…` (value endpoints) | vehicles | optional per-assembly-line counts; without them each line shows half of the total |
+| `build/lineA/plan, build/lineA/actual, build/lineB/…` (value endpoints) | vehicles | per-assembly-line counts, controlled separately from each other (also in a source post: `"build":{"lineA":{"plan":460,"actual":383},"lineB":{"plan":460,"actual":371}}`). If neither line is sent each shows half of the total, marked `est.` |
 | `line` | `{stopped, reason?, stops?, stoppedMin?, runWithoutMin?, missing?}` | `stoppedMin` = line stopped for a missing critical component (min, today); `runWithoutMin` = line kept running while a non-critical component was missing (min, today); `missing` = components missing now |
-| `shops` | `{press:82, weldA:79, weldB:74, paintA:66, paintB:62, engine:68, bumper:42}` (`weld` / `paint` alone set both lines) | buffer %; a value may be `{buf, units?, hours?, cap?}` — `units` = vehicle sets in the buffer, `hours` overrides the computed hours, `cap` = buffer capacity in sets |
+| `shops` | `{press:82, weldA:79, weldB:74, paintA:66, paintB:62, engine:68, bumper:42}` (`weld` / `paint` alone set both lines) | buffer %; a value may be `{buf, units?, hours?, cap?}` — `units` = vehicle sets in the buffer, `hours` overrides the computed hours, `cap` = buffer capacity in sets, `running` = 1/0 (RUNNING / STOPPED on the shop's block; also `shops/<shop>/running`). Without a `running` value the block shows no status (the board never assumes one) |
 | `parts` | `[{id, name, loc, shop, stock, rate, inv?:{dock, stores, supermarket, lineside}, pending?:{ref, eta\|etaAt, qty}}]` | **replaces** the list. `rate` = pcs/min consumed. coverage = stock ÷ rate |
 | `parts.item` | one part or an array | upsert by `id`; omitted fields keep their value; `pending:null` clears |
 | `yard` | `{expected, arrived, docked, received, occupied, docks, g2d, turn}` | g2d / turn in minutes |

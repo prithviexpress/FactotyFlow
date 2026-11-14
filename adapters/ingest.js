@@ -79,6 +79,18 @@ const APPLY = {
     if (p.plan !== undefined) S.build.plan = need(p.plan, 'plan');
     if (p.actual !== undefined) S.build.actual = need(p.actual, 'actual');
     if (p.rate !== undefined) S.build.rate = need(p.rate, 'rate');
+    // per assembly line: { lineA: {plan, actual}, lineB: {plan, actual} } (each line is controlled on its own; the total is only a fallback)
+    for (const L of ['A', 'B']) {
+      const k = 'line' + L, o = p[k];
+      if (o === undefined) continue;
+      asObj(o, 'build.' + k);
+      const cur = Object.assign({}, S.build[k] || { plan: Math.ceil(S.build.plan / 2), actual: Math.floor(S.build.actual / 2) });
+      if (o.plan !== undefined) cur.plan = need(o.plan, k + '.plan');
+      if (o.actual !== undefined) cur.actual = need(o.actual, k + '.actual');
+      if (cur.plan < 1 || cur.actual < 0) throw new IngestError(k + ': plan must be at least 1 and actual at least 0');
+      S.build[k] = cur;
+    }
+    if (p.plan === undefined && p.actual === undefined && S.build.lineA && S.build.lineB) { S.build.plan = S.build.lineA.plan + S.build.lineB.plan; S.build.actual = S.build.lineA.actual + S.build.lineB.actual; }
   },
   line(S, p) {
     asObj(p, 'line');
@@ -97,6 +109,7 @@ const APPLY = {
       if (p[k] === undefined) continue;
       const o = p[k] !== null && typeof p[k] === 'object' ? p[k] : { buf: p[k] };
       S.shops[k].buf = clamp(need(o.buf, k + '.buf'), 0, 100);
+      if (o.running !== undefined) S.shops[k].running = o.running === true || o.running === 1 || o.running === '1' || o.running === 'true';
       for (const f of ['units', 'hours', 'cap']) { if (o[f] !== undefined) S.shops[k][f] = need(o[f], k + '.' + f); else if (f !== 'cap') delete S.shops[k][f]; }
     }
   },

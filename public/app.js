@@ -282,6 +282,8 @@
     /* 1 line risks */
     const L = [];
     if (S.line.stopped) L.push(it('low', 'Line stopped', S.line.reason || 'component missing', '#/events'));
+    const SN = { press: 'Press', weldA: 'Weld A', weldB: 'Weld B', paintA: 'Paint A', paintB: 'Paint B', engine: 'EGTM', bumper: 'IMM-A' };
+    Object.keys(SN).forEach((k) => { if (S.shops[k] && S.shops[k].running === false) L.unshift(it('low', SN[k] + ' stopped', 'no output; downstream buffers will drain', '#/shop/' + (k.indexOf('weld') === 0 ? 'weld' : k.indexOf('paint') === 0 ? 'paint' : k))); });
     if (S.line.missing > 0) L.push(it('watch', 'Line running without ' + S.line.missing + ' component' + (S.line.missing > 1 ? 's' : ''), S.parts.filter((p) => p.stock <= 0 && p.critical === false).map((p) => p.name).slice(0, 3).join(', '), '#/parts'));
     sortedParts().forEach((p) => { const c = Sim.coverage(p), ps = Sim.partStatus(c); if (ps === 'ok') return; const a = Sim.nextAction(S, p); L.push(it(ps, p.name + ' · ' + f0(c) + ' min cover', a.text + ' · ' + a.owner, '#/parts')); });
     /* supply risks from the JV / in-house verticals sit under line risks (they are what stops the line next) */

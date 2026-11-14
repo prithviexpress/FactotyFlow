@@ -750,3 +750,11 @@ table.rt .pn .ic{font-size:26px}
 .ai b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ai small{display:block;margin:1px 0 0;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ai.none{align-items:center;padding:6px 4px}
+
+/* v5: more room in the three verticals so two-line rows are never clipped on wider-font systems */
+#stage{grid-template-rows:42px auto 82px 296px 26px 1fr 20px}
+.ir{padding:3px 8px;gap:1px;flex:1 1 auto}
+.ir .il{font-size:14px;line-height:1.15}
+.ir .is{font-size:11.5px;line-height:1.2;padding-bottom:1px}
+.vbody{overflow:hidden}
+.vtr{line-height:1.2}
