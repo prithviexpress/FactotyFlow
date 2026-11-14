@@ -51,6 +51,7 @@ node server.js            # http://localhost:8080  (server streams state over SS
 |---|---|
 | Today build / line stops | Vehicles build at line rate; a part reaching 0 stock stops the line until the truck arrives |
 | Line risk (right) | Parts ranked by coverage = usable stock ÷ consumption rate; next action/owner derived from coverage |
+| Actionable items | One panel next to the plant flow: line risks, truck delays, bay not available, AMR stoppages, JV / in-house supply, internal deliveries & kanban. Derived from the same data points; click an item to open its detail page |
 | Plant map | Buffer %, JV status, flows (red/amber when a route is delayed, paused when the line stops) |
 | Inbound / transfers / line-side / AMR / quality | Event-driven counters, rolling on-time windows, battery & charging model per AMR |
 | Interaction | Click a shop tab or map node to filter/highlight; "Drill down" lists all parts; hover for tooltips & sparkline values |

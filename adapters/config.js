@@ -11,12 +11,12 @@ const MASK = '********';
 /** The data points shown on the Interfaces page. `sample` documents the payload the dashboard expects. */
 const DOMAIN_INFO = [
   { id: 'build', label: 'Today build (plan vs actual)', source: 'MES', sample: { plan: 920, actual: 766, rate: 1.9 } },
-  { id: 'line', label: 'Line status & logistics stops', source: 'MES / Andon', sample: { stopped: false, reason: null, stops: 0, stoppedMin: 0 } },
-  { id: 'shops', label: 'Shop buffer levels (%)', source: 'MES / WMS', sample: { press: { buf: 82, units: 246 }, weldA: 79, weldB: 74, paintA: 66, paintB: 62, engine: 68, bumper: { buf: 42, hours: 0.6 } } },
+  { id: 'line', label: 'Line status: stopped / running without components (minutes today)', source: 'MES / Andon', sample: { stopped: false, reason: null, stops: 0, stoppedMin: 12, runWithoutMin: 47, missing: 1 } },
+  { id: 'shops', label: 'Shop buffer levels (%)', source: 'MES / WMS', sample: { press: { buf: 82, units: 246 }, weldA: 79, weldB: 74, paintA: 66, paintB: 62, engine: 68, bumper: { buf: 42, hours: 0.6 }, ip: 72, tm: 64 } },
   { id: 'parts', label: 'Parts: stock, consumption rate, next inbound', source: 'WMS / ERP', item: 'parts.item', sample: [{ id: 'P-BMP-F', name: 'Bumper B/H (Front)', loc: 'ASY-08', shop: 'bumper', stock: 28, rate: 1.27, inv: { bay: 8, lineside: 20 }, pending: { ref: 'V-181', etaAt: '2026-10-14T15:05:00+05:30', qty: 160 } }] },
   { id: 'yard', label: 'Truck parking / bay counters', source: 'Gate / truck parking system', sample: { expected: 34, arrived: 26, docked: 21, received: 18, occupied: 21, docks: 28, g2d: 32, turn: 68 } },
   { id: 'trucks', label: 'Inbound truck list', source: 'Gate / truck parking system', item: 'trucks.item', sample: [{ id: 'TRK-1019', supplier: 'Endurance', material: 'Wiring Harness', status: 'docked', dock: 4, schedAt: '2026-10-14T13:34:00+05:30' }] },
-  { id: 'transfers', label: 'In-plant transfer jobs (on time / total)', source: 'Intralogistics / TMS', sample: [{ id: 'eng', onTime: 12, total: 12 }, { id: 'bmp', onTime: 6, total: 8 }, { id: 'milk', onTime: 7, total: 8 }, { id: 'amr', onTime: 8, total: 10 }] },
+  { id: 'transfers', label: 'In-plant transfer jobs (on time / total)', source: 'Intralogistics / TMS', sample: [{ id: 'eng', onTime: 12, total: 12 }, { id: 'bmp', onTime: 6, total: 8 }, { id: 'milk', onTime: 7, total: 8 }, { id: 'amr', onTime: 8, total: 10 }, { id: 'ip', onTime: 9, total: 10 }, { id: 'tm', onTime: 9, total: 10 }] },
   { id: 'lineside', label: 'Line-side stock (key materials)', source: 'WMS / Kanban', item: 'lineside.item', sample: [{ name: 'Bumper (B/H-LH)', usable: 42, safety: 100 }] },
   { id: 'amr', label: 'Indoor AMR fleet (units, routes)', source: 'Fleet manager', item: 'amr.unit', sample: { units: [{ id: 'AMR-01', state: 'busy', battery: 77, route: 'Milk-run (Line side)' }], routes: [{ name: 'Milk-run (Line side)', missions: 56, onTimePct: 90 }], planned: 212 } },
   { id: 'jv', label: 'JV AMR fleet (routes named after the configured JVs)', source: 'Fleet manager', item: 'jv.unit', sample: { units: [{ id: 'JV-01', state: 'idle', battery: 64 }], routes: [{ name: 'JV1 → Assembly', missions: 32, onTimePct: 97 }], planned: 118 } },
@@ -35,7 +35,7 @@ function defaults() {
   for (const d of IDS) domains[d] = blank();
   return {
     staleSec: 60, sources: {}, mqtt: { url: '', username: '', password: '', qos: 0 },
-    plant: { jvs: Sim.DEFAULT_JVS.slice(), terms: Object.assign({}, Sim.DEFAULT_TERMS), slots: JSON.parse(JSON.stringify(Sim.DEFAULT_SLOTS)), layoutVersion: 2, place: '', lat: null, lon: null },
+    plant: { jvs: Sim.DEFAULT_JVS.slice(), terms: Object.assign({}, Sim.DEFAULT_TERMS), slots: JSON.parse(JSON.stringify(Sim.DEFAULT_SLOTS)), layoutVersion: 3, place: '', lat: null, lon: null },
     alerts: {
       weather: { enabled: false, intervalMin: 10, gustKmh: 60, rainMmH: 10, tempHighC: 40, tempLowC: 0, lookaheadH: 3, url: '' },
       traffic: { enabled: false, provider: 'tomtom', key: '', radiusKm: 8, minDelaySec: 300, intervalMin: 5, url: '' },
@@ -76,6 +76,13 @@ function normalize(raw) {
     if (Number(raw.plant.layoutVersion || 1) < 2 && raw.plant.slots && raw.plant.slots.yard && raw.plant.slots.top2 && raw.plant.slots.yard.bind === 'amr' && raw.plant.slots.top2.bind === 'kanban') {
       raw = Object.assign({}, raw, { plant: Object.assign({}, raw.plant, { slots: Object.assign({}, raw.plant.slots, { yard: Object.assign({}, raw.plant.slots.yard, { bind: 'kanban' }), top2: Object.assign({}, raw.plant.slots.top2, { bind: 'amr' }) }) }) });
     }
+    // layout v3 moved the AMR / kanban overlays out of the plant drawing (their blocks are vacant, for messages). A config that still has the old default placement is migrated; the overlays stay available as a choice.
+    if (Number(raw.plant.layoutVersion || 1) < 3 && raw.plant.slots) {
+      const sl = JSON.parse(JSON.stringify(raw.plant.slots)), a = sl.yard, b = sl.top2;
+      if (a && (a.bind === 'kanban' || a.bind === 'amr')) a.bind = 'none';
+      if (b && (b.bind === 'amr' || b.bind === 'kanban')) b.bind = 'none';
+      raw = Object.assign({}, raw, { plant: Object.assign({}, raw.plant, { slots: sl }) });
+    }
     if (raw.plant.terms && raw.plant.terms.jis !== undefined && raw.plant.terms.jit === undefined) {      // the KPI label was called jis before; the old default is dropped, a custom label is kept
       const old = String(raw.plant.terms.jis).trim();
       if (old && old !== 'JIS accuracy') cfg.plant.terms.jit = old;
@@ -83,7 +90,7 @@ function normalize(raw) {
     if (raw.plant.slots && typeof raw.plant.slots === 'object') {
       for (const k of Object.keys(Sim.DEFAULT_SLOTS)) {
         const s = raw.plant.slots[k]; if (!s || typeof s !== 'object') continue;
-        for (const f of ['label', 'bind', 'carrier']) if (s[f] !== undefined) cfg.plant.slots[k][f] = String(s[f]).trim();
+        for (const f of ['label', 'bind', 'carrier', 'text']) if (s[f] !== undefined) cfg.plant.slots[k][f] = String(s[f]).trim();
         if (s.confirmed !== undefined) cfg.plant.slots[k].confirmed = s.confirmed === true || s.confirmed === 'true';
       }
     }
@@ -129,6 +136,7 @@ function validate(cfg) {
   if (new Set(tokens).size !== tokens.length) errs.push('two sources share the same token');
   for (const k of Object.keys(cfg.plant.slots)) {
     const s = cfg.plant.slots[k];
+    if (s.text && s.text.length > 160) errs.push('layout block "' + k + '": message must be at most 160 characters');
     if (s.label && s.label.length > 24) errs.push('layout block "' + k + '": label must be at most 24 characters');
     if (s.bind !== undefined && !Sim.SLOT_BINDS.includes(s.bind)) errs.push('layout block "' + k + '": it can show: ' + Sim.SLOT_BINDS.join(', '));
     if (s.carrier !== undefined && !Sim.CARRIERS.includes(s.carrier)) errs.push('layout block "' + k + '": carrier must be amr or tow');

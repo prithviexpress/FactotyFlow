@@ -7,7 +7,7 @@
  */
 const DOMAINS = ['build', 'line', 'shops', 'parts', 'yard', 'trucks', 'transfers', 'lineside', 'amr', 'jv', 'jvstock', 'quality', 'kpi', 'finished', 'deliveries', 'kanban', 'seqflows'];
 const SHOP_KEYS = ['press', 'weld', 'paint', 'engine', 'bumper', 'assembly'];
-const BUFFER_KEYS = ['press', 'weldA', 'weldB', 'paintA', 'paintB', 'engine', 'bumper'];
+const BUFFER_KEYS = ['press', 'weldA', 'weldB', 'paintA', 'paintB', 'engine', 'bumper', 'ip', 'tm'];
 const BUFFER_ALIAS = { weld: ['weldA', 'weldB'], paint: ['paintA', 'paintB'] };   // older feeds send one buffer for both lines
 
 class IngestError extends Error { constructor(m) { super(m); this.status = 400; } }
@@ -42,7 +42,8 @@ function normPart(p, old) {
     shop: SHOP_KEYS.includes(p.shop) ? p.shop : (old.shop || 'assembly'),
     stock: Math.max(0, num(p.stock, old.stock !== undefined ? old.stock : 0)),
     rate: Math.max(0, num(p.rate, old.rate !== undefined ? old.rate : 0)),
-    icon: str(p.icon, old.icon || 'box'), pending: old.pending || null
+    icon: str(p.icon, old.icon || 'box'), pending: old.pending || null,
+    critical: p.critical !== undefined ? !!p.critical : (old.critical !== undefined ? old.critical : true)
   };
   // optional per-position stock (pcs): { bay, lineside } ('dock' is accepted as an alias of 'bay'). usable stock = bay + lineside
   if (p.inv && typeof p.inv === 'object') {
@@ -78,6 +79,18 @@ const APPLY = {
     if (p.plan !== undefined) S.build.plan = need(p.plan, 'plan');
     if (p.actual !== undefined) S.build.actual = need(p.actual, 'actual');
     if (p.rate !== undefined) S.build.rate = need(p.rate, 'rate');
+    // per assembly line: { lineA: {plan, actual}, lineB: {plan, actual} } (each line is controlled on its own; the total is only a fallback)
+    for (const L of ['A', 'B']) {
+      const k = 'line' + L, o = p[k];
+      if (o === undefined) continue;
+      asObj(o, 'build.' + k);
+      const cur = Object.assign({}, S.build[k] || { plan: Math.ceil(S.build.plan / 2), actual: Math.floor(S.build.actual / 2) });
+      if (o.plan !== undefined) cur.plan = need(o.plan, k + '.plan');
+      if (o.actual !== undefined) cur.actual = need(o.actual, k + '.actual');
+      if (cur.plan < 1 || cur.actual < 0) throw new IngestError(k + ': plan must be at least 1 and actual at least 0');
+      S.build[k] = cur;
+    }
+    if (p.plan === undefined && p.actual === undefined && S.build.lineA && S.build.lineB) { S.build.plan = S.build.lineA.plan + S.build.lineB.plan; S.build.actual = S.build.lineA.actual + S.build.lineB.actual; }
   },
   line(S, p) {
     asObj(p, 'line');
@@ -85,6 +98,8 @@ const APPLY = {
     S.line.reason = S.line.stopped ? str(p.reason, S.line.reason || 'Line stopped') : null;
     if (p.stops !== undefined) S.line.stops = need(p.stops, 'stops');
     if (p.stoppedMin !== undefined) S.line.stoppedMin = need(p.stoppedMin, 'stoppedMin');
+    if (p.runWithoutMin !== undefined) S.line.runWithoutMin = need(p.runWithoutMin, 'runWithoutMin');
+    if (p.missing !== undefined) S.line.missing = need(p.missing, 'missing');
   },
   shops(S, p) {
     asObj(p, 'shops');
@@ -94,6 +109,7 @@ const APPLY = {
       if (p[k] === undefined) continue;
       const o = p[k] !== null && typeof p[k] === 'object' ? p[k] : { buf: p[k] };
       S.shops[k].buf = clamp(need(o.buf, k + '.buf'), 0, 100);
+      if (o.running !== undefined) S.shops[k].running = o.running === true || o.running === 1 || o.running === '1' || o.running === 'true';
       for (const f of ['units', 'hours', 'cap']) { if (o[f] !== undefined) S.shops[k][f] = need(o[f], k + '.' + f); else if (f !== 'cap') delete S.shops[k][f]; }
     }
   },

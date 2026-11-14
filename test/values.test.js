@@ -27,7 +27,7 @@ test('validation: unit/range/whole-number/enum/unknown entity', () => {
   assert.throws(() => V.apply(S, 'shops/press/buf', 'abc'), /expects a number in %/);
   assert.throws(() => V.apply(S, 'yard/arrived', '2.5'), /whole number of trucks/);
   assert.throws(() => V.apply(S, 'trucks/TRK-1019/status', 'sideways'), /one of: scheduled, arrived, docked, received/);
-  assert.throws(() => V.apply(S, 'shops/stores/buf', '5'), /unknown shop "stores"\. Valid: press, weldA, weldB, paintA, paintB, engine, bumper/);
+  assert.throws(() => V.apply(S, 'shops/stores/buf', '5'), /unknown shop "stores"\. Valid: press, weldA, weldB, paintA, paintB, engine, bumper, ip, tm/);
   assert.throws(() => V.apply(S, 'nope/x', '1'), /unknown value path/);
   assert.throws(() => V.apply(S, 'transfers/bmp/onTime', '99'), /cannot exceed total/);
   assert.equal(S.live.shops, undefined);                      // nothing flipped by rejected pushes
@@ -67,7 +67,7 @@ test('HTTP: raw number / JSON body, batch is all-or-nothing, catalogue, token, s
   const cat = await (await fetch(base + '/api/values')).json();
   assert.ok(cat.count >= 60); assert.ok(cat.derived.length >= 15);
   const e = cat.inputs.find((x) => x.path === 'shops/{shop}/buf');
-  assert.equal(e.unit, '%'); assert.equal(e.range, '0 – 100'); assert.deepEqual(e.entities.map((x) => x.id), ['press', 'weldA', 'weldB', 'paintA', 'paintB', 'engine', 'bumper']);
+  assert.equal(e.unit, '%'); assert.equal(e.range, '0 – 100'); assert.deepEqual(e.entities.map((x) => x.id), ['press', 'weldA', 'weldB', 'paintA', 'paintB', 'engine', 'bumper', 'ip', 'tm']);
   assert.equal(e.source.live, true);
   assert.ok(!cat.inputs.some((x) => /coverage|hours/i.test(x.path) && x.group === 'Derived'));
   // a domain set to Simulated refuses pushes
