@@ -23,6 +23,7 @@ const ENT = {
   lineside: { list: (S) => S.lineside.map((l) => slug(l.name)), find: (S, id) => { const l = S.lineside.find((x) => same(x.name, id)); return l ? { id: slug(l.name), o: l } : null; }, create: true },
   part: { list: (S) => S.parts.map((p) => p.id), find: (S, id) => { const p = S.parts.find((x) => x.id === id); return p ? { id, o: p } : null; }, create: true },
   truck: { list: (S) => S.trucks.map((t) => t.id), find: (S, id) => { const t = S.trucks.find((x) => x.id === id); return t ? { id, o: t } : null; }, create: true },
+  bay: { list: (S) => (S.yard.bays || []).slice(), find: (S, id) => ((S.yard.bays || []).includes(id) || (S.yard.bayStatus && S.yard.bayStatus[id]) ? { id, o: { status: (S.yard.bayStatus && S.yard.bayStatus[id]) || 'available' } } : null), create: true },
   amrUnit: { list: (S) => S.amr.amrs.map((a) => a.id), find: (S, id) => { const a = S.amr.amrs.find((x) => x.id === id); return a ? { id, o: a } : null; }, create: true },
   jvUnit: { list: (S) => S.jv.amrs.map((a) => a.id), find: (S, id) => { const a = S.jv.amrs.find((x) => x.id === id); return a ? { id, o: a } : null; }, create: true },
   flow: { list: (S) => Object.keys(S.seqflows), find: (S, id) => (S.seqflows[id] ? { id, o: S.seqflows[id] } : null) },
@@ -75,6 +76,9 @@ Y('g2d', 'Average gate-to-bay time', 'min', 32, { min: 0, max: 1440 }); Y('turn'
 def('Truck parking & bays', 'trucks', 'trucks/{truck}/status', 'Status of one truck', 'scheduled | arrived | docked | received', 'enum', 'docked', { ent: 'truck', enum: ['scheduled', 'arrived', 'docked', 'received'],
   get: (S, e) => e.o.status, set: (S, v, e) => Ing.ingest(S, 'trucks.item', { id: e.id, status: v }), viaIngest: true });
 def('Truck parking & bays', 'trucks', 'trucks/{truck}/dock', 'Bay number a truck is at', 'bay no.', NUM, 4, { ent: 'truck', min: 1, int: true, get: (S, e) => e.o.dock, set: (S, v, e) => Ing.ingest(S, 'trucks.item', { id: e.id, dock: v }), viaIngest: true });
+def('Truck parking & bays', 'trucks', 'trucks/{truck}/assignedBay', 'Bay a truck is meant to unload at (while it waits at the gate: which bay is it waiting for)', 'bay id', 'text', 'AB-14', { ent: 'truck', get: (S, e) => (e.o.assignedBay === undefined ? null : e.o.assignedBay), set: (S, v, e) => Ing.ingest(S, 'trucks.item', { id: e.id, assignedBay: v }), viaIngest: true });
+def('Truck parking & bays', 'yard', 'yard/bays/{bay}/status', 'Status of one bay (available | occupied | blocked | outOfService). Trucks assigned to a blocked / outOfService bay count as held for it', 'available | occupied | blocked | outOfService', 'enum', 'blocked', { ent: 'bay', entName: 'bay', enum: ['available', 'occupied', 'blocked', 'outOfService'], get: (S, e) => e.o.status, set: (S, v, e) => Ing.ingest(S, 'yard', { bayStatus: { [e.id]: v } }), viaIngest: true });
+Y('unloadLimitMin', 'Minutes a truck may stay at a bay before the bay counts as slow', 'min', 45, { min: 1, max: 600 });
 def('Truck parking & bays', 'trucks', 'trucks/{truck}/supplier', 'Supplier of one truck', 'text', 'text', 'Endurance', { ent: 'truck', get: (S, e) => e.o.sup, set: (S, v, e) => Ing.ingest(S, 'trucks.item', { id: e.id, supplier: v }), viaIngest: true });
 
 // -- motorpool, KPIs, deliveries, quality

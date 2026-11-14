@@ -143,3 +143,23 @@ test('the funnel adds up: expected = not yet here + waiting + at a bay now + rec
     assert.ok([g.notYet, g.waiting, g.atBayNow, g.received].every((n) => n >= 0));
   }
 });
+
+test('bay view inputs are prepared: assignedBay per truck, per-bay status, unload limit', () => {
+  const S = Sim.createState();
+  Ing.ingest(S, 'yard', { bays: ['AB-13', 'AB-14', 'AB-15'] });
+  Ing.ingest(S, 'trucks.item', { id: 'HR38AB0266073', status: 'arrived', assignedBay: 'AB-14' });
+  assert.equal(S.trucks.find((t) => t.id === 'HR38AB0266073').assignedBay, 'AB-14');
+  Ing.ingest(S, 'trucks.item', { id: 'HR38AB0266073', supplier: 'Bharat Forge' });                    // partial update keeps it
+  assert.equal(S.trucks.find((t) => t.id === 'HR38AB0266073').assignedBay, 'AB-14');
+  Ing.ingest(S, 'yard', { bayStatus: { 'AB-14': 'blocked', 'AB-15': 'outOfService' } });
+  Ing.ingest(S, 'yard', { bayStatus: { 'AB-15': 'available' } });                                      // clears one, keeps the other
+  assert.deepEqual(S.yard.bayStatus, { 'AB-14': 'blocked' });
+  assert.throws(() => Ing.ingest(S, 'yard', { bayStatus: { 'AB-13': 'broken' } }), /must be one of/);
+  assert.deepEqual(S.yard.bayStatus, { 'AB-14': 'blocked' });                                          // a bad post changes nothing
+  const V = require('../adapters/values.js');
+  V.apply(S, 'yard/bays/AB-13/status', 'outOfService'); assert.equal(S.yard.bayStatus['AB-13'], 'outOfService');
+  assert.equal(V.read(S, 'yard/bays/AB-14/status').value, 'blocked'); assert.equal(V.read(S, 'yard/bays/AB-15/status').value, 'available');
+  V.apply(S, 'trucks/HR38AB0266073/assignedBay', 'AB-15'); assert.equal(S.trucks.find((t) => t.id === 'HR38AB0266073').assignedBay, 'AB-15');
+  V.apply(S, 'yard/unloadLimitMin', '60'); assert.equal(S.yard.unloadLimitMin, 60);
+  assert.throws(() => V.apply(S, 'yard/unloadLimitMin', '0'), /out of range/);
+});

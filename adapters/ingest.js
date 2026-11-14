@@ -73,6 +73,7 @@ function normUnit(u, F) {
   };
 }
 
+const BAY_STATES = ['available', 'occupied', 'blocked', 'outOfService'];
 const APPLY = {
   build(S, p) {
     asObj(p, 'build');
@@ -125,7 +126,19 @@ const APPLY = {
   },
   yard(S, p) {
     asObj(p, 'yard');
-    for (const k of ['expected', 'arrived', 'docked', 'received', 'occupied', 'docks', 'g2d', 'turn']) if (p[k] !== undefined) S.yard[k] = need(p[k], k);
+    for (const k of ['expected', 'arrived', 'docked', 'received', 'occupied', 'docks', 'g2d', 'turn', 'unloadLimitMin']) if (p[k] !== undefined) S.yard[k] = need(p[k], k);
+    if (p.unloadLimitMin !== undefined && !(S.yard.unloadLimitMin > 0)) throw new IngestError('yard.unloadLimitMin must be greater than 0');
+    if (p.bayStatus !== undefined) {   // { "AB-14": "blocked", ... }: only the bays you send change; send "available" to clear one
+      asObj(p.bayStatus, 'yard.bayStatus');
+      const next = Object.assign({}, S.yard.bayStatus || {});
+      for (const id of Object.keys(p.bayStatus)) {
+        const v = String(p.bayStatus[id]).trim();
+        if (!BAY_STATES.includes(v)) throw new IngestError('yard.bayStatus.' + id + ' must be one of: ' + BAY_STATES.join(', '));
+        if (!id || id.length > 24) throw new IngestError('yard.bayStatus: bay ids are 1 to 24 characters');
+        if (v === 'available') delete next[id]; else next[id] = v;
+      }
+      S.yard.bayStatus = next;
+    }
     if (p.bays !== undefined) {   // the bays' own ids, in display order: the grid then shows these instead of 1..docks
       const ids = asArray(p.bays, 'yard.bays').map((b) => String(b).trim());
       if (ids.length > 2000 || ids.some((b) => !b || b.length > 24)) throw new IngestError('yard.bays: up to 2000 ids, each 1 to 24 characters');
@@ -142,6 +155,7 @@ const APPLY = {
         const sent = (...ks) => ks.some((k) => x[k] !== undefined);
         const o = S.trucks[i];
         if (!sent('supplier', 'sup')) t.sup = o.sup; if (!sent('material', 'mat')) t.mat = o.mat; if (!sent('status')) t.status = o.status;
+        if (!sent('assignedBay')) t.assignedBay = o.assignedBay;
         if (!sent('dock')) t.dock = o.dock; if (!sent('schedAt', 'sched')) t.sched = o.sched; if (!sent('arrivedAt')) t.arrivedAt = o.arrivedAt;
         if (!sent('dockedAt')) t.dockedAt = o.dockedAt; if (!sent('doneAt')) t.doneAt = o.doneAt;
         S.trucks[i] = t;
@@ -230,7 +244,7 @@ function normTruck(t) {
   const status = ['scheduled', 'arrived', 'docked', 'received'].includes(t.status) ? t.status : 'scheduled';
   return {
     id: String(t.id), sup: str(t.supplier !== undefined ? t.supplier : t.sup, '—'), mat: str(t.material !== undefined ? t.material : t.mat, '—'),
-    status, dock: normDock(t.dock),
+    status, dock: normDock(t.dock), assignedBay: normDock(t.assignedBay),
     sched: clockOf(t.schedAt !== undefined ? t.schedAt : t.sched), arrivedAt: clockOf(t.arrivedAt), dockedAt: clockOf(t.dockedAt), doneAt: clockOf(t.doneAt)
   };
 }

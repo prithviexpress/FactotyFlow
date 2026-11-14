@@ -144,7 +144,7 @@
         engine: { buf: 68, target: 68, running: true }, bumper: { buf: 42, target: 46, running: true }, ip: { buf: 72, target: 72, running: true }, tm: { buf: 64, target: 65, running: true }
       },
       yard: {
-        expected: 34, arrived: 26, docked: 21, received: 18, occupied: 21, docks: 28,
+        expected: 34, arrived: 26, docked: 21, received: 18, occupied: 21, docks: 28, unloadLimitMin: 45,
         g2d: 32, turn: 68
       },
       finished: { onTime: 92, shipOnTime: 92, units: 176, shipRate: 1.8 },

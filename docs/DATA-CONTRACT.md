@@ -46,7 +46,8 @@ Time values: `eta` = minutes from now, or `etaAt` = ISO-8601 timestamp (converte
 | `parts` | `[{id, name, loc, shop, stock, rate, inv?:{dock, stores, supermarket, lineside}, pending?:{ref, eta\|etaAt, qty}}]` | **replaces** the list. `rate` = pcs/min consumed. coverage = stock ÷ rate |
 | `parts.item` | one part or an array | upsert by `id`; omitted fields keep their value; `pending:null` clears |
 | `yard` | `{expected, arrived, docked, received, occupied, docks, g2d, turn}` | g2d / turn in minutes |
-| `trucks` / `trucks.item` | `{id, supplier, material, status, dock?, schedAt?, arrivedAt?, dockedAt?, doneAt?}` | status: scheduled/arrived/docked/received |
+| `trucks` / `trucks.item` | `{id, supplier, material, status, dock?, assignedBay?, schedAt?, arrivedAt?, dockedAt?, doneAt?}` | status: scheduled/arrived/docked/received |
+| `yard` extra: bay status and unload limit | `{"bayStatus":{"AB-14":"blocked","AB-15":"outOfService"}, "unloadLimitMin":45}` | **Prepared for the bay view, not displayed yet.** `bayStatus`: only the bays you send change; states `available / occupied / blocked / outOfService` (`available` clears). `unloadLimitMin`: minutes a truck may stay at a bay before it counts as slow (default 45). `assignedBay` on a truck = the bay it is meant for (for a waiting truck: the bay it waits for). Per value: `yard/bays/<bay>/status`, `yard/unloadLimitMin`, `trucks/<truck>/assignedBay`. Time at the bay is computed from the truck's `dockedAt` |
 | `transfers` | `[{id, onTime, total}]` or `[{id, q:[1,0,1,…]}]` | ids: `eng`, `bmp`, `milk`, `amr` |
 | `lineside` / `lineside.item` | `{name, usable, safety, max?, icon?, pending?:{eta\|etaAt, qty}}` | |
 | `amr` / `jv` | `{units:[{id, state, battery, route?, taskMin?}], routes:[{name, missions, onTimePct}], planned, misc?, chargers?, utilizationPct?}` | state: idle/busy/charging |
