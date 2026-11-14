@@ -170,7 +170,7 @@ test('the default 8 JV parts all render on the map (compact list mode) and the m
   assert.ok(S.line.runWithoutMin > 0);
 });
 
-test('assembly lines A and B are controlled separately; shops show RUNNING / STOPPED from their own value', () => {
+test('assembly lines A and B are controlled separately; only assembly shows a running status', () => {
   const S = Sim.createState();
   Ing.ingest(S, 'build', { plan: 920, actual: 766, lineA: { plan: 500, actual: 410 }, lineB: { plan: 420, actual: 356 } });
   const l = Sim.lineSplit(S); assert.equal(l.derived, false);
@@ -180,13 +180,5 @@ test('assembly lines A and B are controlled separately; shops show RUNNING / STO
   Ing.ingest(S, 'build', { lineB: { actual: 360 } });                         // one value of one line
   assert.equal(S.build.lineB.actual, 360); assert.equal(S.build.lineA.actual, 410);
   assert.throws(() => Ing.ingest(S, 'build', { lineA: { actual: -1 } }));
-  // running status: simulated follows the line, a pushed value wins, unknown shows nothing
-  assert.equal((r.nodes.match(/>RUNNING</g) || []).length >= 6, true);
-  Ing.ingest(S, 'shops', { weldA: { buf: 79, running: false } });
-  r = global.window.FFMap.render(S, ctx(S));
-  assert.ok(r.nodes.includes('>STOPPED<'));
-  V.apply(S, 'shops/paintB/running', '0'); assert.equal(S.shops.paintB.running, false);
-  assert.throws(() => V.apply(S, 'shops/paintB/running', '2'), /out of range/);
-  delete S.shops.engine.running; S.live.shops = true;
-  assert.ok(!global.window.FFMap.render(S, ctx(S)).nodes.match(/EGTM[\s\S]{0,400}>RUNNING</));
+  assert.ok(!r.nodes.includes('>STOPPED<') && (r.nodes.match(/>RUNNING</g) || []).length === 2);   // only the two assembly lines show a running status
 });
