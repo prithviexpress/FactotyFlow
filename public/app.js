@@ -230,7 +230,7 @@
       '<div class="vcs">' + cell('Expected', fn.expected) + cell('Not yet here', fn.notYet, pc(fn.notYet)) + cell('Waiting', fn.waiting, pc(fn.waiting)) + cell(T('atBay') + ' now', fn.atBayNow, pc(fn.atBayNow)) + cell('Received', fn.received, pc(fn.received)) + '</div>' +
       '<div class="vbays"' + tipA(y.occupied + ' of ' + y.docks + ' ' + esc(T('bays').toLowerCase()) + ' in use') + '><span><b>' + y.occupied + ' / ' + y.docks + '</b> ' + esc(T('bays').toLowerCase()) + ' in use</span><div class="vbar"><b class="' + st + '" style="width:' + Math.min(100, (y.occupied / Math.max(1, y.docks)) * 100).toFixed(0) + '%"></b></div></div>' +
       '<div class="vms">' + mini('Gate → ' + esc(T('bay').toLowerCase()), y.g2d, 'g2d', h.g2d) + mini('Truck turnaround', y.turn, 'turn', h.turn) + '</div>' +
-      '<div class="vtl">' + next.map((t) => '<div class="vtr"><b>' + esc(t.id) + '</b><span>' + esc(fitStr(t.sup, 13)) + '</span><span class="mut">' + esc(fitStr(t.mat, 14)) + '</span>' + chip(t) + '</div>').join('') + '</div></div>');
+      '<div class="vtl">' + next.map((t) => '<div class="vtr"><b' + tipA(esc(t.id) + ' · ' + esc(t.sup) + ' · ' + esc(t.mat)) + '>' + esc(t.id) + '</b><span>' + esc(t.sup) + '</span><span class="mut">' + esc(t.mat) + '</span>' + chip(t) + '</div>').join('') + '</div></div>');
     $('#v-a').dataset.href = '#/inbound';
   }
   const fitStr = (s, n) => (String(s).length > n ? String(s).slice(0, n - 1) + '…' : String(s));

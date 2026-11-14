@@ -760,3 +760,9 @@ table.rt .pn .ic{font-size:26px}
 .vtr{line-height:1.2}
 .vcs{grid-template-columns:repeat(5,1fr)}
 .vc b{font-size:22px}.vc small{font-size:11px}
+
+/* real truck ids / bay ids are long: every cell stays on one line and truncates instead of overlapping */
+.vtr{grid-template-columns:minmax(124px,auto) minmax(0,1fr) minmax(0,.9fr) auto;gap:6px}
+.vtr>*{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vtr>b{font-size:12.5px}
+.vtr .chip{min-width:0;max-width:130px;padding:1px 6px}
