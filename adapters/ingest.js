@@ -110,6 +110,7 @@ const APPLY = {
       if (p[k] === undefined) continue;
       const o = p[k] !== null && typeof p[k] === 'object' ? p[k] : { buf: p[k] };
       S.shops[k].buf = clamp(need(o.buf, k + '.buf'), 0, 100);
+      if (o.running !== undefined) S.shops[k].running = o.running === true || o.running === 1 || o.running === '1' || o.running === 'true';
       for (const f of ['units', 'hours', 'cap']) { if (o[f] !== undefined) S.shops[k][f] = need(o[f], k + '.' + f); else if (f !== 'cap') delete S.shops[k][f]; }
     }
   },

@@ -140,8 +140,8 @@
       line: { stopped: false, reason: null, stops: 0, stoppedMin: 0, runWithoutMin: 0, missing: 0 },
       mods: { bumperJam: 0, jvDelay: 0, traffic: 0 },
       shops: {
-        press: { buf: 82, target: 80 }, weldA: { buf: 79, target: 78 }, weldB: { buf: 74, target: 76 }, paintA: { buf: 66, target: 65 }, paintB: { buf: 62, target: 63 },
-        engine: { buf: 68, target: 68 }, bumper: { buf: 42, target: 46 }, ip: { buf: 72, target: 72 }, tm: { buf: 64, target: 65 }
+        press: { buf: 82, target: 80, running: true }, weldA: { buf: 79, target: 78, running: true }, weldB: { buf: 74, target: 76, running: true }, paintA: { buf: 66, target: 65, running: true }, paintB: { buf: 62, target: 63, running: true },
+        engine: { buf: 68, target: 68, running: true }, bumper: { buf: 42, target: 46, running: true }, ip: { buf: 72, target: 72, running: true }, tm: { buf: 64, target: 65, running: true }
       },
       yard: {
         expected: 34, arrived: 26, docked: 21, received: 18, occupied: 21, docks: 28, unloadLimitMin: 45,
@@ -463,6 +463,7 @@
     const L = S.live || {};
     const tick = clamp(m, 0, 2);     // noise scale so fast speeds don't explode
 
+    if (!L.shops) for (const k of Object.keys(S.shops)) S.shops[k].running = running;
     /* build */
     if (L.build) { /* live feed owns build counters */ } else if (running) {
       const d = Math.min(S.build.rate * m * rnd(0.9, 1.05), S.build.plan - S.build.actual);

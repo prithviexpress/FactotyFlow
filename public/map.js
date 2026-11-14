@@ -33,6 +33,7 @@
   const fit = (s, w, px) => { s = String(s === undefined || s === null ? '' : s); const max = Math.max(3, Math.floor(w / (px || 9))); return s.length > max ? s.slice(0, max - 1) + '…' : s; };
   const cls = (g) => (g.h >= 120 && g.w >= 240 ? 'large' : g.h >= 120 ? 'tall' : 'wide');          // widgets adapt to the block they are placed in
   const status = (v) => Sim.bufferStatus(v);
+  const runTag = (S, key) => (S.shops[key] && S.shops[key].running !== undefined ? S.shops[key].running : undefined);
   const hh = (h) => (h === null || h === undefined ? '' : (h < 10 ? h.toFixed(1) : Math.round(h)) + ' h');
 
   const TINT = { ok: 'var(--ok)', watch: 'var(--watch)', low: 'var(--low)', none: 'var(--ink3)' };
@@ -230,23 +231,24 @@
 
     /* ---- shop-style blocks ---- */
     function shop(slot, key, family, src, fallbackLabel) {
-      const g = G[slot], s = S.shops[key], st = status(s.buf), w = wip[key], tall = g.h > 100, nm = label(slot, fallbackLabel);
+      const g = G[slot], s = S.shops[key], bst = status(s.buf), run = runTag(S, key), st = run === false ? 'low' : bst, w = wip[key], tall = g.h > 100, nm = label(slot, fallbackLabel);
+      const rp = run === undefined ? '' : pill(g.x + 12, tall ? g.y + 50 : g.y + 25, run ? 'RUNNING' : 'STOPPED', run ? 'ok' : 'low'), dy = run === undefined ? 0 : tall ? 18 : 0;
       let inner;
       if (tall) {
-        inner = tx(g.x + 12, g.y + 22, fit(nm, g.w - 18, 8.4), 'bt') + pill(g.x + 12, g.y + 30, f0(s.buf) + '%', st) + tx(g.x + 12, g.y + 66, 'Buffer stock', 'sm') + tx(g.x + 12, g.y + 83, w && w.hours !== null ? hh(w.hours) : '—', 'bn2') +
+        inner = tx(g.x + 12, g.y + 22, fit(nm, g.w - 18, 8.4), 'bt') + pill(g.x + 12, g.y + 30, f0(s.buf) + '%', bst) + rp + tx(g.x + 12, g.y + 66 + dy, 'Buffer stock', 'sm') + tx(g.x + 12, g.y + 83 + dy, w && w.hours !== null ? hh(w.hours) : '—', 'bn2') +
           bar(g.x + 12, g.y + g.h - 30, g.w - 24, s.buf, st) + (src ? srcTag(src, g.x + 10, g.y + g.h - 22) : '');
       } else {
-        inner = tx(g.x + 12, g.y + 19, fit(nm, g.w - 66, 8.4), 'bt') + pill(g.x + g.w - 9, g.y + 4, f0(s.buf) + '%', st, 'end') + tx(g.x + 12, g.y + g.h - 21, 'Buffer' + (w && w.hours !== null ? ' · ' + hh(w.hours) : ''), 'sm') + bar(g.x + 12, g.y + g.h - 11, g.w - 24, s.buf, st);
+        inner = tx(g.x + 12, g.y + 19, fit(nm, g.w - 66, 8.4), 'bt') + pill(g.x + g.w - 9, g.y + 4, f0(s.buf) + '%', bst, 'end') + rp + tx(g.x + 12, g.y + g.h - (run === undefined ? 21 : 15), 'Buffer' + (w && w.hours !== null ? ' · ' + hh(w.hours) : ''), 'sm') + bar(g.x + 12, g.y + g.h - 11, g.w - 24, s.buf, bst);
       }
       out.push(block({ id: slot, kind: 'prod', tip: TIPS[slot], x: g.x, y: g.y, w: g.w, h: g.h, st, family, sel: sel(family), dim: dim(family), inner }));
     }
     shop('egtm', 'engine', 'engine', 'egtm', 'EGTM');
     shop('imma', 'bumper', 'bumper', 'imma', 'IMM-A');
     {
-      const g = G.press, s = S.shops.press, st = status(s.buf), w = wip.press;
+      const g = G.press, s = S.shops.press, bst = status(s.buf), run = runTag(S, 'press'), st = run === false ? 'low' : bst, w = wip.press, rp = run === undefined ? '' : pill(g.x + 12, g.y + 50, run ? 'RUNNING' : 'STOPPED', run ? 'ok' : 'low'), dy = run === undefined ? 0 : 18;
       out.push(block({ id: 'press', kind: 'prod', tip: TIPS.press, x: g.x, y: g.y, w: g.w, h: g.h, st, family: 'press', sel: sel('press'), dim: dim('press'), inner:
-        tx(g.x + 12, g.y + 22, fit(label('press', 'PRESS A/B'), g.w - 18, 8.4), 'bt') + pill(g.x + 12, g.y + 30, f0(s.buf) + '%', st) + tx(g.x + 12, g.y + 66, 'Buffer stock', 'sm') +
-        tx(g.x + 12, g.y + 83, w && w.hours !== null ? hh(w.hours) : '—', 'bn2') + bar(g.x + 12, g.y + g.h - 30, g.w - 24, s.buf, st) + srcTag('press', g.x + 10, g.y + g.h - 22) }));
+        tx(g.x + 12, g.y + 22, fit(label('press', 'PRESS A/B'), g.w - 18, 8.4), 'bt') + pill(g.x + 12, g.y + 30, f0(s.buf) + '%', bst) + rp + tx(g.x + 12, g.y + 66 + dy, 'Buffer stock', 'sm') +
+        tx(g.x + 12, g.y + 83 + dy, w && w.hours !== null ? hh(w.hours) : '—', 'bn2') + bar(g.x + 12, g.y + g.h - 30, g.w - 24, s.buf, bst) + srcTag('press', g.x + 10, g.y + g.h - 22) }));
     }
     shop('weldB', 'weldB', 'weld', null, 'WELD B'); shop('weldA', 'weldA', 'weld', null, 'WELD A');
     shop('paintB', 'paintB', 'paint', null, 'PAINT B'); shop('paintA', 'paintA', 'paint', null, 'PAINT A');
