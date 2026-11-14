@@ -321,6 +321,18 @@
   const median = (a) => { if (!a.length) return null; const b = a.slice().sort((x, y) => x - y), n = b.length; return n % 2 ? b[(n - 1) / 2] : (b[n / 2 - 1] + b[n / 2]) / 2; };
 
   /** Hours of inventory (stock / consumption rate) at every position along the flow. */
+  /** The truck funnel as parts that add up: expected = not yet here + waiting + at a bay now + received.
+   *  (`docked` counts trucks "currently or already" at a bay, so the ones at a bay now are docked - received.) */
+  function funnel(y) {
+    const received = Math.max(0, y.received), docked = Math.max(received, y.docked), arrived = Math.max(docked, y.arrived), expected = Math.max(arrived, y.expected);
+    return { expected, notYet: expected - arrived, waiting: arrived - docked, atBayNow: docked - received, received };
+  }
+  /** The ids of the bays the grid shows, and which of them have a truck at them. */
+  function bayGrid(S) {
+    const y = S.yard, ids = y.bays && y.bays.length ? y.bays.slice() : Array.from({ length: Math.max(0, y.docks) }, (_, i) => String(i + 1));
+    const busy = new Set(S.trucks.filter((t) => t.status === 'docked' && t.dock !== null && t.dock !== undefined && t.dock !== '').map((t) => String(t.dock)));
+    return ids.map((id) => ({ id, busy: busy.has(id) }));
+  }
   function inventoryView(S) {
     const T = S.setup.terms;
     const POS = [{ id: 'inbound', label: 'Inbound (en route)' }, { id: 'bay', label: 'Receiving ' + T.bays.toLowerCase() }, { id: 'lineside', label: 'Line-side' }];
@@ -692,7 +704,7 @@
   }
 
   return {
-    createState, step, inject, resetDomain, SEQFLOWS, amrHealth, kanbanStatus, raiseAlert, clearAlert, pruneAlerts, reconcileAlerts, LEVELS, inventoryView, hourStatus, setPlant, lineSplit, DEFAULT_SLOTS, SLOT_BINDS, CARRIERS, DEFAULT_TERMS, DEFAULT_JVS, MAX_JVS, TARGET_H, coverage, partStatus, bufferStatus, linesideStatus, routeStatus,
+    createState, step, inject, funnel, bayGrid, resetDomain, SEQFLOWS, amrHealth, kanbanStatus, raiseAlert, clearAlert, pruneAlerts, reconcileAlerts, LEVELS, inventoryView, hourStatus, setPlant, lineSplit, DEFAULT_SLOTS, SLOT_BINDS, CARRIERS, DEFAULT_TERMS, DEFAULT_JVS, MAX_JVS, TARGET_H, coverage, partStatus, bufferStatus, linesideStatus, routeStatus,
     nextAction, fleetView, fmtClock, makeTrucks, SHOP_NAMES, RISK_MIN
   };
 });

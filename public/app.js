@@ -240,17 +240,18 @@
   /* ---------- inbound ---------- */
   function renderInbound() {
     const y = S.yard, h = S.hist;
-    const pc = (n) => f0((n / y.expected) * 100) + '%';
+    const fn = window.FactorySim.funnel(y), pcf = (n) => f0((n / Math.max(1, fn.expected)) * 100) + '%';
     const mc = (ic, lab, val, key, arr, col) =>
       '<div class="mc">' + ico(ic) + '<div class="tx">' + lab + '<b>' + f0(val) + ' min</b></div><div class="sc">' +
       spark(key, arr, { color: col, unit: ' min', h: 40 }) + xlabels(h.t, true) + '</div></div>';
     setHTML($('#p-inbound'),
       '<div class="ptitle"><h2>INBOUND TRUCK FLOW <small>(Today)</small></h2><a class="more" data-href="#/inbound">Details \u203a</a></div>' +
       '<div class="funnel">' + ico('truck') +
-      '<div class="fs"' + tipA('Trucks scheduled today (grows with ad-hoc loads)') + '><small>Expected</small><b>' + y.expected + '</b></div><span class="arr">▶</span>' +
-      '<div class="fs"><small>Arrived</small><b>' + y.arrived + '</b><i>(' + pc(y.arrived) + ')</i></div><span class="arr">▶</span>' +
-      '<div class="fs"><small>' + T('atBay') + '</small><b>' + y.docked + '</b><i>(' + pc(y.docked) + ')</i></div><span class="arr">▶</span>' +
-      '<div class="fs"><small>Received</small><b>' + y.received + '</b><i>(' + pc(y.received) + ')</i></div></div>' +
+      '<div class="fs"' + tipA('Trucks scheduled today (grows with ad-hoc loads): the four figures to the right add up to it') + '><small>Expected</small><b>' + fn.expected + '</b></div><span class="arr">=</span>' +
+      '<div class="fs"' + tipA('Scheduled, not at the plant yet') + '><small>Not yet here</small><b>' + fn.notYet + '</b><i>(' + pcf(fn.notYet) + ')</i></div><span class="arr">+</span>' +
+      '<div class="fs"' + tipA('At the plant, not at a bay yet') + '><small>Waiting</small><b>' + fn.waiting + '</b><i>(' + pcf(fn.waiting) + ')</i></div><span class="arr">+</span>' +
+      '<div class="fs"' + tipA('At a bay right now') + '><small>' + T('atBay') + ' now</small><b>' + fn.atBayNow + '</b><i>(' + pcf(fn.atBayNow) + ')</i></div><span class="arr">+</span>' +
+      '<div class="fs"><small>Received</small><b>' + fn.received + '</b><i>(' + pcf(fn.received) + ')</i></div></div>' +
       '<div class="minis">' + mc('clock', 'Gate to ' + T('bay') + ' Time<br>(avg.)', y.g2d, 'g2d', h.g2d, 'var(--cyan)') +
       mc('truck', 'Truck Turnaround Time (avg.)', y.turn, 'turn', h.turn, 'var(--cyan)') + '</div>');
   }

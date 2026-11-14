@@ -112,12 +112,11 @@
       return '<tr><td><b>' + t.id + '</b></td><td>' + t.sup + '</td><td>' + t.mat + '</td><td><span class="chip ' + st + '">' + (t.status === 'docked' ? atBay : t.status).toUpperCase() + '</span></td><td>' + (t.dock || '—') + '</td>' +
         '<td>' + clk(t.sched) + overdue + '</td><td>' + clk(t.arrivedAt) + late + '</td><td>' + dwell + '</td></tr>';
     });
-    const occ = new Set(S.trucks.filter((t) => t.status === 'docked' && t.dock).map((t) => t.dock));
-    let grid = '';
-    for (let i = 1; i <= y.docks; i++) grid += '<span class="dk ' + (occ.has(i) ? 'busy' : '') + '" data-tip="' + bay + ' ' + i + (occ.has(i) ? ' — occupied' : ' — free') + '">' + i + '</span>';
+    const fn = window.FactorySim.funnel(y), pctOf = (n) => H.f0((n / Math.max(1, fn.expected)) * 100) + '%';
+    const grid = window.FactorySim.bayGrid(S).map((b) => '<span class="dk ' + (b.busy ? 'busy' : '') + '" data-tip="' + bay + ' ' + b.id + (b.busy ? ' — occupied' : ' — free') + '">' + b.id + '</span>').join('');
     return frame('inbound', 'Inbound Truck Flow — ' + TM(S, 'parking'), 'Gate → ' + bay.toLowerCase() + ' → received · today',
-      cards([card('Expected', y.expected), card('Arrived', y.arrived, '', H.f0((y.arrived / y.expected) * 100) + '%'), card(atBay, y.docked, '', H.f0((y.docked / y.expected) * 100) + '%'),
-        card('Received', y.received, 'ok', H.f0((y.received / y.expected) * 100) + '%'), card('At plant now', Math.max(0, y.arrived - y.received), 'cy'),
+      cards([card('Expected', fn.expected), card('Not yet here', fn.notYet, '', pctOf(fn.notYet)), card('Waiting', fn.waiting, fn.waiting >= 6 ? 'watch' : '', pctOf(fn.waiting)),
+        card(atBay + ' now', fn.atBayNow, 'cy', pctOf(fn.atBayNow)), card('Received', fn.received, 'ok', pctOf(fn.received)),
         card('Gate → ' + bay.toLowerCase() + ' (avg)', H.f0(y.g2d) + ' min', y.g2d > 45 ? 'watch' : ''), card('Truck turnaround (avg)', H.f0(y.turn) + ' min', y.turn > 90 ? 'watch' : '')]) +
       '<div class="two">' + sect('Gate to ' + bay.toLowerCase() + ' time', big(H, 'g2d', S.hist.g2d, S.hist.t, { color: 'var(--cyan)', unit: ' min' })) +
       sect('Truck turnaround time', big(H, 'turn', S.hist.turn, S.hist.t, { color: 'var(--cyan)', unit: ' min' })) + '</div>' +

@@ -107,3 +107,38 @@ test('plant setup: JV names and terminology drive the state', () => {
   assert.equal(S.jvSites.length, 6);                                                     // capped
   for (let i = 0; i < 500; i++) Sim.step(S, 30);                                         // simulates fine with renamed JVs
 });
+
+test('yard bays: the grid shows the bays\' own ids, and a truck at "AA-02" lights that bay', () => {
+  const Sim = require('../public/sim.js'), S = Sim.createState();
+  Ing.ingest(S, 'yard', { expected: 4, arrived: 3, docked: 2, received: 1, occupied: 1, bays: ['AA-01', 'AA-02', 'BB-01'] });
+  assert.deepEqual(S.yard.bays, ['AA-01', 'AA-02', 'BB-01']);
+  assert.equal(S.yard.docks, 3, 'docks follows the list when it is not sent');
+  Ing.ingest(S, 'trucks', [{ id: 'T1', status: 'docked', dock: 'AA-02' }, { id: 'T2', status: 'docked', dock: 'bb-01' }, { id: 'T3', status: 'received', dock: 'AA-01' }]);
+  assert.equal(S.trucks[0].dock, 'AA-02');
+  assert.deepEqual(Sim.bayGrid(S), [{ id: 'AA-01', busy: false }, { id: 'AA-02', busy: true }, { id: 'BB-01', busy: false }]);  // case matters; a received truck holds no bay
+});
+
+test('yard bays: without the list the grid is 1..docks and numeric docks still work', () => {
+  const Sim = require('../public/sim.js'), S = Sim.createState();
+  S.yard.bays = undefined;
+  Ing.ingest(S, 'yard', { docks: 3 });
+  Ing.ingest(S, 'trucks', [{ id: 'T1', status: 'docked', dock: 2 }, { id: 'T2', status: 'docked', dock: '3' }]);
+  assert.deepEqual(Sim.bayGrid(S).map((b) => [b.id, b.busy]), [['1', false], ['2', true], ['3', true]]);
+});
+
+test('yard bays: bad lists are refused and change nothing', () => {
+  const S = require('../public/sim.js').createState();
+  for (const bad of [['A', 'A'], [''], 'AA-01', [new Array(30).join('x')]]) assert.throws(() => Ing.ingest(S, 'yard', { bays: bad }), /yard\.bays/);
+  assert.throws(() => Ing.ingest(S, 'trucks', [{ id: 'T', dock: new Array(30).join('x') }]), /dock/);
+});
+
+test('the funnel adds up: expected = not yet here + waiting + at a bay now + received', () => {
+  const { funnel } = require('../public/sim.js');
+  const f = funnel({ expected: 1264, arrived: 330, docked: 219, received: 196 });
+  assert.deepEqual(f, { expected: 1264, notYet: 934, waiting: 111, atBayNow: 23, received: 196 });
+  for (const y of [{ expected: 34, arrived: 26, docked: 21, received: 18 }, { expected: 5, arrived: 9, docked: 9, received: 9 }, { expected: 0, arrived: 0, docked: 0, received: 0 }]) {
+    const g = funnel(y);
+    assert.equal(g.notYet + g.waiting + g.atBayNow + g.received, g.expected);
+    assert.ok([g.notYet, g.waiting, g.atBayNow, g.received].every((n) => n >= 0));
+  }
+});

@@ -110,6 +110,13 @@ const APPLY = {
   yard(S, p) {
     asObj(p, 'yard');
     for (const k of ['expected', 'arrived', 'docked', 'received', 'occupied', 'docks', 'g2d', 'turn']) if (p[k] !== undefined) S.yard[k] = need(p[k], k);
+    if (p.bays !== undefined) {   // the bays' own ids, in display order: the grid then shows these instead of 1..docks
+      const ids = asArray(p.bays, 'yard.bays').map((b) => String(b).trim());
+      if (ids.length > 2000 || ids.some((b) => !b || b.length > 24)) throw new IngestError('yard.bays: up to 2000 ids, each 1 to 24 characters');
+      if (new Set(ids).size !== ids.length) throw new IngestError('yard.bays: ids must be unique');
+      S.yard.bays = ids;
+      if (p.docks === undefined) S.yard.docks = ids.length;
+    }
   },
   trucks(S, p) { S.trucks = asArray(p, 'trucks').map((t) => normTruck(t)); },
   'trucks.item'(S, p) {
@@ -207,9 +214,18 @@ function normTruck(t) {
   const status = ['scheduled', 'arrived', 'docked', 'received'].includes(t.status) ? t.status : 'scheduled';
   return {
     id: String(t.id), sup: str(t.supplier !== undefined ? t.supplier : t.sup, '—'), mat: str(t.material !== undefined ? t.material : t.mat, '—'),
-    status, dock: t.dock === undefined || t.dock === null ? null : num(t.dock, null),
+    status, dock: normDock(t.dock),
     sched: clockOf(t.schedAt !== undefined ? t.schedAt : t.sched), arrivedAt: clockOf(t.arrivedAt), dockedAt: clockOf(t.dockedAt), doneAt: clockOf(t.doneAt)
   };
+}
+/** a bay: its number, or its own id such as "AA-12" (matched against yard.bays) */
+function normDock(v) {
+  if (v === undefined || v === null || v === '') return null;
+  if (typeof v === 'number') return num(v, null);
+  const s = String(v).trim();
+  if (!s) return null;
+  if (s.length > 24) throw new IngestError('truck.dock: at most 24 characters');
+  return /^\d+$/.test(s) ? Number(s) : s;
 }
 function normLine(x, old) {
   asObj(x, 'lineside item');
