@@ -232,20 +232,20 @@
     /* ---- shop-style blocks ---- */
     function shop(slot, key, family, src, fallbackLabel) {
       const g = G[slot], s = S.shops[key], bst = status(s.buf), run = runTag(S, key), st = run === false ? 'low' : bst, w = wip[key], tall = g.h > 100, nm = label(slot, fallbackLabel);
-      const rp = run === undefined ? '' : pill(g.x + 12, tall ? g.y + 50 : g.y + 25, run ? 'RUNNING' : 'STOPPED', run ? 'ok' : 'low'), dy = run === undefined ? 0 : tall ? 18 : 0;
+      const rp = '', dy = 0;
       let inner;
       if (tall) {
         inner = tx(g.x + 12, g.y + 22, fit(nm, g.w - 18, 8.4), 'bt') + pill(g.x + 12, g.y + 30, f0(s.buf) + '%', bst) + rp + tx(g.x + 12, g.y + 66 + dy, 'Buffer stock', 'sm') + tx(g.x + 12, g.y + 83 + dy, w && w.hours !== null ? hh(w.hours) : '—', 'bn2') +
           bar(g.x + 12, g.y + g.h - 30, g.w - 24, s.buf, st) + (src ? srcTag(src, g.x + 10, g.y + g.h - 22) : '');
       } else {
-        inner = tx(g.x + 12, g.y + 19, fit(nm, g.w - 66, 8.4), 'bt') + pill(g.x + g.w - 9, g.y + 4, f0(s.buf) + '%', bst, 'end') + rp + tx(g.x + 12, g.y + g.h - (run === undefined ? 21 : 15), 'Buffer' + (w && w.hours !== null ? ' · ' + hh(w.hours) : ''), 'sm') + bar(g.x + 12, g.y + g.h - 11, g.w - 24, s.buf, bst);
+        inner = tx(g.x + 12, g.y + 19, fit(nm, g.w - 66, 8.4), 'bt') + pill(g.x + g.w - 9, g.y + 4, f0(s.buf) + '%', bst, 'end') + rp + tx(g.x + 12, g.y + g.h - 21, 'Buffer' + (w && w.hours !== null ? ' · ' + hh(w.hours) : ''), 'sm') + bar(g.x + 12, g.y + g.h - 11, g.w - 24, s.buf, bst);
       }
       out.push(block({ id: slot, kind: 'prod', tip: TIPS[slot], x: g.x, y: g.y, w: g.w, h: g.h, st, family, sel: sel(family), dim: dim(family), inner }));
     }
     shop('egtm', 'engine', 'engine', 'egtm', 'EGTM');
     shop('imma', 'bumper', 'bumper', 'imma', 'IMM-A');
     {
-      const g = G.press, s = S.shops.press, bst = status(s.buf), run = runTag(S, 'press'), st = run === false ? 'low' : bst, w = wip.press, rp = run === undefined ? '' : pill(g.x + 12, g.y + 50, run ? 'RUNNING' : 'STOPPED', run ? 'ok' : 'low'), dy = run === undefined ? 0 : 18;
+      const g = G.press, s = S.shops.press, bst = status(s.buf), run = runTag(S, 'press'), st = run === false ? 'low' : bst, w = wip.press, rp = '', dy = 0;
       out.push(block({ id: 'press', kind: 'prod', tip: TIPS.press, x: g.x, y: g.y, w: g.w, h: g.h, st, family: 'press', sel: sel('press'), dim: dim('press'), inner:
         tx(g.x + 12, g.y + 22, fit(label('press', 'PRESS A/B'), g.w - 18, 8.4), 'bt') + pill(g.x + 12, g.y + 30, f0(s.buf) + '%', bst) + rp + tx(g.x + 12, g.y + 66 + dy, 'Buffer stock', 'sm') +
         tx(g.x + 12, g.y + 83 + dy, w && w.hours !== null ? hh(w.hours) : '—', 'bn2') + bar(g.x + 12, g.y + g.h - 30, g.w - 24, s.buf, bst) + srcTag('press', g.x + 10, g.y + g.h - 22) }));

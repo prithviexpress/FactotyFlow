@@ -180,13 +180,12 @@ test('assembly lines A and B are controlled separately; shops show RUNNING / STO
   Ing.ingest(S, 'build', { lineB: { actual: 360 } });                         // one value of one line
   assert.equal(S.build.lineB.actual, 360); assert.equal(S.build.lineA.actual, 410);
   assert.throws(() => Ing.ingest(S, 'build', { lineA: { actual: -1 } }));
-  // running status: simulated follows the line, a pushed value wins, unknown shows nothing
-  assert.equal((r.nodes.match(/>RUNNING</g) || []).length >= 6, true);
+  // running input: a stopped shop turns red (no text); only the assembly lines carry the RUNNING pill
+  let r2 = global.window.FFMap.render(S, ctx(S)); assert.equal((r2.nodes.match(/>RUNNING</g) || []).length, 2);
   Ing.ingest(S, 'shops', { weldA: { buf: 79, running: false } });
-  r = global.window.FFMap.render(S, ctx(S));
-  assert.ok(r.nodes.includes('>STOPPED<'));
+  r2 = global.window.FFMap.render(S, ctx(S));
+  assert.ok(!r2.nodes.includes('>STOPPED<') && (r2.nodes.match(/>RUNNING</g) || []).length === 2);
+  assert.match(r2.nodes, /data-node="weldA"[^>]*>|class="nd blk[^"]*problem[^"]*"[^>]*data-node="weldA"/);
   V.apply(S, 'shops/paintB/running', '0'); assert.equal(S.shops.paintB.running, false);
   assert.throws(() => V.apply(S, 'shops/paintB/running', '2'), /out of range/);
-  delete S.shops.engine.running; S.live.shops = true;
-  assert.ok(!global.window.FFMap.render(S, ctx(S)).nodes.match(/EGTM[\s\S]{0,400}>RUNNING</));
 });
