@@ -254,11 +254,11 @@
     shop('paintB', 'paintB', 'paint', null, 'PAINT B'); shop('paintA', 'paintA', 'paint', null, 'PAINT A');
 
     /* ---- assembly lines A / B ---- */
-    const stopped = S.line.stopped;
+    const stopped = S.line.stopped, andon = String(S.line.reason || 'line stopped').trim(), andonTxt = /^andon/i.test(andon) ? andon : 'Andon: ' + andon;
     [['asmB', 'B'], ['asmA', 'A']].forEach(([slot, L]) => {
       const g = G[slot], d = split[L], pct = d.plan ? (d.actual / d.plan) * 100 : 0, st = stopped ? 'low' : 'ok', nm = label(slot, 'ASSEMBLY ' + L), bw = g.w - 330;
-      out.push(block({ id: slot, kind: 'asm', tip: TIPS[slot], x: g.x, y: g.y, w: g.w, h: g.h, st, family: 'assembly', href: '#/shop/assembly', sel: sel('assembly'), dim: dim('assembly'), inner:
-        tx(g.x + 16, g.y + 22, fit(nm, 190, 9), 'bt') + pill(g.x + 16 + Math.min(String(nm).length, 21) * 9 + 14, g.y + 8, stopped ? 'STOPPED' : 'RUNNING', stopped ? 'low' : 'ok') +
+      out.push(block({ id: slot, kind: 'asm', tip: TIPS[slot] + (stopped ? ' · ' + andonTxt : ''), x: g.x, y: g.y, w: g.w, h: g.h, st, family: 'assembly', href: '#/shop/assembly', sel: sel('assembly'), dim: dim('assembly'), inner:
+        tx(g.x + 16, g.y + 22, fit(nm, 190, 9), 'bt') + (stopped ? pill(g.x + 250, g.y + 7, fit(andonTxt, g.w - 250 - 24, 6.7), 'low') : pill(g.x + 16 + Math.min(String(nm).length, 21) * 9 + 14, g.y + 8, 'RUNNING', 'ok')) +
         tx(g.x + 16, g.y + 47, f0(d.actual), 'bn') + tx(g.x + 16 + String(f0(d.actual)).length * 13 + 6, g.y + 46, '/ ' + d.plan + ' vehicles' + (split.derived ? ' · est.' : ''), 'sm') +
         '<rect x="' + (g.x + 250) + '" y="' + (g.y + 32) + '" width="' + bw + '" height="8" rx="4" style="fill:var(--track)"/><rect x="' + (g.x + 250) + '" y="' + (g.y + 32) + '" width="' + Math.max(0, Math.min(bw, (bw * pct) / 100)).toFixed(1) + '" height="8" rx="4" fill="' + TINT[st] + '"/>' +
         pill(g.x + g.w - 12, g.y + 27, f0(pct) + '%', st, 'end') }));

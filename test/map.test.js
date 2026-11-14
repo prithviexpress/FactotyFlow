@@ -26,7 +26,9 @@ test('block layout renders the drawing\'s blocks, the JV tiles, the sequence bus
   assert.match(r.flows, /id="rt-jv-a" d="M230,156 V169 H577 V332 H600 V320"/); assert.match(r.flows, /id="rt-eg-a" d="M626,156 V169 H577 V332 H700 V320"/);
   assert.match(r.flows, /id="rt-im-a" d="M784,156 V169 H577 V332 H860 V320"/); assert.ok(!r.flows.includes('H1148'));
   assert.ok(r.flows.includes('M600,332 V320') && r.flows.includes('M700,169 V182'));
-  S.line.stopped = true; S.line.reason = 'x';
+  S.line.stopped = true; S.line.reason = 'Andon: station ASY-08 door misfit';
+  { const rs = global.window.FFMap.render(S, ctx(S)).nodes; assert.ok(rs.includes('Andon: station ASY-08 door misfit') && !rs.includes('>STOPPED<')); }
+  S.line.reason = 'x';
   assert.ok(!global.window.FFMap.render(S, ctx(S)).flows.includes('animateMotion'));          // carriers stop with the line
 });
 
