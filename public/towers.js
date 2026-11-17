@@ -144,20 +144,20 @@
   }
 
   const TOWERS = { production, quality, utility, safety }, ROW_BUDGET = 13;
-  function actions(groups) {
+  function actions(groups, bare) {
     const total = groups.reduce((a, g) => a + g.items.length, 0), red = groups.some((g) => g.items.some((i) => i.st === 'low'));
-    const shown = groups.map((g) => Math.min(1, g.items.length)); let spare = ROW_BUDGET - groups.length;
+    const shown = groups.map((g) => Math.min(1, g.items.length)); let spare = (bare ? 10 : ROW_BUDGET) - groups.length;
     for (let again = true; again && spare > 0;) { again = false; groups.forEach((g, i) => { if (spare > 0 && shown[i] < g.items.length) { shown[i]++; spare--; again = true; } }); }
     return '<aside class="vbox twr-a' + (red ? ' problem' : '') + '"><div class="vh"><span class="vb">!</span><h2>ACTIONABLE ITEMS</h2><span class="vr ' + (red ? 'low' : total ? 'watch' : 'ok') + '">' + (total ? total + ' open' : 'all clear') + '</span></div><div class="vbody ag">' +
-      groups.map((g, i) => { g.items.sort((a, b) => SEV[a.st] - SEV[b.st]); const w = g.items.some((x) => x.st === 'low') ? 'low' : g.items.length ? 'watch' : 'ok', k = shown[i];
-        return '<div class="agrp ' + w + '" style="flex-grow:' + (Math.max(1, k) + 0.7) + '"><div class="agh"><span class="gn">' + (i + 1) + '</span><b>' + esc(g.title) + '</b><span class="cnt ' + w + '"' + (g.items.length > k ? tip((g.items.length - k) + ' more not shown') : '') + '>' + (g.items.length || '✓') + '</span></div>' +
+      groups.map((g, i) => { g.items.sort((a, b) => SEV[a.st] - SEV[b.st]); const gh = g.href ? ' data-href="' + g.href + '"' : ''; const w = g.items.some((x) => x.st === 'low') ? 'low' : g.items.length ? 'watch' : 'ok', k = shown[i];
+        return '<div class="agrp ' + w + '" style="flex-grow:' + (Math.max(1, k) + 0.7) + '"><div class="agh"' + gh + '><span class="gn">' + (i + 1) + '</span><b>' + esc(g.title) + '</b><span class="cnt ' + w + '"' + (g.items.length > k ? tip((g.items.length - k) + ' more not shown') : '') + '>' + (g.items.length || '✓') + '</span></div>' +
           (g.items.length ? g.items.slice(0, k).map((x) => '<div class="ai ' + x.st + '"' + (x.href ? ' data-href="' + x.href + '"' : '') + tip(x.t + (x.d ? ' — ' + x.d : '')) + '><i class="sd ' + x.st + '"></i><span><b>' + esc(x.t) + '</b>' + (x.d ? '<small>' + esc(x.d) + '</small>' : '') + '</span></div>').join('') : '<div class="ai none"><span>' + esc(g.empty) + '</span></div>') + '</div>'; }).join('') + '</div></aside>';
   }
   function render(id, S) {
     const t = TOWERS[id](S);
-    return '<div class="twr"><div class="twr-k">' + t.tiles + '</div><div class="twr-m">' + t.boxes.map((b) => '<div class="vbox"><div class="vh"><span class="vb ' + b[1] + '">' + b[0] + '</span><h2>' + b[2] + '</h2><span class="vsub">' + b[3] + '</span></div><div class="vbody">' + b[4] + '</div></div>').join('') + '</div>' + actions(t.groups) + '</div>';
+    return '<div class="twr"><div class="twr-k">' + t.tiles + '</div><div class="twr-m">' + t.boxes.map((b, i) => '<div class="vbox"><div class="vh"><span class="vb">' + 'ABCD'[i] + '</span><h2>' + b[2] + '</h2><span class="vsub">' + b[3] + '</span></div><div class="vbody">' + b[4] + '</div></div>').join('') + '</div>' + actions(t.groups) + '</div>';
   }
   function summary(id, S) { const g = TOWERS[id](S).groups; return { total: g.reduce((a, x) => a + x.items.length, 0), red: g.some((x) => x.items.some((i) => i.st === 'low')) }; }
   const NAMES = { production: 'PRODUCTION CONTROL TOWER', quality: 'QUALITY CONTROL TOWER', utility: 'UTILITY CONTROL TOWER', safety: 'SAFETY CONTROL TOWER' };
-  window.FFTowers = { has: (id) => !!TOWERS[id], render, summary, title: (id) => NAMES[id], ids: Object.keys(TOWERS) };
+  window.FFTowers = { has: (id) => !!TOWERS[id], render, summary, groups: (id, S) => TOWERS[id](S).groups, actionsHTML: actions, title: (id) => NAMES[id], ids: Object.keys(TOWERS) };
 })();

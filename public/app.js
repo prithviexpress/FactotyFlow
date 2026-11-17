@@ -392,7 +392,7 @@
     if (lastRoute && FORM[lastRoute] && lastRoute !== r && FORM[lastRoute].unmount) FORM[lastRoute].unmount();
     if (FORM[r]) {                                // form pages: mounted once, only status cells update (never re-rendered, or typing would be lost)
       $('#stage').classList.add('paged'); $('#stage').classList.toggle('ovmode', r === 'overall'); renderHeader(); renderAlertBar();
-      if (lastRoute !== r) { cache.delete($('#page')); $('#page').scrollTop = 0; lastRoute = r; FORM[r].mount($('#page'), S, { server: SERVER, renderMap, actions: () => { const gs = actionGroups(); return { total: gs.reduce((a, g) => a + g.items.length, 0), red: gs.some((g) => g.items.some((i) => i.st === 'low')) }; } }); }
+      if (lastRoute !== r) { cache.delete($('#page')); $('#page').scrollTop = 0; lastRoute = r; FORM[r].mount($('#page'), S, { server: SERVER, renderMap, groups: () => actionGroups(), actions: () => { const gs = actionGroups(); return { total: gs.reduce((a, g) => a + g.items.length, 0), red: gs.some((g) => g.items.some((i) => i.st === 'low')) }; } }); }
       else FORM[r].update(S);
       renderFoot(); return;
     }

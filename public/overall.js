@@ -71,7 +71,7 @@
       tile('utility', 'Utility', '#/utility', kf('Energy vs target', V.eVarPct === null ? '—' : (V.eVarPct > 0 ? '+' : '') + V.eVarPct.toFixed(1) + '%', stE) + kf('Energy (kWh)', n0(V.energy)) + kf('Demand / contract', load.toFixed(0) + '%', atMost(load, 90, 7)), 'Energy against target to now and power demand against contract. Click for the utility tower.') +
       tile('safety', 'Safety', '#/safety', kf('Lost time injury', sf.lti, sf.lti > 0 ? 'low' : 'ok') + kf('TRIR', sf.trir.toFixed(2), stTrir) + kf('Compliance', p1(sf.compliance), atLeast(sf.compliance, sf.complianceTarget, 1)), 'Lost time injuries, total recordable incident rate and compliance. Click for the safety tower.'));
 
-    put('ov-table', '<table class="ovt"><thead><tr><th>Department</th><th>Plan (shift)</th><th>Plan to now</th><th>Actual</th><th>Variance</th><th>Achievement</th><th>OEE</th></tr></thead><tbody>' +
+    put('ov-table', '<table class="ovt"><thead><tr><th>Department</th><th>Shift plan</th><th>Plan now</th><th>Actual</th><th>Var.</th><th>Achiev.</th><th>OEE</th></tr></thead><tbody>' +
       V.rows.map((r) => { const a = atLeast(r.attain, 97, 7), o = atLeast(r.oee, 90, 5); return '<tr><td><i class="sd ' + (a === 'mut' ? '' : a) + '"></i><b>' + esc(r.name) + '</b></td><td>' + n0(r.plan) + '</td><td>' + n0(r.due) + '</td><td>' + n0(r.actual) + '</td><td class="' + (r.variance < 0 ? a : 'ok') + '">' + (r.variance > 0 ? '+' : '') + n0(r.variance) + '</td><td class="' + a + '">' + p1(r.attain) + '</td><td class="' + o + '">' + p1(r.oee) + '</td></tr>'; }).join('') +
       '<tr class="tot"><td><b>Total</b></td><td>' + n0(V.plan) + '</td><td>' + n0(V.due) + '</td><td>' + n0(V.actual) + '</td><td class="' + stProd + '">' + (V.actual - V.due > 0 ? '+' : '') + n0(V.actual - V.due) + '</td><td class="' + stProd + '">' + p1(V.attain) + '</td><td></td></tr></tbody></table>');
 
@@ -79,7 +79,7 @@
       gap = V.actual - V.due, ranked = V.rows.filter((q) => q.attain !== null).sort((a, b) => a.attain - b.attain), worstD = ranked[0], behind = ranked.filter((q) => q.attain < 97).length,
       stNeed = rateNow === null || rateNeed === null ? 'mut' : rateNeed <= rateNow ? 'ok' : rateNeed <= rateNow * 1.08 ? 'watch' : 'low';
     const sk = (lab, val, st, sub, hint) => '<div class="sk"' + tip(hint) + '><small>' + lab + '</small><b class="' + (st || '') + '">' + val + '</b>' + (sub ? '<i>' + sub + '</i>' : '') + '</div>';
-    put('ov-trend', '<div class="trw"><div class="trc"><div class="tlg"><span><i class="l-ac"></i>Actual</span><span><i class="l-pl"></i>Plan</span><span><i class="l-fc"></i>Forecast</span></div>' + trendChart(S, V, { w: 520, h: 330 }) + '</div><div class="trs">' +
+    put('ov-trend', '<div class="trw"><div class="trc"><div class="tlg"><span><i class="l-ac"></i>Actual</span><span><i class="l-pl"></i>Plan</span><span><i class="l-fc"></i>Forecast</span></div>' + trendChart(S, V, { w: 420, h: 330 }) + '</div><div class="trs">' +
       sk('Projected output', V.forecast === null ? '—' : n0(V.forecast), fcSt, V.forecast === null ? 'needs 15 min of shift' : ((V.forecast / V.plan - 1) * 100 >= 0 ? '+' : '') + ((V.forecast / V.plan - 1) * 100).toFixed(1) + '% vs plan', 'Run-rate forecast: output so far ÷ elapsed shift time × shift length') +
       sk('Gap to plan now', (gap > 0 ? '+' : '') + n0(gap), stProd, 'units against plan to now', 'Actual minus the share of the shift plan that should be done by now') +
       sk('Rate to recover', rateNeed === null ? '—' : n0(rateNeed) + ' /h', stNeed, rateNow === null ? '' : 'running at ' + n0(rateNow) + ' /h', 'Output per hour needed for the rest of the shift to reach the shift plan, against the average rate so far') +
@@ -87,29 +87,23 @@
       '</div></div>');
 
     const fr = V.len ? V.elapsed / V.len : 0;
-    put('ov-prod', V.rows.map((r) => { const st = atLeast(r.attain, 97, 7); return '<div class="hb"' + tip(r.name + ': ' + n0(r.actual) + ' of ' + n0(r.plan) + ' planned for the shift. The mark is where the plan is now.') + '><span>' + esc(r.name.replace(/ Shop$/, '').replace('Vehicle Inspection', 'Insp.')) + '</span><div class="tr"><i></i><b class="bg-' + (st === 'mut' ? 'ok' : st) + '" style="width:' + Math.min(100, (r.actual / Math.max(1, r.plan)) * 100).toFixed(1) + '%"></b><u style="left:' + (fr * 100).toFixed(1) + '%"></u></div><em>' + n0(r.actual) + '</em></div>'; }).join(''));
-
-    const short = { press: 'P', weld: 'W', paint: 'Pa', engine: 'E', assembly: 'A', im: 'IM', inspection: 'In' };
-    put('ov-util', '<div class="vbars">' + V.rows.map((r) => { const due = r.energyTarget * fr, st = due > 0 ? atMost(((r.energy - due) / due) * 100, 0, 3) : 'ok';
-      return '<div' + tip(r.name + ': ' + n0(r.energy) + ' kWh used, shift target ' + n0(r.energyTarget) + ' kWh. The dashed mark is the target to now.') + '><div class="col"><u style="bottom:' + (fr * 100).toFixed(1) + '%"></u><b class="bg-' + st + '" style="height:' + Math.min(100, (r.energy / Math.max(1, r.energyTarget)) * 100).toFixed(1) + '%"></b></div><small>' + (short[r.id] || esc(r.name.slice(0, 2))) + '</small></div>'; }).join('') + '</div>' +
-      '<div class="foot3"><span><b>' + n0(V.energy) + '</b> kWh</span><span class="' + stE + '">' + (V.eVarPct === null ? '—' : (V.eVarPct > 0 ? '+' : '') + V.eVarPct.toFixed(1) + '% vs target') + '</span></div>');
-
-    put('ov-logi', lineChart(S.hist.turn, { color: 'var(--hl)', target: T.tat, t: S.hist.t, minSpan: 4 }) + '<div class="foot3"><span><b>' + n0(V.tat) + ' min</b> now</span><span class="' + stTat + '">target ≤ ' + n0(T.tat) + ' min</span></div>');
-    put('ov-fm', donut(fm));
-    put('ov-mat', '<div class="kv big"><span>Inventory accuracy <small>(≥ ' + T.invAcc + '%)</small></span><b class="' + stAcc + '">' + p1(V.invAcc) + '</b></div><div class="kv big"><span>Rejection <small>(≤ ' + T.rejection + '%)</small></span><b class="' + stRej + '">' + V.rej.toFixed(1) + '%</b></div><div class="kv big"><span>Parts on hold</span><b>' + n0(S.quality.quarantined) + '</b></div>');
-    put('ov-safe', '<div class="kv big"><span>Lost time injury (LTI)</span><b class="' + (sf.lti > 0 ? 'low' : 'ok') + '">' + sf.lti + '</b></div><div class="kv big"><span>TRIR <small>(≤ ' + sf.trirTarget.toFixed(2) + ')</small></span><b class="' + stTrir + '">' + sf.trir.toFixed(2) + '</b></div>' +
-      '<div class="kv big"><span>Safety compliance <small>(≥ ' + sf.complianceTarget + '%)</small></span><b class="' + atLeast(sf.compliance, sf.complianceTarget, 1) + '">' + p1(sf.compliance) + '</b></div>');
+    /* actionable items: the top items of every tower, one section per tower, so the reader goes from "how are we doing" to "what needs me" */
+    if (window.FFTowers) {
+      const lg = ctx && ctx.groups ? ctx.groups() : [], flat = (gs) => gs.reduce((a, g) => a.concat(g.items), []).sort((a, b) => (a.st === 'low' ? 0 : 1) - (b.st === 'low' ? 0 : 1));
+      const sec = (title, href, gs, empty) => ({ title, href, empty, items: flat(gs).map((x) => ({ st: x.st, t: x.t, d: x.d, href: x.href || href })) });
+      put('ov-act', window.FFTowers.actionsHTML([sec('PRODUCTION', '#/production', window.FFTowers.groups('production', S), 'On plan, OEE on target'), sec('QUALITY', '#/quality', window.FFTowers.groups('quality', S), 'Yield, rejection and 4M on target'),
+        sec('LOGISTICS', '#/', lg, 'No line risk, trucks and bays flowing'), sec('UTILITY', '#/utility', window.FFTowers.groups('utility', S), 'Energy, demand, air and water within limits'), sec('SAFETY', '#/safety', window.FFTowers.groups('safety', S), 'No open incident or overdue action')], true));
+    }
 
   }
 
-  const box = (title, sub, body) => '<div class="vbox"><div class="vh"><h2>' + title + '</h2>' + (sub ? '<span class="vsub">' + sub + '</span>' : '') + '</div><div class="vbody" id="' + body + '"></div></div>';
+  const box = (letter, title, sub, body) => '<div class="vbox"><div class="vh"><span class="vb">' + letter + '</span><h2>' + title + '</h2>' + (sub ? '<span class="vsub">' + sub + '</span>' : '') + '</div><div class="vbody" id="' + body + '"></div></div>';
   function mount(el, S, c) {
     root = el; ctx = c || {}; cache = {};
     el.innerHTML = '<div class="ov"><div class="ov-tiles" id="ov-tiles"></div>' +
-      '<div class="ov-mid">' + box('PLAN VS ACTUAL', 'by department · variance and achievement against plan to now', 'ov-table') + box('PRODUCTION TREND AND FORECAST', 'cumulative, this shift', 'ov-trend') + '</div>' +
-      '<div class="ov-bot"><div class="vbox" id="ov-mapbox"><div class="vh"><h2>PLANT LAYOUT</h2><span class="vsub">achievement and OEE by shop · material flow · plant-wide figures in the vacant blocks</span></div><div class="ov-map" id="ov-map"></div></div>' +
-      '<div class="ov-cards">' + box('PRODUCTION', 'actual vs plan', 'ov-prod') + box('ENERGY', 'kWh by department', 'ov-util') + box('TRUCK TURNAROUND', 'minutes', 'ov-logi') +
-      box('4M', 'compliance', 'ov-fm') + box('MATERIAL', 'accuracy and rejection', 'ov-mat') + box('SAFETY', 'performance', 'ov-safe') + '</div></div></div>';
+      '<div class="ov-mid">' + box('A', 'PLAN VS ACTUAL', 'by department · against plan to now', 'ov-table') + box('B', 'TREND AND FORECAST', 'cumulative output, this shift', 'ov-trend') + '</div>' +
+      '<div class="vbox" id="ov-mapbox"><div class="vh"><span class="vb">C</span><h2>PLANT LAYOUT</h2><span class="vsub">achievement and OEE by shop · material flow · plant-wide figures in the vacant blocks</span></div><div class="ov-map" id="ov-map"></div></div>' +
+      '<div id="ov-act" class="ov-act"></div></div>';
     const map = document.getElementById('map'); if (map) el.querySelector('#ov-map').appendChild(map);
     update(S);
   }
