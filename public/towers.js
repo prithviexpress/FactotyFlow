@@ -24,7 +24,7 @@
     const V = Sim.mgmtView(S), P = S.production, remain = Math.max(0, V.len - V.elapsed);
     const stA = atLeast(V.attain, 97, 7), stF = V.forecast === null ? 'mut' : atLeast((V.forecast / V.plan) * 100, 99, 4), stO = atLeast(V.oeeAvg, 90, 5), down = V.downMin, stD = atMost(down, 60, 60);
     const rateNow = V.elapsed > 0 ? (V.actual / V.elapsed) * 60 : null, rateNeed = remain > 0 ? (Math.max(0, V.plan - V.actual) / remain) * 60 : null;
-    const tiles = tile('Attainment', p1(V.attain), stA, n0(V.actual) + ' of ' + n0(V.due) + ' planned to now', 'Output of all departments against the share of the shift plan that should be done by now') +
+    const tiles = tile('Achievement', p1(V.attain), stA, n0(V.actual) + ' of ' + n0(V.due) + ' planned to now', 'Output of all departments against the share of the shift plan that should be done by now') +
       tile('Projected output', V.forecast === null ? '—' : n0(V.forecast), stF, V.forecast === null ? 'needs 15 min of shift' : ((V.forecast / V.plan - 1) * 100 >= 0 ? '+' : '') + ((V.forecast / V.plan - 1) * 100).toFixed(1) + '% vs shift plan ' + n0(V.plan), 'Run-rate forecast: output so far ÷ elapsed shift time × shift length') +
       tile('Average OEE', p1(V.oeeAvg), stO, 'target ≥ 90%', 'Simple average of the departments. OEE = availability × performance × quality') +
       tile('Downtime', n0(down) + ' min', stD, 'all departments, this shift') +
@@ -40,7 +40,7 @@
     const lossTot = P.losses.reduce((a, l) => a + l.min, 0), mxL = Math.max.apply(null, P.losses.map((l) => l.min).concat([1]));
     const losses = P.losses.length ? hbars(P.losses.slice(0, 6).map((l) => [l.reason, l.min, n0(l.min) + ' min · ' + (lossTot ? ((l.min / lossTot) * 100).toFixed(0) : 0) + '%', l.min >= 45 ? 'low' : l.min >= 25 ? 'watch' : 'ok']), mxL) : empty('No losses reported');
     const boxes = [
-      ['▤', '', 'PLAN VS ACTUAL AND OEE', 'against plan to now · availability × performance × quality', table(['Department', 'Plan now', 'Actual', 'Var.', 'Attain.', 'Avail.', 'Perf.', 'Qual.', 'OEE', 'Down'], rows)],
+      ['▤', '', 'PLAN VS ACTUAL AND OEE', 'against plan to now · availability × performance × quality', table(['Department', 'Plan now', 'Actual', 'Var.', 'Achiev.', 'Avail.', 'Perf.', 'Qual.', 'OEE', 'Down'], rows)],
       ['H', 'c-prod', 'HOURLY OUTPUT', 'all departments · dashed line = hourly plan', hourly],
       ['↗', 'flow', 'TREND AND FORECAST', 'cumulative, this shift', '<div class="tlg"><span><i class="l-ac"></i>Actual</span><span><i class="l-pl"></i>Plan</span><span><i class="l-fc"></i>Forecast</span></div>' + trendChart(S, V)],
       ['!', 'c-mat', 'DOWNTIME BY REASON', 'minutes this shift, largest first', losses]];

@@ -65,7 +65,7 @@
 
   function render(S, c) {
     const { T, f0, ui } = c, SL = S.setup.slots, IV = c.IV, y = S.yard;
-    /* overall mode (management dashboard): blocks show the department's attainment and OEE instead of logistics buffers; vacant blocks carry plant-wide figures */
+    /* overall mode (management dashboard): blocks show the department's achievement and OEE instead of logistics buffers; vacant blocks carry plant-wide figures */
     const OV = c.mode === 'overall' ? Sim.mgmtView(S) : null, DEPT = { engine: 'engine', bumper: 'im', press: 'press', weldA: 'weld', weldB: 'weld', paintA: 'paint', paintB: 'paint' };
     const lvl = (v, t, band, most) => (v === null || v === undefined ? 'ok' : most ? (v <= t ? 'ok' : v <= t + band ? 'watch' : 'low') : v >= t ? 'ok' : v >= t - band ? 'watch' : 'low');
     const wst = (a, b) => (a === 'low' || b === 'low' ? 'low' : a === 'watch' || b === 'watch' ? 'watch' : 'ok');
@@ -243,12 +243,12 @@
           tx(g.x + 12, g.y + 101, nk(d.actual) + ' / ' + nk(d.plan), 'sm') + bar(g.x + 12, g.y + g.h - 16, g.w - 24, pc, a)
         : tx(g.x + 12, g.y + 19, fit(nm, g.w - (g.w < 150 ? 56 : 74), 8.4), 'bt') + pill(g.x + g.w - 9, g.y + 4, g.w < 150 && d.attain !== null ? Math.round(d.attain) + '%' : p1(d.attain), a, 'end') +
           '<text x="' + (g.x + 12) + '" y="' + (g.y + g.h - 21) + '" class="sm">OEE <tspan style="font-weight:700;fill:' + TINT[o] + '">' + p1(d.oee) + '</tspan>' + (g.w > 180 ? ' · ' + nk(d.actual) + ' / ' + nk(d.plan) : '') + '</text>' + bar(g.x + 12, g.y + g.h - 11, g.w - 24, pc, a);
-      out.push(block({ id: slot, kind: 'prod', tip: d.name + ' (department total) · attainment ' + p1(d.attain) + ' of plan to now, OEE ' + p1(d.oee) + ', ' + nk(d.actual) + ' of ' + nk(d.plan) + ' for the shift', x: g.x, y: g.y, w: g.w, h: g.h, st, inner }));
+      out.push(block({ id: slot, kind: 'prod', tip: d.name + ' (department total) · achievement ' + p1(d.attain) + ' of plan to now, OEE ' + p1(d.oee) + ', ' + nk(d.actual) + ' of ' + nk(d.plan) + ' for the shift', x: g.x, y: g.y, w: g.w, h: g.h, st, inner }));
     }
     /* plant-wide figures shown in a vacant block (not a location in the drawing) */
     function info(slot, g) {
       const sf = S.safety, fm = S.quality.fourM, M = { targets: S.quality.targets }; let title, big, st, small;
-      if (slot === 'yard') { const d = OV.rows.find((q) => q.id === 'inspection'), a = lvl(d.attain, 97, 7), o = lvl(d.oee, 90, 5); title = d.name.toUpperCase(); big = p1(d.attain) + ' attainment'; st = wst(a, o); small = ['OEE ' + p1(d.oee), nk(d.actual) + ' of ' + nk(d.plan) + ' planned', 'rejection ' + OV.rej.toFixed(1) + '% (target ≤ ' + M.targets.rejection + '%)']; }
+      if (slot === 'yard') { const d = OV.rows.find((q) => q.id === 'inspection'), a = lvl(d.attain, 97, 7), o = lvl(d.oee, 90, 5); title = d.name.toUpperCase(); big = p1(d.attain) + ' achievement'; st = wst(a, o); small = ['OEE ' + p1(d.oee), nk(d.actual) + ' of ' + nk(d.plan) + ' planned', 'rejection ' + OV.rej.toFixed(1) + '% (target ≤ ' + M.targets.rejection + '%)']; }
       else if (slot === 'top1') { st = OV.eVarPct === null ? 'ok' : lvl(OV.eVarPct, 0, 3, true); title = 'UTILITY'; big = nk(OV.energy) + ' kWh'; small = [(OV.eVarPct === null ? '' : (OV.eVarPct > 0 ? '+' : '') + OV.eVarPct.toFixed(1) + '% vs target to now')]; }
       else if (slot === 'top2') { const t = lvl(sf.trir, sf.trirTarget, sf.trirTarget * 0.2, true); st = sf.lti > 0 ? 'low' : t; title = 'SAFETY'; big = 'LTI ' + sf.lti; small = ['TRIR ' + sf.trir.toFixed(2), '(≤ ' + sf.trirTarget.toFixed(2) + ')', 'Compliance', p1(sf.compliance)]; }
       else { st = lvl(OV.fmAvg, fm.target, 1); title = '4M'; big = p1(OV.fmAvg); small = ['Man ' + p1(fm.man), 'Machine ' + p1(fm.machine), 'Material ' + p1(fm.material), 'Method ' + p1(fm.method)]; }

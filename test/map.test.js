@@ -192,7 +192,7 @@ test('assembly lines A and B are controlled separately; shops show RUNNING / STO
   assert.throws(() => V.apply(S, 'shops/paintB/running', '2'), /out of range/);
 });
 
-test('plant layout in overall mode: department attainment and OEE on the shops, plant-wide figures in vacant blocks, logistics mode unchanged', () => {
+test('plant layout in overall mode: department achievement and OEE on the shops, plant-wide figures in vacant blocks, logistics mode unchanged', () => {
   const S = Sim.createState(); S.clock = 600;
   const ov = global.window.FFMap.render(S, Object.assign(ctx(S), { mode: 'overall' }));
   assert.ok(ov.nodes.includes('OEE') && !ov.nodes.includes('Buffer stock'));

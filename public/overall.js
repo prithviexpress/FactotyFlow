@@ -65,13 +65,13 @@
     const tatVar = V.tat - T.tat;
     const load = (S.utility.power.kw / S.utility.power.contractKw) * 100, lowOee = Math.min.apply(null, V.rows.map((q) => q.oee));
     put('ov-tiles',
-      tile('production', 'Production', '#/production', kf('Attainment', p1(V.attain), stProd) + kf('Forecast', V.forecast === null ? '—' : n0(V.forecast), fcSt) + kf('Lowest OEE', p1(lowOee), atLeast(lowOee, 90, 5)), 'Output against plan to now, run-rate forecast for the shift and the weakest department OEE. Click for the production tower.') +
+      tile('production', 'Production', '#/production', kf('Achievement', p1(V.attain), stProd) + kf('Forecast', V.forecast === null ? '—' : n0(V.forecast), fcSt) + kf('Lowest OEE', p1(lowOee), atLeast(lowOee, 90, 5)), 'Output against plan to now, run-rate forecast for the shift and the weakest department OEE. Click for the production tower.') +
       tile('quality', 'Quality', '#/quality', kf('Rejection', V.rej.toFixed(1) + '%', stRej) + kf('4M', p1(V.fmAvg), st4) + kf('Inventory acc.', p1(V.invAcc), stAcc), 'Rejected share of the build, 4M compliance and stock accuracy. Click for the quality tower.') +
       tile('logistics', 'Logistics', '#/', kf('Turnaround', n0(V.tat) + ' min', stTat) + kf('Trucks waiting', waiting, waiting >= 6 ? 'low' : waiting >= 3 ? 'watch' : 'ok') + kf('Parts at risk', atRisk, atRisk ? 'low' : 'ok'), 'Truck turnaround against ' + n0(T.tat) + ' min, trucks waiting for a bay and parts short on cover. Click for the logistics tower.') +
       tile('utility', 'Utility', '#/utility', kf('Energy vs target', V.eVarPct === null ? '—' : (V.eVarPct > 0 ? '+' : '') + V.eVarPct.toFixed(1) + '%', stE) + kf('Energy (kWh)', n0(V.energy)) + kf('Demand / contract', load.toFixed(0) + '%', atMost(load, 90, 7)), 'Energy against target to now and power demand against contract. Click for the utility tower.') +
       tile('safety', 'Safety', '#/safety', kf('Lost time injury', sf.lti, sf.lti > 0 ? 'low' : 'ok') + kf('TRIR', sf.trir.toFixed(2), stTrir) + kf('Compliance', p1(sf.compliance), atLeast(sf.compliance, sf.complianceTarget, 1)), 'Lost time injuries, total recordable incident rate and compliance. Click for the safety tower.'));
 
-    put('ov-table', '<table class="ovt"><thead><tr><th>Department</th><th>Plan (shift)</th><th>Plan to now</th><th>Actual</th><th>Variance</th><th>Attainment</th><th>OEE</th></tr></thead><tbody>' +
+    put('ov-table', '<table class="ovt"><thead><tr><th>Department</th><th>Plan (shift)</th><th>Plan to now</th><th>Actual</th><th>Variance</th><th>Achievement</th><th>OEE</th></tr></thead><tbody>' +
       V.rows.map((r) => { const a = atLeast(r.attain, 97, 7), o = atLeast(r.oee, 90, 5); return '<tr><td><i class="sd ' + (a === 'mut' ? '' : a) + '"></i><b>' + esc(r.name) + '</b></td><td>' + n0(r.plan) + '</td><td>' + n0(r.due) + '</td><td>' + n0(r.actual) + '</td><td class="' + (r.variance < 0 ? a : 'ok') + '">' + (r.variance > 0 ? '+' : '') + n0(r.variance) + '</td><td class="' + a + '">' + p1(r.attain) + '</td><td class="' + o + '">' + p1(r.oee) + '</td></tr>'; }).join('') +
       '<tr class="tot"><td><b>Total</b></td><td>' + n0(V.plan) + '</td><td>' + n0(V.due) + '</td><td>' + n0(V.actual) + '</td><td class="' + stProd + '">' + (V.actual - V.due > 0 ? '+' : '') + n0(V.actual - V.due) + '</td><td class="' + stProd + '">' + p1(V.attain) + '</td><td></td></tr></tbody></table>');
 
@@ -83,7 +83,7 @@
       sk('Projected output', V.forecast === null ? '—' : n0(V.forecast), fcSt, V.forecast === null ? 'needs 15 min of shift' : ((V.forecast / V.plan - 1) * 100 >= 0 ? '+' : '') + ((V.forecast / V.plan - 1) * 100).toFixed(1) + '% vs plan', 'Run-rate forecast: output so far ÷ elapsed shift time × shift length') +
       sk('Gap to plan now', (gap > 0 ? '+' : '') + n0(gap), stProd, 'units against plan to now', 'Actual minus the share of the shift plan that should be done by now') +
       sk('Rate to recover', rateNeed === null ? '—' : n0(rateNeed) + ' /h', stNeed, rateNow === null ? '' : 'running at ' + n0(rateNow) + ' /h', 'Output per hour needed for the rest of the shift to reach the shift plan, against the average rate so far') +
-      sk('Furthest behind', worstD ? esc(worstD.name) : '—', worstD ? atLeast(worstD.attain, 97, 7) : 'mut', worstD ? p1(worstD.attain) + ' · ' + behind + ' of ' + V.rows.length + ' behind' : '', 'Department with the lowest attainment against plan to now') +
+      sk('Furthest behind', worstD ? esc(worstD.name) : '—', worstD ? atLeast(worstD.attain, 97, 7) : 'mut', worstD ? p1(worstD.attain) + ' · ' + behind + ' of ' + V.rows.length + ' behind' : '', 'Department with the lowest achievement against plan to now') +
       '</div></div>');
 
     const fr = V.len ? V.elapsed / V.len : 0;
@@ -106,8 +106,8 @@
   function mount(el, S, c) {
     root = el; ctx = c || {}; cache = {};
     el.innerHTML = '<div class="ov"><div class="ov-tiles" id="ov-tiles"></div>' +
-      '<div class="ov-mid">' + box('PLAN VS ACTUAL', 'by department · variance and attainment against plan to now', 'ov-table') + box('PRODUCTION TREND AND FORECAST', 'cumulative, this shift', 'ov-trend') + '</div>' +
-      '<div class="ov-bot"><div class="vbox" id="ov-mapbox"><div class="vh"><h2>PLANT LAYOUT</h2><span class="vsub">attainment and OEE by shop · material flow · plant-wide figures in the vacant blocks</span></div><div class="ov-map" id="ov-map"></div></div>' +
+      '<div class="ov-mid">' + box('PLAN VS ACTUAL', 'by department · variance and achievement against plan to now', 'ov-table') + box('PRODUCTION TREND AND FORECAST', 'cumulative, this shift', 'ov-trend') + '</div>' +
+      '<div class="ov-bot"><div class="vbox" id="ov-mapbox"><div class="vh"><h2>PLANT LAYOUT</h2><span class="vsub">achievement and OEE by shop · material flow · plant-wide figures in the vacant blocks</span></div><div class="ov-map" id="ov-map"></div></div>' +
       '<div class="ov-cards">' + box('PRODUCTION', 'actual vs plan', 'ov-prod') + box('ENERGY', 'kWh by department', 'ov-util') + box('TRUCK TURNAROUND', 'minutes', 'ov-logi') +
       box('4M', 'compliance', 'ov-fm') + box('MATERIAL', 'accuracy and rejection', 'ov-mat') + box('SAFETY', 'performance', 'ov-safe') + '</div></div></div>';
     const map = document.getElementById('map'); if (map) el.querySelector('#ov-map').appendChild(map);
