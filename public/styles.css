@@ -855,3 +855,44 @@ svg.ch{flex:1;min-height:0;width:100%;display:block}
 .dn .dv{font-size:13px}.dn .dc{font-size:6.5px;fill:var(--ink2)}
 .ov-map #map{max-height:100%}
 #stage.ovmode #map{height:100%}
+
+/* overall v2: figures beside the trend, towers with key figures, layout sized to the map */
+.trw{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 236px;gap:10px}
+.trc{display:flex;flex-direction:column;min-height:0;min-width:0}
+.trs{display:grid;grid-template-rows:repeat(4,minmax(0,1fr));gap:5px;min-height:0}
+.sk{border:1px solid var(--line);border-radius:5px;background:var(--panel2);padding:1px 9px;display:flex;flex-direction:column;justify-content:center;min-height:0;line-height:1.15;overflow:hidden}
+.sk small{font-size:10.5px;color:var(--ink2);text-transform:uppercase;letter-spacing:.4px}
+.sk b{font-size:17px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sk i{font-style:normal;font-size:10.5px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sk .ok{color:var(--ok)}.sk .watch{color:var(--watch)}.sk .low{color:var(--low)}
+.ov-bot{grid-template-columns:max-content minmax(0,1fr)}
+#ov-mapbox{max-width:62vw}
+.ov-map{display:block}
+.ov-map #map{height:100%;width:auto;aspect-ratio:1152/340;max-width:100%;display:block}
+.tw{display:grid;grid-template-columns:150px minmax(0,1fr) 14px;gap:8px;padding:2px 8px}
+.twn{display:flex;align-items:center;gap:8px;min-width:0}
+.twn .vb{width:24px;height:24px;font-size:14px}
+.twn b{font-size:14px}.twn em{display:block;font-size:11px}
+.twf{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;min-width:0}
+.kf{min-width:0;line-height:1.15}
+.kf small{display:block;font-size:10px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kf b{font-size:14.5px;font-weight:800;white-space:nowrap}
+.kf .ok{color:var(--ok)}.kf .watch{color:var(--watch)}.kf .low{color:var(--low)}
+.tw.todo{opacity:1;border-style:dashed}.tw.todo .twn em{color:var(--ink3)}
+.nd.blk.k-info .bk{fill:var(--card);fill-opacity:.45;stroke:var(--cardline);stroke-dasharray:5 4;filter:none}
+.nd.blk.k-info.problem .bk{stroke:var(--low)}
+.nd .zs{font-size:8.5px;letter-spacing:1px;fill:var(--ink3);font-weight:700}
+.trw{grid-template-columns:minmax(0,1fr) 320px}
+.trs{grid-template-rows:repeat(2,minmax(0,1fr));grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.sk{padding:2px 9px;gap:1px}
+.sk b{font-size:19px}
+.ov-bot{grid-template-columns:minmax(0,61%) minmax(0,1fr)}
+#ov-mapbox{max-width:none}
+.ov-map{display:flex}
+.ov-map #map{flex:1;min-height:0;width:100%;height:100%;aspect-ratio:auto;max-width:none}
+.tw span{flex:initial}
+.tw .twn>span:last-child{min-width:0;flex:1}
+.tw .twn .vb{flex:none}
+.tw{grid-template-columns:136px minmax(0,1fr) 12px}
+.tw .twn em{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kf b{display:block}

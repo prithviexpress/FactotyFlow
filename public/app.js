@@ -203,8 +203,8 @@
       '<span><svg viewBox="0 0 12 10"><circle cx="6" cy="5" r="4" class="cr"/><circle cx="6" cy="5" r="1.5" class="cr2"/></svg>AMR</span>' +
       '<span><svg viewBox="0 0 16 10"><rect x="1" y="2" width="8" height="6" rx="1.5" class="cr"/><rect x="9.5" y="3" width="5.5" height="4.4" rx="1.2" class="cr2"/></svg>Tow</span>');
   }
-  function renderMap() {
-    const r = window.FFMap.render(S, { T, f0, ui, IV: Sim.inventoryView(S) });
+  function renderMap(mode) {
+    const r = window.FFMap.render(S, { T, f0, ui, IV: Sim.inventoryView(S), mode });
     setHTML($('#roads'), '');
     setHTML($('#flows'), r.flows);
     setHTML($('#nodes'), r.nodes);

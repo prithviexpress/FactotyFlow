@@ -65,6 +65,11 @@
 
   function render(S, c) {
     const { T, f0, ui } = c, SL = S.setup.slots, IV = c.IV, y = S.yard;
+    /* overall mode (management dashboard): blocks show the department's attainment and OEE instead of logistics buffers; vacant blocks carry plant-wide figures */
+    const OV = c.mode === 'overall' ? Sim.mgmtView(S) : null, DEPT = { engine: 'engine', bumper: 'im', press: 'press', weldA: 'weld', weldB: 'weld', paintA: 'paint', paintB: 'paint' };
+    const lvl = (v, t, band, most) => (v === null || v === undefined ? 'ok' : most ? (v <= t ? 'ok' : v <= t + band ? 'watch' : 'low') : v >= t ? 'ok' : v >= t - band ? 'watch' : 'low');
+    const wst = (a, b) => (a === 'low' || b === 'low' ? 'low' : a === 'watch' || b === 'watch' ? 'watch' : 'ok');
+    const nk = (v) => (v >= 10000 ? (v / 1000).toFixed(1) + 'K' : Math.round(v).toLocaleString('en-US')), p1 = (v) => (v === null || v === undefined ? '—' : v.toFixed(1) + '%');
     const wip = {}; IV.wip.forEach((w) => { wip[w.id] = w; });
     const sel = (fam) => !!fam && ui.shop === fam, dim = (fam) => !!fam && ui.shop !== 'all' && ui.shop !== fam;
     const label = (slot, fallback) => (SL[slot] && SL[slot].label) || fallback;
@@ -217,6 +222,7 @@
         out.push(bind === 'amr' ? amrOverlay(g) : kanbanOverlay(g)); return;
       }
       if (!HREF[bind]) {
+        if (OV && !(SL[slot] && SL[slot].text)) { info(slot, g); return; }
         const msg = (SL[slot] && SL[slot].text) || '', shownMsg = msg || 'Reserved for messages', per = Math.max(8, Math.floor((g.w - 22) / 6.1)), lines = [];
         shownMsg.split(/\s+/).filter(Boolean).forEach((wd) => { const l = lines[lines.length - 1]; if (l !== undefined && (l + ' ' + wd).length <= per) lines[lines.length - 1] = l + ' ' + wd; else lines.push(wd.slice(0, per)); });
         const room = Math.max(1, Math.floor((g.h - 40) / 14)), shown = lines.slice(0, room); if (lines.length > room) shown[room - 1] = shown[room - 1].slice(0, per - 1) + '…';
@@ -230,7 +236,29 @@
     });
 
     /* ---- shop-style blocks ---- */
+    function ovShop(slot, key, fallbackLabel) {
+      const g = G[slot], d = OV.rows.find((q) => q.id === DEPT[key]), a = lvl(d.attain, 97, 7), o = lvl(d.oee, 90, 5), st = wst(a, o), tall = g.h > 100, nm = label(slot, fallbackLabel), pc = Math.min(100, d.attain === null ? 0 : d.attain);
+      const inner = tall
+        ? tx(g.x + 12, g.y + 22, fit(nm, g.w - 18, 8.4), 'bt') + pill(g.x + 12, g.y + 30, p1(d.attain), a) + tx(g.x + 12, g.y + 66, 'OEE', 'sm') + tx(g.x + 12, g.y + 83, p1(d.oee), 'bn2', 'style="fill:' + TINT[o] + '"') +
+          tx(g.x + 12, g.y + 101, nk(d.actual) + ' / ' + nk(d.plan), 'sm') + bar(g.x + 12, g.y + g.h - 16, g.w - 24, pc, a)
+        : tx(g.x + 12, g.y + 19, fit(nm, g.w - (g.w < 150 ? 56 : 74), 8.4), 'bt') + pill(g.x + g.w - 9, g.y + 4, g.w < 150 && d.attain !== null ? Math.round(d.attain) + '%' : p1(d.attain), a, 'end') +
+          '<text x="' + (g.x + 12) + '" y="' + (g.y + g.h - 21) + '" class="sm">OEE <tspan style="font-weight:700;fill:' + TINT[o] + '">' + p1(d.oee) + '</tspan>' + (g.w > 180 ? ' · ' + nk(d.actual) + ' / ' + nk(d.plan) : '') + '</text>' + bar(g.x + 12, g.y + g.h - 11, g.w - 24, pc, a);
+      out.push(block({ id: slot, kind: 'prod', tip: d.name + ' (department total) · attainment ' + p1(d.attain) + ' of plan to now, OEE ' + p1(d.oee) + ', ' + nk(d.actual) + ' of ' + nk(d.plan) + ' for the shift', x: g.x, y: g.y, w: g.w, h: g.h, st, inner }));
+    }
+    /* plant-wide figures shown in a vacant block (not a location in the drawing) */
+    function info(slot, g) {
+      const M = S.mgmt, sf = M.safety, fm = M.fourM; let title, big, st, small;
+      if (slot === 'yard') { const d = OV.rows.find((q) => q.id === 'inspection'), a = lvl(d.attain, 97, 7), o = lvl(d.oee, 90, 5); title = d.name.toUpperCase(); big = p1(d.attain) + ' attainment'; st = wst(a, o); small = ['OEE ' + p1(d.oee), nk(d.actual) + ' of ' + nk(d.plan) + ' planned', 'rejection ' + OV.rej.toFixed(1) + '% (target ≤ ' + M.targets.rejection + '%)']; }
+      else if (slot === 'top1') { st = OV.eVarPct === null ? 'ok' : lvl(OV.eVarPct, 0, 3, true); title = 'UTILITY'; big = nk(OV.energy) + ' kWh'; small = [(OV.eVarPct === null ? '' : (OV.eVarPct > 0 ? '+' : '') + OV.eVarPct.toFixed(1) + '% vs target to now')]; }
+      else if (slot === 'top2') { const t = lvl(sf.trir, sf.trirTarget, sf.trirTarget * 0.2, true); st = sf.lti > 0 ? 'low' : t; title = 'SAFETY'; big = 'LTI ' + sf.lti; small = ['TRIR ' + sf.trir.toFixed(2), '(≤ ' + sf.trirTarget.toFixed(2) + ')', 'Compliance', p1(sf.compliance)]; }
+      else { st = lvl(OV.fmAvg, fm.target, 1); title = '4M'; big = p1(OV.fmAvg); small = ['Man ' + p1(fm.man), 'Machine ' + p1(fm.machine), 'Material ' + p1(fm.material), 'Method ' + p1(fm.method)]; }
+      const room = Math.max(0, Math.floor((g.h - 52) / 14));
+      out.push('<g class="nd blk k-info' + (st === 'low' ? ' problem' : '') + '" data-tip="' + X(title + ' · plant-wide figure, shown in a vacant block (not a location in the plant drawing)').replace(/"/g, '&quot;') + '"><rect class="bk" x="' + g.x + '" y="' + g.y + '" width="' + g.w + '" height="' + g.h + '" rx="8"/>' +
+        '<circle cx="' + (g.x + 14) + '" cy="' + (g.y + 16) + '" r="4" fill="' + TINT[st] + '"/>' + tx(g.x + 24, g.y + 20, fit(title, g.w - 30, 8.4), 'bt') + (g.w >= 200 ? tx(g.x + g.w - 10, g.y + 19, 'PLANT-WIDE', 'zs', 'text-anchor="end"') : '') +
+        tx(g.x + 12, g.y + 42, big, 'bn2', 'style="fill:' + TINT[st] + '"') + small.slice(0, room).map((l, i) => tx(g.x + 12, g.y + 58 + i * 14, l, 'sm')).join('') + '</g>');
+    }
     function shop(slot, key, family, src, fallbackLabel) {
+      if (OV) return ovShop(slot, key, fallbackLabel);
       const g = G[slot], s = S.shops[key], bst = status(s.buf), run = runTag(S, key), st = run === false ? 'low' : bst, w = wip[key], tall = g.h > 100, nm = label(slot, fallbackLabel);
       const rp = '', dy = 0;
       let inner;
@@ -244,7 +272,7 @@
     }
     shop('egtm', 'engine', 'engine', 'egtm', 'EGTM');
     shop('imma', 'bumper', 'bumper', 'imma', 'IMM-A');
-    {
+    if (OV) ovShop('press', 'press', 'PRESS A/B'); else {
       const g = G.press, s = S.shops.press, bst = status(s.buf), run = runTag(S, 'press'), st = run === false ? 'low' : bst, w = wip.press, rp = '', dy = 0;
       out.push(block({ id: 'press', kind: 'prod', tip: TIPS.press, x: g.x, y: g.y, w: g.w, h: g.h, st, family: 'press', sel: sel('press'), dim: dim('press'), inner:
         tx(g.x + 12, g.y + 22, fit(label('press', 'PRESS A/B'), g.w - 18, 8.4), 'bt') + pill(g.x + 12, g.y + 30, f0(s.buf) + '%', bst) + rp + tx(g.x + 12, g.y + 66 + dy, 'Buffer stock', 'sm') +

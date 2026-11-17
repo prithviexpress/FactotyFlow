@@ -191,3 +191,17 @@ test('assembly lines A and B are controlled separately; shops show RUNNING / STO
   V.apply(S, 'shops/paintB/running', '0'); assert.equal(S.shops.paintB.running, false);
   assert.throws(() => V.apply(S, 'shops/paintB/running', '2'), /out of range/);
 });
+
+test('plant layout in overall mode: department attainment and OEE on the shops, plant-wide figures in vacant blocks, logistics mode unchanged', () => {
+  const S = Sim.createState(); S.clock = 600;
+  const ov = global.window.FFMap.render(S, Object.assign(ctx(S), { mode: 'overall' }));
+  assert.ok(ov.nodes.includes('OEE') && !ov.nodes.includes('Buffer stock'));
+  assert.equal((ov.nodes.match(/PLANT-WIDE/g) || []).length >= 2, true);
+  for (const t of ['SAFETY', 'UTILITY', 'VEHICLE INSPECTION', '>4M<']) assert.ok(ov.nodes.includes(t), t);
+  assert.match(ov.flows, /class="seq/);                                              // material flow stays
+  Sim.setPlant(S, { slots: { top2: { text: 'Audit on Friday' } } });                 // a message you wrote wins over the plant-wide figure
+  const ov2 = global.window.FFMap.render(S, Object.assign(ctx(S), { mode: 'overall' }));
+  assert.ok(ov2.nodes.includes('Audit on') && !ov2.nodes.includes('>SAFETY<'));
+  const lg = global.window.FFMap.render(S, ctx(S));
+  assert.ok(lg.nodes.includes('Buffer stock') && !lg.nodes.includes('PLANT-WIDE'));
+});
