@@ -205,3 +205,23 @@ test('plant layout in overall mode: department attainment and OEE on the shops, 
   const lg = global.window.FFMap.render(S, ctx(S));
   assert.ok(lg.nodes.includes('Buffer stock') && !lg.nodes.includes('PLANT-WIDE'));
 });
+
+test('topic towers render from the shared data and raise actionable items; the overall dashboard links to them', () => {
+  global.window.FFOverall = undefined; global.document = undefined;
+  require('../public/overall.js'); require('../public/towers.js');
+  const T = global.window.FFTowers, S = Sim.createState(); S.clock = 600;
+  for (const id of ['production', 'quality', 'utility', 'safety']) {
+    assert.ok(T.has(id)); const html = T.render(id, S);
+    assert.ok(html.includes('ACTIONABLE ITEMS') && html.includes('class="twr"') && (html.match(/class="agrp/g) || []).length === 4, id);
+    const sm = T.summary(id, S); assert.ok(sm.total >= 0 && typeof sm.red === 'boolean');
+  }
+  assert.ok(!T.has('logistics') && !T.has('overall'));
+  const before = T.summary('safety', S).total;
+  Ing.ingest(S, 'safety', { lti: 1, incidents: { 'INC-950': { dept: 'paint', type: 'Chemical <b>splash</b>', sev: 'high' } }, permits: { overdue: 2 } });
+  const after = T.summary('safety', S); assert.ok(after.total >= before + 3 && after.red);
+  const h = T.render('safety', S); assert.ok(h.includes('INC-950') && h.includes('Chemical &lt;b&gt;splash') && !h.includes('<b>splash'));     // escaped
+  Ing.ingest(S, 'utility', { power: { kw: 5150, contractKw: 5200 }, air: { bar: 6.0, minBar: 6.2 } });
+  const u = T.render('utility', S); assert.ok(u.includes('of contract') && u.includes('Air pressure 6.00 bar'));
+  Ing.ingest(S, 'production', { depts: { weld: { plan: 15000, actual: 100, avail: 80, perf: 90, qual: 99 } } });
+  const p = T.render('production', S); assert.ok(p.includes('Weld Shop · OEE') && p.includes('weakest part: availability'));
+});

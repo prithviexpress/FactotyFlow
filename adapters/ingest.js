@@ -5,7 +5,7 @@
  * (see `L = S.live` guards in public/sim.js). Domains with no feed keep simulating (MIXED mode).
  * Payload shapes are documented in docs/DATA-CONTRACT.md.
  */
-const DOMAINS = ['build', 'line', 'shops', 'parts', 'yard', 'trucks', 'transfers', 'lineside', 'amr', 'jv', 'jvstock', 'quality', 'kpi', 'finished', 'deliveries', 'kanban', 'seqflows', 'mgmt'];
+const DOMAINS = ['build', 'line', 'shops', 'parts', 'yard', 'trucks', 'transfers', 'lineside', 'amr', 'jv', 'jvstock', 'quality', 'kpi', 'finished', 'deliveries', 'kanban', 'seqflows', 'production', 'utility', 'safety'];
 const SHOP_KEYS = ['press', 'weld', 'paint', 'engine', 'bumper', 'assembly'];
 const BUFFER_KEYS = ['press', 'weldA', 'weldB', 'paintA', 'paintB', 'engine', 'bumper', 'ip', 'tm'];
 const BUFFER_ALIAS = { weld: ['weldA', 'weldB'], paint: ['paintA', 'paintB'] };   // older feeds send one buffer for both lines
@@ -73,6 +73,19 @@ function normUnit(u, F) {
   };
 }
 
+const nn = (v, n) => { const x = need(v, n); if (x < 0) throw new IngestError(n + ' must be 0 or more'); return x; };
+const pc = (v, n) => { const x = need(v, n); if (x < 0 || x > 100) throw new IngestError(n + ' must be between 0 and 100'); return x; };
+function eachDept(src, dst, dom, fn) {
+  asObj(src, dom + '.depts');
+  for (const k of Object.keys(src)) { if (!dst[k]) throw new IngestError('unknown department "' + k + '". Valid: ' + Object.keys(dst).join(', ')); asObj(src[k], dom + '.depts.' + k); fn(src[k], dst[k], k); }
+}
+/** { "name": number, ... } -> [[name, number]], sorted by the number, largest first */
+function keyed(o, name, max) {
+  asObj(o, name);
+  const ks = Object.keys(o);
+  if (ks.length > max || ks.some((k) => !k.trim() || k.length > 40)) throw new IngestError(name + ': up to ' + max + ' entries, names of 1 to 40 characters');
+  return ks.map((k) => [k.trim(), o[k]]).sort((a, b) => Number(b[1]) - Number(a[1]));
+}
 const BAY_STATES = ['available', 'occupied', 'blocked', 'outOfService'];
 const APPLY = {
   build(S, p) {
@@ -126,7 +139,7 @@ const APPLY = {
   },
   yard(S, p) {
     asObj(p, 'yard');
-    for (const k of ['expected', 'arrived', 'docked', 'received', 'occupied', 'docks', 'g2d', 'turn', 'unloadLimitMin']) if (p[k] !== undefined) S.yard[k] = need(p[k], k);
+    for (const k of ['expected', 'arrived', 'docked', 'received', 'occupied', 'docks', 'g2d', 'turn', 'unloadLimitMin', 'turnTarget']) if (p[k] !== undefined) S.yard[k] = need(p[k], k);
     if (p.unloadLimitMin !== undefined && !(S.yard.unloadLimitMin > 0)) throw new IngestError('yard.unloadLimitMin must be greater than 0');
     if (p.bayStatus !== undefined) {   // { "AB-14": "blocked", ... }: only the bays you send change; send "available" to clear one
       asObj(p.bayStatus, 'yard.bayStatus');
@@ -202,7 +215,13 @@ const APPLY = {
   },
   quality(S, p) {
     asObj(p, 'quality');
-    for (const k of ['rejected', 'quarantined', 'spf']) if (p[k] !== undefined) S.quality[k] = need(p[k], k);
+    const M = JSON.parse(JSON.stringify(S.quality));
+    for (const k of ['rejected', 'quarantined', 'spf']) if (p[k] !== undefined) M[k] = need(p[k], k);
+    if (p.fourM !== undefined) { asObj(p.fourM, 'quality.fourM'); for (const f of ['man', 'machine', 'material', 'method', 'target']) if (p.fourM[f] !== undefined) M.fourM[f] = pc(p.fourM[f], 'fourM.' + f); }
+    if (p.targets !== undefined) { asObj(p.targets, 'quality.targets'); for (const f of ['rejection', 'invAcc', 'fpy']) if (p.targets[f] !== undefined) M.targets[f] = pc(p.targets[f], 'targets.' + f); }
+    if (p.depts !== undefined) eachDept(p.depts, M.depts, 'quality', (o, d, k) => { for (const f of ['inspected', 'defects']) if (o[f] !== undefined) d[f] = nn(o[f], k + '.' + f); if (d.defects > d.inspected) throw new IngestError(k + ': defects cannot exceed inspected'); });
+    if (p.defects !== undefined) M.defects = keyed(p.defects, 'quality.defects', 12).map((x) => ({ type: x[0], count: nn(x[1], 'defects.' + x[0]) }));
+    S.quality = M;
   },
   kpi(S, p) {
     asObj(p, 'kpi');
@@ -211,36 +230,58 @@ const APPLY = {
   },
   finished(S, p) { asObj(p, 'finished'); for (const k of ['onTime', 'shipOnTime', 'units', 'shipRate']) if (p[k] !== undefined) S.finished[k] = need(p[k], k); },
   deliveries(S, p) { asObj(p, 'deliveries'); for (const k of ['total', 'onTime']) if (p[k] !== undefined) S.deliveries[k] = need(p[k], k); },
-  /* management numbers of the overall dashboard: partial posts change only what they carry; everything is validated before anything is applied */
-  mgmt(S, p) {
-    asObj(p, 'mgmt');
-    const M = JSON.parse(JSON.stringify(S.mgmt)), pc = (v, n) => { const x = need(v, n); if (x < 0 || x > 100) throw new IngestError(n + ' must be between 0 and 100'); return x; },
-      nn = (v, n) => { const x = need(v, n); if (x < 0) throw new IngestError(n + ' must be 0 or more'); return x; };
-    if (p.depts !== undefined) {
-      asObj(p.depts, 'mgmt.depts');
-      for (const k of Object.keys(p.depts)) {
-        if (!M.depts[k]) throw new IngestError('unknown department "' + k + '". Valid: ' + Object.keys(M.depts).join(', '));
-        const o = p.depts[k]; asObj(o, 'mgmt.depts.' + k);
-        for (const f of ['plan', 'actual', 'energy', 'energyTarget']) if (o[f] !== undefined) M.depts[k][f] = nn(o[f], k + '.' + f);
-        if (o.oee !== undefined) M.depts[k].oee = pc(o.oee, k + '.oee');
-        if (o.name !== undefined) { const nm = String(o.name).trim(); if (!nm || nm.length > 24) throw new IngestError(k + '.name: 1 to 24 characters'); M.depts[k].name = nm; }
-      }
-    }
-    if (p.fourM !== undefined) { asObj(p.fourM, 'mgmt.fourM'); for (const f of ['man', 'machine', 'material', 'method', 'target']) if (p.fourM[f] !== undefined) M.fourM[f] = pc(p.fourM[f], 'fourM.' + f); }
-    if (p.safety !== undefined) {
-      asObj(p.safety, 'mgmt.safety');
-      for (const f of ['lti', 'trir', 'trirTarget']) if (p.safety[f] !== undefined) M.safety[f] = nn(p.safety[f], 'safety.' + f);
-      for (const f of ['compliance', 'complianceTarget']) if (p.safety[f] !== undefined) M.safety[f] = pc(p.safety[f], 'safety.' + f);
-    }
-    if (p.targets !== undefined) { asObj(p.targets, 'mgmt.targets'); for (const f of ['tat', 'invAcc', 'rejection']) if (p.targets[f] !== undefined) M.targets[f] = nn(p.targets[f], 'targets.' + f); }
+  /* topic towers. Partial posts change only what they carry; everything is validated on a copy before anything is applied */
+  production(S, p) {
+    asObj(p, 'production');
+    const M = JSON.parse(JSON.stringify(S.production));
+    if (p.depts !== undefined) eachDept(p.depts, M.depts, 'production', (o, d, k) => {
+      for (const f of ['plan', 'actual', 'downMin']) if (o[f] !== undefined) d[f] = nn(o[f], k + '.' + f);
+      for (const f of ['oee', 'avail', 'perf', 'qual']) if (o[f] !== undefined) d[f] = pc(o[f], k + '.' + f);
+      if (o.oee === undefined && (o.avail !== undefined || o.perf !== undefined || o.qual !== undefined)) d.oee = (d.avail * d.perf * d.qual) / 10000;
+      if (o.name !== undefined) { const nm = String(o.name).trim(); if (!nm || nm.length > 24) throw new IngestError(k + '.name: 1 to 24 characters'); d.name = nm; }
+    });
+    if (p.losses !== undefined) M.losses = keyed(p.losses, 'production.losses', 12).map((x) => ({ reason: x[0], min: nn(x[1], 'losses.' + x[0]) }));
     if (p.shift !== undefined) {
-      asObj(p.shift, 'mgmt.shift');
+      asObj(p.shift, 'production.shift');
       const hm = (v, n) => { const m = /^(\d{1,2}):(\d{2})$/.exec(String(v).trim()); if (!m || +m[1] > 23 || +m[2] > 59) throw new IngestError(n + ' must be HH:MM'); return +m[1] * 60 + +m[2]; };
       if (p.shift.start !== undefined) M.shift.start = hm(p.shift.start, 'shift.start');
       if (p.shift.end !== undefined) M.shift.end = hm(p.shift.end, 'shift.end');
       if (!(M.shift.end > M.shift.start)) throw new IngestError('shift.end must be after shift.start');
     }
-    S.mgmt = M;
+    S.production = M;
+  },
+  utility(S, p) {
+    asObj(p, 'utility');
+    const M = JSON.parse(JSON.stringify(S.utility));
+    if (p.depts !== undefined) eachDept(p.depts, M.depts, 'utility', (o, d, k) => { for (const f of ['energy', 'energyTarget']) if (o[f] !== undefined) d[f] = nn(o[f], k + '.' + f); });
+    for (const [g, fs] of [['power', ['kw', 'peakKw', 'contractKw']], ['water', ['m3', 'target']], ['air', ['bar', 'minBar']]]) if (p[g] !== undefined) { asObj(p[g], 'utility.' + g); for (const f of fs) if (p[g][f] !== undefined) M[g][f] = nn(p[g][f], g + '.' + f); }
+    if (p.power && p.power.kw !== undefined && p.power.peakKw === undefined) M.power.peakKw = Math.max(M.power.peakKw, M.power.kw);
+    S.utility = M;
+  },
+  safety(S, p) {
+    asObj(p, 'safety');
+    const M = JSON.parse(JSON.stringify(S.safety));
+    for (const f of ['lti', 'trir', 'trirTarget', 'daysSinceLti', 'nearMiss']) if (p[f] !== undefined) M[f] = nn(p[f], f);
+    for (const f of ['compliance', 'complianceTarget']) if (p[f] !== undefined) M[f] = pc(p[f], f);
+    for (const g of ['observations', 'permits']) if (p[g] !== undefined) { asObj(p[g], 'safety.' + g); for (const f of ['open', 'overdue']) if (p[g][f] !== undefined) M[g][f] = nn(p[g][f], g + '.' + f); }
+    if (p.depts !== undefined) { asObj(p.depts, 'safety.depts'); for (const k of Object.keys(p.depts)) { if (M.depts[k] === undefined) throw new IngestError('unknown department "' + k + '". Valid: ' + Object.keys(M.depts).join(', ')); M.depts[k] = pc(p.depts[k], 'depts.' + k); } }
+    if (p.incidents !== undefined) {                      // keyed by incident id; send status "closed" to close one, null to remove it
+      asObj(p.incidents, 'safety.incidents');
+      for (const id of Object.keys(p.incidents)) {
+        const x = p.incidents[id], i = M.incidents.findIndex((q) => q.id === id);
+        if (x === null) { if (i >= 0) M.incidents.splice(i, 1); continue; }
+        asObj(x, 'incident ' + id);
+        const cur = i >= 0 ? M.incidents[i] : { id, at: S.clock % 1440, dept: '', type: 'Incident', sev: 'low', status: 'open' };
+        if (x.dept !== undefined) cur.dept = String(x.dept).trim().slice(0, 24);
+        if (x.type !== undefined) cur.type = String(x.type).trim().slice(0, 80);
+        if (x.sev !== undefined) { if (!['low', 'med', 'high'].includes(x.sev)) throw new IngestError('incident ' + id + ': sev must be low, med or high'); cur.sev = x.sev; }
+        if (x.status !== undefined) { if (!['open', 'closed'].includes(x.status)) throw new IngestError('incident ' + id + ': status must be open or closed'); cur.status = x.status; }
+        if (x.at !== undefined) { const c = clockOf(x.at); if (c !== null) cur.at = c; }
+        if (i < 0) M.incidents.unshift(cur);
+      }
+      if (M.incidents.length > 50) M.incidents.length = 50;
+    }
+    S.safety = M;
   },
   kanban(S, p) {
     asObj(p, 'kanban');

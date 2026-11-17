@@ -247,7 +247,7 @@
     }
     /* plant-wide figures shown in a vacant block (not a location in the drawing) */
     function info(slot, g) {
-      const M = S.mgmt, sf = M.safety, fm = M.fourM; let title, big, st, small;
+      const sf = S.safety, fm = S.quality.fourM, M = { targets: S.quality.targets }; let title, big, st, small;
       if (slot === 'yard') { const d = OV.rows.find((q) => q.id === 'inspection'), a = lvl(d.attain, 97, 7), o = lvl(d.oee, 90, 5); title = d.name.toUpperCase(); big = p1(d.attain) + ' attainment'; st = wst(a, o); small = ['OEE ' + p1(d.oee), nk(d.actual) + ' of ' + nk(d.plan) + ' planned', 'rejection ' + OV.rej.toFixed(1) + '% (target ≤ ' + M.targets.rejection + '%)']; }
       else if (slot === 'top1') { st = OV.eVarPct === null ? 'ok' : lvl(OV.eVarPct, 0, 3, true); title = 'UTILITY'; big = nk(OV.energy) + ' kWh'; small = [(OV.eVarPct === null ? '' : (OV.eVarPct > 0 ? '+' : '') + OV.eVarPct.toFixed(1) + '% vs target to now')]; }
       else if (slot === 'top2') { const t = lvl(sf.trir, sf.trirTarget, sf.trirTarget * 0.2, true); st = sf.lti > 0 ? 'low' : t; title = 'SAFETY'; big = 'LTI ' + sf.lti; small = ['TRIR ' + sf.trir.toFixed(2), '(≤ ' + sf.trirTarget.toFixed(2) + ')', 'Compliance', p1(sf.compliance)]; }

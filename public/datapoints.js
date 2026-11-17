@@ -38,7 +38,8 @@
       'Several at once, all-or-nothing: <code>POST ' + esc(base) + '/api/values</code> with <code>{"build/actual": 766, "shops/press/buf": 82}</code>. Read back: <code>GET /api/value/&lt;path&gt;</code>. ' +
       'A group turns LIVE on its first valid push; until then it stays simulated. Paths in <em>{braces}</em> take an id (a shop, JV name, part number…): click a row for the list.</p>' +
       '<pre class="dpsample">curl -X POST ' + esc(base) + '/api/value/build/actual ' + (cat.tokenRequired ? '-H "Authorization: Bearer $INGEST_TOKEN" ' : '') + '-d 766</pre></div>' +
-      '<div class="filters"><input id="dp-filter" placeholder="Filter: e.g. buffer, %, parts, yard…" style="width:340px"><span class="mut" id="dp-count" style="font-size:12px"></span></div>' +
+      '<div class="filters"><input id="dp-filter" placeholder="Filter: e.g. buffer, %, parts, yard…" style="width:340px"><span class="mut" id="dp-count" style="font-size:12px"></span>' +
+      '<span class="mut" style="font-size:12px;margin-left:10px">Tower:</span>' + [['', 'All'], ['production tower', 'Production'], ['quality', 'Quality'], ['utility tower', 'Utility'], ['safety tower', 'Safety']].map((t) => '<button type="button" class="tbtn" data-topic="' + t[0] + '">' + t[1] + '</button>').join('') + '</div>' +
       '<table class="dt dpt"><thead><tr><th>Endpoint</th><th>What it is</th><th>Unit</th><th>Valid range</th><th>Example</th><th>Current</th><th>Source</th></tr></thead><tbody>' + rows.join('') + '</tbody></table>' +
       '<section class="dsec" style="margin-top:16px"><h3>Calculated on the dashboard — not pushable (' + cat.derived.length + ')</h3><p class="note">These are derived from the values above, so there is nothing to send. If one looks wrong, fix the input it comes from.</p>' +
       '<table class="dt"><thead><tr><th>Value on the dashboard</th><th>How it is calculated</th></tr></thead><tbody>' + derived + '</tbody></table></section>';
@@ -80,6 +81,8 @@
       root._dpBound = true;
       root.addEventListener('input', (e) => { if (e.target.id === 'dp-filter' && cat) applyFilter(); });
       root.addEventListener('click', (e) => {
+        const tp = e.target.closest('button[data-topic]');
+        if (tp && cat) { root.querySelector('#dp-filter').value = tp.dataset.topic; applyFilter(); return; }
         const cp = e.target.closest('button[data-copy]');
         if (cp) { navigator.clipboard && navigator.clipboard.writeText(cp.dataset.copy); cp.textContent = 'Copied ✓'; setTimeout(() => { cp.textContent = 'Copy'; }, 1200); return; }
         const tr = e.target.closest('tr.dpr');

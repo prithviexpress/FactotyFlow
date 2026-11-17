@@ -896,3 +896,44 @@ svg.ch{flex:1;min-height:0;width:100%;display:block}
 .tw{grid-template-columns:136px minmax(0,1fr) 12px}
 .tw .twn em{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .kf b{display:block}
+
+/* ================= topic towers (production, quality, utility, safety) ================= */
+.tnav a{padding:4px 9px;font-size:11.5px}
+#hdr h1{white-space:nowrap}
+.twr{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 392px;grid-template-rows:84px minmax(0,1fr);gap:8px;min-height:0}
+.twr>*{min-height:0;min-width:0}
+.twr-k{grid-column:1/-1;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+.tkp{background:var(--panel);border:2px solid var(--edge);border-radius:8px;padding:5px 14px;display:flex;flex-direction:column;justify-content:center;line-height:1.15;min-width:0;overflow:hidden}
+.tkp.low{border-color:var(--low);animation:glowpulse 2.4s ease-in-out infinite}.tkp.watch{border-color:var(--watch)}
+.tkp small{font-size:12.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--ink2)}
+.tkp b{font-size:29px;font-weight:800;white-space:nowrap}
+.tkp b.ok{color:var(--ok)}.tkp b.watch{color:var(--watch)}.tkp b.low{color:var(--low)}
+.tkp i{font-style:normal;font-size:12px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.twr-m{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);grid-template-rows:minmax(0,1.1fr) minmax(0,1fr);gap:8px}
+.twr .vh{min-height:34px;padding:4px 10px}.twr .vh h2{font-size:15.5px}
+.twr .vbody{padding:8px 12px;gap:5px}
+.twr .ovt{font-size:14.5px}
+.twr .ovt td.lft{text-align:left;font-weight:500}
+.twr .ovt td.barc{width:24%}
+.twr-a .ag{padding:0}
+.hb.wide{grid-template-columns:150px minmax(0,1fr) 130px;font-size:13.5px}
+.hb.wide .tr{height:14px}.hb.wide .tr b{height:12px}
+.vbars.tall>div em{font-style:normal;font-size:11.5px;font-weight:700;height:14px}
+.vbars.tall small{font-size:11.5px}
+.vbars .col b.part{opacity:.55}
+.twr .kv.big{font-size:14.5px}.twr .kv.big b{font-size:27px}
+.twr .empty{padding:18px}
+#hdr{gap:12px}
+#hdr h1{font-size:23px;padding-left:12px}
+#hdr .meta{font-size:15px;gap:9px}
+#hdr .env{font-size:15px}
+.twr-m{grid-template-columns:minmax(0,1.5fr) minmax(0,1fr)}
+.twr .ovt{font-size:13.5px}
+.twr .ovt th{font-size:10.5px;padding:2px 6px;white-space:nowrap}
+.twr .ovt td{padding:1px 6px;white-space:nowrap}
+.twr .ovt.short{height:auto}
+.twr .ovt.short td{padding:7px 6px}
+.twr .dn{justify-content:center;gap:28px}
+.twr .dn svg{max-height:240px}
+.twr .dl{flex:0 0 240px;font-size:15px;gap:8px}
+.twr .dl small{font-size:11px}

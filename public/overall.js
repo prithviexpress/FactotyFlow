@@ -29,7 +29,7 @@
       '<circle cx="' + x(n - 1) + '" cy="' + y(vals[n - 1]) + '" r="3" style="fill:' + o.color + '"/>' + tl + '</svg>';
   }
   function trendChart(S, V) {
-    const M = S.mgmt, W = 640, H = 230, L = 46, R = 14, T = 12, B = 22, t0 = M.shift.start, t1 = M.shift.end;
+    const M = S.production, W = 640, H = 230, L = 46, R = 14, T = 12, B = 22, t0 = M.shift.start, t1 = M.shift.end;
     const mx = Math.max(V.plan, V.forecast || 0, 1) * 1.08, x = (t) => L + ((t - t0) / (t1 - t0)) * (W - L - R), y = (v) => T + (1 - v / mx) * (H - T - B);
     let g = '';
     for (let i = 0; i <= 4; i++) { const v = (mx / 4) * i; g += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + y(v) + '" y2="' + y(v) + '" class="gl"/><text x="' + (L - 5) + '" y="' + (y(v) + 3) + '" class="ax" text-anchor="end">' + (v >= 1000 ? Math.round(v / 1000) + 'K' : Math.round(v)) + '</text>'; }
@@ -52,7 +52,7 @@
   }
 
   function render(S) {
-    const V = Sim.mgmtView(S), M = S.mgmt, T = M.targets, sf = M.safety, fm = M.fourM;
+    const V = Sim.mgmtView(S), T = { tat: V.tatTarget, invAcc: S.quality.targets.invAcc, rejection: S.quality.targets.rejection }, sf = S.safety, fm = S.quality.fourM;
     const stProd = atLeast(V.attain, 97, 7), stE = V.eVarPct === null ? 'mut' : atMost(V.eVarPct, 0, 3), stTat = atMost(V.tat, T.tat, T.tat * 0.1), st4 = atLeast(V.fmAvg, fm.target, 1),
       stAcc = atLeast(V.invAcc, T.invAcc, 3), stRej = atMost(V.rej, T.rejection, 0.5), stMat = stAcc === 'low' || stRej === 'low' ? 'low' : stAcc === 'watch' || stRej === 'watch' ? 'watch' : 'ok',
       stTrir = atMost(sf.trir, sf.trirTarget, sf.trirTarget * 0.2), stSafe = sf.lti > 0 ? 'low' : stTrir;
@@ -61,12 +61,12 @@
       cols.map((c) => '<div><small>' + c[0] + '</small><b class="' + (c[2] || '') + '">' + c[1] + '</b></div>').join('') + '</div></div>';
     const tatVar = V.tat - T.tat;
     put('ov-tiles',
-      tile('prod', 'bars', 'Production', stProd, [['Actual', n0(V.actual)], ['Plan to now', n0(V.due)], ['Attain.', p1(V.attain), stProd]], null, 'All departments. Plan to now = shift plan × share of the shift elapsed. Production tower: not built yet.') +
-      tile('util', 'sun', 'Utility', stE, [['Energy (kWh)', n0(V.energy)], ['Target to now', n0(V.eDue)], ['Var.', V.eVarPct === null ? '—' : arrow(V.eVarPct) + Math.abs(V.eVarPct).toFixed(1) + '%', stE]], null, 'Energy used vs the target for the elapsed part of the shift. Utility tower: not built yet.') +
+      tile('prod', 'bars', 'Production', stProd, [['Actual', n0(V.actual)], ['Plan to now', n0(V.due)], ['Attain.', p1(V.attain), stProd]], '#/production', 'All departments. Plan to now = shift plan × share of the shift elapsed. Click for the production tower.') +
+      tile('util', 'sun', 'Utility', stE, [['Energy (kWh)', n0(V.energy)], ['Target to now', n0(V.eDue)], ['Var.', V.eVarPct === null ? '—' : arrow(V.eVarPct) + Math.abs(V.eVarPct).toFixed(1) + '%', stE]], '#/utility', 'Energy used vs the target for the elapsed part of the shift. Click for the utility tower.') +
       tile('logi', 'truck', 'Logistics', stTat, [['TAT', n0(V.tat) + ' min'], ['Target', '≤ ' + n0(T.tat) + ' min'], ['Var.', arrow(tatVar) + Math.abs(Math.round(tatVar)) + ' min', stTat]], '#/', 'Average truck turnaround. Click for the logistics control tower.') +
-      tile('fm', 'target', '4M', st4, [['Compliance', p1(V.fmAvg)], ['Target', '≥ ' + fm.target + '%'], ['Var.', arrow(V.fmAvg - fm.target) + Math.abs(V.fmAvg - fm.target).toFixed(1) + ' pp', st4]], null, 'Average of man, machine, material and method compliance.') +
-      tile('mat', 'box', 'Material', stMat, [['Inventory acc.', p1(V.invAcc), stAcc], ['Rejection', V.rej.toFixed(1) + '%', stRej], ['Target', '≤ ' + T.rejection + '%']], '#/', 'Stock accuracy (cycle count) and rejected share of the build. Quality tower: not built yet.') +
-      tile('safe', 'warn', 'Safety', stSafe, [['Lost time injury', String(sf.lti), sf.lti > 0 ? 'low' : 'ok'], ['TRIR', sf.trir.toFixed(2), stTrir], ['Target', '≤ ' + sf.trirTarget.toFixed(2)]], null, 'Lost time injuries and total recordable incident rate. Safety tower: not built yet.'));
+      tile('fm', 'target', '4M', st4, [['Compliance', p1(V.fmAvg)], ['Target', '≥ ' + fm.target + '%'], ['Var.', arrow(V.fmAvg - fm.target) + Math.abs(V.fmAvg - fm.target).toFixed(1) + ' pp', st4]], '#/quality', 'Average of man, machine, material and method compliance. Click for the quality tower.') +
+      tile('mat', 'box', 'Material', stMat, [['Inventory acc.', p1(V.invAcc), stAcc], ['Rejection', V.rej.toFixed(1) + '%', stRej], ['Target', '≤ ' + T.rejection + '%']], '#/quality', 'Stock accuracy (cycle count) and rejected share of the build. Click for the quality tower.') +
+      tile('safe', 'warn', 'Safety', stSafe, [['Lost time injury', String(sf.lti), sf.lti > 0 ? 'low' : 'ok'], ['TRIR', sf.trir.toFixed(2), stTrir], ['Target', '≤ ' + sf.trirTarget.toFixed(2)]], '#/safety', 'Lost time injuries and total recordable incident rate. Click for the safety tower.'));
 
     put('ov-table', '<table class="ovt"><thead><tr><th>Department</th><th>Plan (shift)</th><th>Plan to now</th><th>Actual</th><th>Variance</th><th>Attainment</th><th>OEE</th></tr></thead><tbody>' +
       V.rows.map((r) => { const a = atLeast(r.attain, 97, 7), o = atLeast(r.oee, 90, 5); return '<tr><td><i class="sd ' + (a === 'mut' ? '' : a) + '"></i><b>' + esc(r.name) + '</b></td><td>' + n0(r.plan) + '</td><td>' + n0(r.due) + '</td><td>' + n0(r.actual) + '</td><td class="' + (r.variance < 0 ? a : 'ok') + '">' + (r.variance > 0 ? '+' : '') + n0(r.variance) + '</td><td class="' + a + '">' + p1(r.attain) + '</td><td class="' + o + '">' + p1(r.oee) + '</td></tr>'; }).join('') +
@@ -101,16 +101,17 @@
     const acts = ctx && ctx.actions ? ctx.actions() : null, y = S.yard, waiting = Math.max(0, y.arrived - y.docked), atRisk = S.parts.filter((q) => Sim.coverage(q) < Sim.RISK_MIN).length;
     const kf = (lab, val, st) => '<div class="kf"><small>' + lab + '</small><b class="' + (st || '') + '">' + val + '</b></div>';
     const tw = (cls, name, state, href, st, figs) => '<div class="tw ' + (href ? 'live' : 'todo') + '"' + (href ? ' data-href="' + href + '"' : tip('Key figures are live. The operator board for this topic is not built yet.')) + '><div class="twn"><span class="vb ' + cls + '">' + name[0] + '</span><span><b>' + name + '</b><em class="' + (st || 'mut') + '">' + state + '</em></span></div><div class="twf">' + figs + '</div>' + (href ? '<u>›</u>' : '') + '</div>';
+    const ts = (id) => { const x = window.FFTowers ? window.FFTowers.summary(id, S) : null; return x ? { t: x.total ? x.total + ' open items' : 'all clear', st: x.red ? 'low' : x.total ? 'watch' : 'ok' } : { t: 'open', st: 'ok' }; };
     put('ov-towers',
       tw('c-logi', 'Logistics', acts ? (acts.total ? acts.total + ' open items' : 'all clear') : 'open', '#/', acts ? (acts.red ? 'low' : acts.total ? 'watch' : 'ok') : 'ok',
         kf('Parts at risk', atRisk, atRisk ? 'low' : 'ok') + kf('Trucks waiting', waiting, waiting >= 6 ? 'low' : waiting >= 3 ? 'watch' : 'ok') + kf('Bays in use', y.occupied + ' / ' + y.docks) + kf('Turnaround', n0(V.tat) + ' min', stTat) + kf('Line stop', n0(S.line.stoppedMin) + ' min', S.line.stopped ? 'low' : S.line.stoppedMin > 0 ? 'watch' : 'ok')) +
-      tw('c-prod', 'Production', 'board not built yet', null, null,
+      tw('c-prod', 'Production', ts('production').t, '#/production', ts('production').st,
         kf('Attainment', p1(V.attain), stProd) + kf('Forecast', V.forecast === null ? '—' : n0(V.forecast), fcSt) + kf('Depts behind', behind + ' / ' + V.rows.length, behind ? 'watch' : 'ok') + kf('Lowest OEE', p1(Math.min.apply(null, V.rows.map((q) => q.oee))), atLeast(Math.min.apply(null, V.rows.map((q) => q.oee)), 90, 5)) + kf('Line', S.line.stopped ? 'STOPPED' : 'running', S.line.stopped ? 'low' : 'ok')) +
-      tw('c-mat', 'Quality', 'board not built yet', null, null,
+      tw('c-mat', 'Quality', ts('quality').t, '#/quality', ts('quality').st,
         kf('Rejection', V.rej.toFixed(1) + '%', stRej) + kf('Rejected', n0(S.quality.rejected)) + kf('Single-piece flow', p1(S.quality.spf), atLeast(S.quality.spf, 90, 3)) + kf('Inventory acc.', p1(V.invAcc), stAcc) + kf('4M', p1(V.fmAvg), st4)) +
-      tw('c-util', 'Utility', 'board not built yet', null, null,
+      tw('c-util', 'Utility', ts('utility').t, '#/utility', ts('utility').st,
         kf('Energy (kWh)', n0(V.energy)) + kf('Target to now', n0(V.eDue)) + kf('Variance', V.eVarPct === null ? '—' : (V.eVarPct > 0 ? '+' : '') + V.eVarPct.toFixed(1) + '%', stE) + kf('Shift target', n0(V.eTarget)) + kf('Over target', V.rows.filter((q) => q.energy > q.energyTarget * fr * 1.03).length + ' depts')) +
-      tw('c-safe', 'Safety', 'board not built yet', null, null,
+      tw('c-safe', 'Safety', ts('safety').t, '#/safety', ts('safety').st,
         kf('Lost time injury', sf.lti, sf.lti > 0 ? 'low' : 'ok') + kf('TRIR', sf.trir.toFixed(2), stTrir) + kf('TRIR target', '≤ ' + sf.trirTarget.toFixed(2)) + kf('Compliance', p1(sf.compliance), atLeast(sf.compliance, sf.complianceTarget, 1)) + kf('Alerts', (S.alerts || []).length, (S.alerts || []).length ? 'watch' : 'ok')));
   }
 
@@ -132,5 +133,5 @@
     if (map && home) home.appendChild(map);
     root = null; cache = {};
   }
-  window.FFOverall = { mount, update, unmount };
+  window.FFOverall = { mount, update, unmount, util: { esc, n0, p1, tip, atLeast, atMost, clk, lineChart, trendChart, donut } };
 })();

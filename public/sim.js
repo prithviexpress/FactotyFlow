@@ -151,7 +151,6 @@
       kpi: { jit: 98.4, stockAcc: 97.8 },
       deliveries: { total: 375, onTime: 345 },
       kanban: { cards: 120, open: 18, overdue: 2, avgWaitMin: 14, onTimePct: 94 },
-      mgmt: newMgmt(clock),
       seqflows: { jvB: { active: 1, missions: 46, onTimePct: 96 }, jvA: { active: 1, missions: 44, onTimePct: 95 }, jvWB: { active: 1, missions: 31, onTimePct: 97 }, jvWA: { active: 0, missions: 29, onTimePct: 96 },
         egB: { active: 1, missions: 52, onTimePct: 98 }, egA: { active: 1, missions: 50, onTimePct: 97 }, imB: { active: 0, missions: 37, onTimePct: 92 }, imA: { active: 1, missions: 35, onTimePct: 91 },
         prWB: { active: 1, missions: 88, onTimePct: 98 }, prWA: { active: 1, missions: 86, onTimePct: 97 } },
@@ -202,6 +201,7 @@
     S.hist.turn = seedSeries(68, 6, HIST);
     S.hist.spf = seedSeries(91, 2, HIST);
     S.hist.rejPct = seedSeries(2.0, 0.3, HIST).map((v) => Math.max(0, +v.toFixed(2)));
+    seedTopics(S, clock);
     S.hist.rej = seedSeries(1.6, 1.4, HIST).map((v) => Math.max(0, +v.toFixed(1)));
     S.lineside.forEach((l) => { l.max = Math.round(l.safety * 1.3); });
     const CAP = { press: 300, weldA: 120, weldB: 120, paintA: 100, paintB: 100, engine: 180, bumper: 160, ip: 140, tm: 110 };
@@ -632,7 +632,7 @@
     }
 
     /* management numbers (overall dashboard): department output, energy, 4M, safety */
-    stepMgmt(S, m, tick, running);
+    stepTopics(S, m, tick, running);
 
     /* history samples */
     S.sampleAcc += m;
@@ -644,50 +644,81 @@
       pushH(h.rej, S.quality.rejected - S.rejMark); S.rejMark = S.quality.rejected;
       for (const k in S.shops) pushH(h.shops[k], S.shops[k].buf);
       pushH(h.rejPct, S.build.actual > 0 ? (S.quality.rejected / S.build.actual) * 100 : 0);
-      sampleMgmt(S);
+      sampleTopics(S);
     }
     return S;
   }
 
-  /* ---------- management numbers for the overall dashboard ---------- */
-  function newMgmt(clock) {
-    const M = { shift: { start: 390, end: 900 }, depts: {}, fourM: { man: 98.2, machine: 98.4, material: 99.3, method: 97.6, target: 98 },
-      safety: { lti: 0, trir: 0.18, trirTarget: 0.3, compliance: 98.6, complianceTarget: 98 }, targets: { tat: 90, invAcc: 98, rejection: 2.5 }, trend: [] };
-    const fr = clamp(((clock % 1440) - M.shift.start) / (M.shift.end - M.shift.start), 0, 1);
-    MGMT_DEPTS.forEach((d) => { M.depts[d.id] = { name: d.name, plan: d.plan, actual: Math.round(d.plan * fr * d.eff), oee: d.oee, energy: Math.round(d.kwh * fr * 0.98), energyTarget: d.kwh, _eff: d.eff }; });
-    const tot = MGMT_DEPTS.reduce((a, d) => a + M.depts[d.id].actual, 0), t0 = M.shift.start, t1 = clock % 1440;
-    if (fr > 0) for (let t = t0; t <= t1; t += 10) M.trend.push([t, Math.round((tot * (t - t0)) / Math.max(1, t1 - t0))]);
-    return M;
+  /* ---------- topic data: production, utility, safety, quality (feeds the overall dashboard and the topic towers) ---------- */
+  const DEPT_IDS = MGMT_DEPTS.map((d) => d.id);
+  function seedTopics(S, clock) {
+    const P = { shift: { start: 390, end: 900 }, depts: {}, trend: [], losses: [{ reason: 'Die / tool change', min: 38 }, { reason: 'Material wait', min: 27 }, { reason: 'Breakdown', min: 21 }, { reason: 'Quality hold', min: 12 }, { reason: 'Minor stops', min: 9 }] };
+    const fr = clamp(((clock % 1440) - P.shift.start) / (P.shift.end - P.shift.start), 0, 1);
+    const U = { depts: {}, power: { kw: 4350, peakKw: 4720, contractKw: 5200 }, water: { m3: Math.round(620 * fr * 0.97), target: 620 }, air: { bar: 6.8, minBar: 6.2 }, kwHist: seedSeries(4350, 220, HIST) };
+    const Q = S.quality; Q.fourM = { man: 98.2, machine: 98.4, material: 99.3, method: 97.6, target: 98 }; Q.targets = { rejection: 2.5, invAcc: 98, fpy: 96 }; Q.depts = {};
+    Q.defects = [{ type: 'Dent / scratch', count: 41 }, { type: 'Weld spatter', count: 29 }, { type: 'Paint run / sag', count: 22 }, { type: 'Fitment gap', count: 17 }, { type: 'Missing part', count: 8 }, { type: 'Other', count: 6 }];
+    const SF = { lti: 0, trir: 0.18, trirTarget: 0.3, compliance: 98.6, complianceTarget: 98, daysSinceLti: 412, nearMiss: 3, observations: { open: 7, overdue: 1 }, permits: { open: 5, overdue: 0 }, depts: {},
+      incidents: [{ id: 'INC-204', at: Math.max(0, (clock % 1440) - 95), dept: 'weld', type: 'Near miss: forklift / pedestrian', sev: 'med', status: 'open' }, { id: 'INC-203', at: Math.max(0, (clock % 1440) - 260), dept: 'press', type: 'First aid: hand cut', sev: 'low', status: 'closed' }] };
+    const FPY = { press: 98.6, weld: 96.8, paint: 94.9, engine: 98.1, assembly: 97.2, im: 96.4, inspection: 99.0 }, CMP = { press: 97.4, weld: 98.9, paint: 99.2, engine: 98.8, assembly: 98.4, im: 99.0, inspection: 99.4 };
+    MGMT_DEPTS.forEach((d) => {
+      const actual = Math.round(d.plan * fr * d.eff), q = 99.2, a = clamp(d.oee / 0.99 / (q / 100) + 1.5, 80, 99.5), pf = clamp((d.oee / (a / 100) / (q / 100)), 80, 99.9);
+      P.depts[d.id] = { name: d.name, plan: d.plan, actual, oee: d.oee, avail: +a.toFixed(1), perf: +pf.toFixed(1), qual: q, downMin: Math.round((100 - a) * 5.1 * fr), _eff: d.eff };
+      U.depts[d.id] = { energy: Math.round(d.kwh * fr * 0.98), energyTarget: d.kwh };
+      Q.depts[d.id] = { inspected: actual, defects: Math.round(actual * (1 - FPY[d.id] / 100)), _fpy: FPY[d.id] };
+      SF.depts[d.id] = CMP[d.id];
+    });
+    const tot = DEPT_IDS.reduce((x, k) => x + P.depts[k].actual, 0), t0 = P.shift.start, t1 = clock % 1440;
+    if (fr > 0) for (let t = t0; t <= t1; t += 10) P.trend.push([t, Math.round((tot * (t - t0)) / Math.max(1, t1 - t0))]);
+    S.production = P; S.utility = U; S.safety = SF; S.yard.turnTarget = 90;
   }
-  function stepMgmt(S, m, tick, running) {
-    const M = S.mgmt, L = S.live || {}, tod = S.clock % 1440, len = Math.max(1, M.shift.end - M.shift.start), inShift = tod >= M.shift.start && tod < M.shift.end;
-    if (L.mgmt) return;
-    if (M._tod !== undefined && M._tod < M.shift.start && tod >= M.shift.start) { for (const k in M.depts) { M.depts[k].actual = 0; M.depts[k].energy = 0; } M.trend = []; }   // new shift
-    M._tod = tod;
-    for (const k in M.depts) {
-      const d = M.depts[k];
-      d._eff = clamp((d._eff || 0.95) + (R() - 0.5) * 0.004 * tick, 0.7, 1.02);
-      if (inShift) { if (running || k !== 'assembly') d.actual = Math.min(d.plan, d.actual + (d.plan / len) * m * d._eff); d.energy += (d.energyTarget / len) * m * (0.96 + R() * 0.05); }
-      d.oee = clamp(d.oee + (R() - 0.5) * 0.25 * tick, 70, 99.5);
+  function stepTopics(S, m, tick, running) {
+    const P = S.production, U = S.utility, Q = S.quality, SF = S.safety, L = S.live || {}, tod = S.clock % 1440, len = Math.max(1, P.shift.end - P.shift.start), inShift = tod >= P.shift.start && tod < P.shift.end;
+    const newShift = P._tod !== undefined && P._tod < P.shift.start && tod >= P.shift.start; P._tod = tod;
+    if (!L.production) {
+      if (newShift) { for (const k in P.depts) { P.depts[k].actual = 0; P.depts[k].downMin = 0; } P.trend = []; P.losses.forEach((l) => { l.min = 0; }); }
+      for (const k in P.depts) {
+        const d = P.depts[k];
+        d._eff = clamp((d._eff || 0.95) + (R() - 0.5) * 0.004 * tick, 0.7, 1.02);
+        if (inShift && (running || k !== 'assembly')) d.actual = Math.min(d.plan, d.actual + (d.plan / len) * m * d._eff);
+        d.avail = clamp(d.avail + (R() - 0.5) * 0.2 * tick, 78, 99.8); d.perf = clamp(d.perf + (R() - 0.5) * 0.2 * tick, 78, 99.9); d.qual = clamp(d.qual + (R() - 0.5) * 0.05 * tick, 95, 99.9);
+        d.oee = (d.avail * d.perf * d.qual) / 10000;
+        if (inShift) d.downMin += m * (1 - d.avail / 100) * 0.9;
+      }
+      if (inShift) { const l = P.losses[Math.floor(R() * P.losses.length)]; l.min += m * 0.22 * (running ? 1 : 3); }
     }
-    for (const k of ['man', 'machine', 'material', 'method']) M.fourM[k] = clamp(M.fourM[k] + (R() - 0.5) * 0.08 * tick, 92, 100);
-    M.safety.compliance = clamp(M.safety.compliance + (R() - 0.5) * 0.05 * tick, 94, 100);
+    if (!L.utility) {
+      if (newShift) { for (const k in U.depts) U.depts[k].energy = 0; U.water.m3 = 0; U.power.peakKw = U.power.kw; }
+      if (inShift) { for (const k in U.depts) U.depts[k].energy += (U.depts[k].energyTarget / len) * m * (0.96 + R() * 0.05); U.water.m3 += (U.water.target / len) * m * (0.94 + R() * 0.08); }
+      U.power.kw = clamp(U.power.kw + ((running ? 4350 : 3100) - U.power.kw) * 0.05 * tick + (R() - 0.5) * 120 * tick, 2200, 5600); U.power.peakKw = Math.max(U.power.peakKw, U.power.kw);
+      U.air.bar = clamp(U.air.bar + (6.8 - U.air.bar) * 0.04 * tick + (R() - 0.5) * 0.06 * tick, 5.6, 7.4);
+    }
+    if (!L.quality) {
+      for (const k of ['man', 'machine', 'material', 'method']) Q.fourM[k] = clamp(Q.fourM[k] + (R() - 0.5) * 0.08 * tick, 92, 100);
+      if (newShift) { for (const k in Q.depts) { Q.depts[k].inspected = 0; Q.depts[k].defects = 0; } Q.defects.forEach((d) => { d.count = 0; }); }
+      for (const k in Q.depts) { const d = Q.depts[k], add = Math.max(0, P.depts[k].actual - d.inspected); d.inspected += add; const nd = add * (1 - d._fpy / 100) * (0.6 + R() * 0.8); d.defects += nd; if (nd > 0) Q.defects[Math.floor(R() * R() * Q.defects.length)].count += nd; }
+    }
+    if (!L.safety) {
+      SF.compliance = clamp(SF.compliance + (R() - 0.5) * 0.05 * tick, 94, 100);
+      for (const k in SF.depts) SF.depts[k] = clamp(SF.depts[k] + (R() - 0.5) * 0.06 * tick, 93, 100);
+    }
   }
-  function sampleMgmt(S) {
-    const M = S.mgmt, tod = S.clock % 1440, tot = Object.keys(M.depts).reduce((a, k) => a + M.depts[k].actual, 0), last = M.trend[M.trend.length - 1];
-    if (last && (tot < last[1] - 0.5 || tod < last[0])) M.trend = [];                 // counters went back to zero: a new shift started
-    if (tod >= M.shift.start && tod <= M.shift.end) { M.trend.push([+tod.toFixed(1), Math.round(tot)]); if (M.trend.length > 140) M.trend.shift(); }
+  function sampleTopics(S) {
+    const P = S.production, tod = S.clock % 1440, tot = DEPT_IDS.reduce((a, k) => a + P.depts[k].actual, 0), last = P.trend[P.trend.length - 1];
+    if (last && (tot < last[1] - 0.5 || tod < last[0])) P.trend = [];                 // counters went back to zero: a new shift started
+    if (tod >= P.shift.start && tod <= P.shift.end) { P.trend.push([+tod.toFixed(1), Math.round(tot)]); if (P.trend.length > 140) P.trend.shift(); }
+    const h = S.utility.kwHist; h.push(Math.round(S.utility.power.kw)); if (h.length > HIST) h.shift();
   }
-  /** totals, attainment, run-rate forecast and status for the overall dashboard */
+  /** totals, attainment, run-rate forecast and status for the overall dashboard and the towers */
   function mgmtView(S) {
-    const M = S.mgmt, tod = S.clock % 1440, len = Math.max(1, M.shift.end - M.shift.start), el = clamp(tod - M.shift.start, 0, len);
-    const rows = Object.keys(M.depts).map((k) => { const d = M.depts[k], due = d.plan * (el / len); return { id: k, name: d.name, plan: d.plan, due, actual: d.actual, variance: d.actual - due, attain: due > 0 ? (d.actual / due) * 100 : null, oee: d.oee, energy: d.energy, energyTarget: d.energyTarget }; });
-    const plan = rows.reduce((a, r) => a + r.plan, 0), actual = rows.reduce((a, r) => a + r.actual, 0), energy = rows.reduce((a, r) => a + r.energy, 0), eTarget = rows.reduce((a, r) => a + r.energyTarget, 0);
+    const P = S.production, U = S.utility, Q = S.quality, tod = S.clock % 1440, len = Math.max(1, P.shift.end - P.shift.start), el = clamp(tod - P.shift.start, 0, len);
+    const rows = DEPT_IDS.map((k) => { const d = P.depts[k], u = U.depts[k], q = Q.depts[k], due = d.plan * (el / len);
+      return { id: k, name: d.name, plan: d.plan, due, actual: d.actual, variance: d.actual - due, attain: due > 0 ? (d.actual / due) * 100 : null, oee: d.oee, avail: d.avail, perf: d.perf, qual: d.qual, downMin: d.downMin,
+        energy: u.energy, energyTarget: u.energyTarget, inspected: q.inspected, defects: q.defects, fpy: q.inspected > 0 ? (1 - q.defects / q.inspected) * 100 : null, safety: S.safety.depts[k] }; });
+    const sum = (f) => rows.reduce((a, r) => a + r[f], 0), plan = sum('plan'), actual = sum('actual'), energy = sum('energy'), eTarget = sum('energyTarget'), due = plan * (el / len);
     const forecast = el >= 15 ? Math.min(plan * 1.2, (actual / el) * len) : null, eDue = eTarget * (el / len);
-    const fm = M.fourM, fmAvg = (fm.man + fm.machine + fm.material + fm.method) / 4, rej = S.build.actual > 0 ? (S.quality.rejected / S.build.actual) * 100 : 0;
-    const due = plan * (el / len);
+    const fm = Q.fourM, fmAvg = (fm.man + fm.machine + fm.material + fm.method) / 4, rej = S.build.actual > 0 ? (Q.rejected / S.build.actual) * 100 : 0, insp = sum('inspected');
     return { rows, plan, due, actual, attain: due > 0 ? (actual / due) * 100 : null, forecast, elapsed: el, len, energy, eTarget, eDue, eVarPct: eDue > 0 ? ((energy - eDue) / eDue) * 100 : null,
-      tat: S.yard.turn, fmAvg, rej, invAcc: S.kpi.stockAcc };
+      tat: S.yard.turn, tatTarget: S.yard.turnTarget || 90, fmAvg, rej, invAcc: S.kpi.stockAcc, fpy: insp > 0 ? (1 - sum('defects') / insp) * 100 : null, downMin: sum('downMin'), oeeAvg: rows.reduce((a, r) => a + r.oee, 0) / rows.length };
   }
 
   /* ---------- movement health (overlay on the plant map) ---------- */
@@ -706,7 +737,7 @@
   /* ---------- hand a domain back to the simulator (fresh simulated data) ---------- */
   const DOMAIN_KEYS = {
     build: ['build'], line: ['line'], shops: ['shops'], parts: ['parts'], yard: ['yard', 'trucks'], trucks: ['trucks'],
-    transfers: ['transfers'], lineside: ['lineside'], amr: ['amr'], jv: ['jv'], kanban: ['kanban'], mgmt: ['mgmt'], seqflows: ['seqflows'], jvstock: ['jvSites'], quality: ['quality'], kpi: ['kpi'],
+    transfers: ['transfers'], lineside: ['lineside'], amr: ['amr'], jv: ['jv'], kanban: ['kanban'], production: ['production'], utility: ['utility'], safety: ['safety'], seqflows: ['seqflows'], jvstock: ['jvSites'], quality: ['quality'], kpi: ['kpi'],
     finished: ['finished'], deliveries: ['deliveries']
   };
   function resetDomain(S, domain) {
@@ -774,7 +805,7 @@
   }
 
   return {
-    createState, step, inject, MGMT_DEPTS, mgmtView, funnel, bayGrid, resetDomain, SEQFLOWS, amrHealth, kanbanStatus, raiseAlert, clearAlert, pruneAlerts, reconcileAlerts, LEVELS, inventoryView, hourStatus, setPlant, lineSplit, DEFAULT_SLOTS, SLOT_BINDS, CARRIERS, DEFAULT_TERMS, DEFAULT_JVS, MAX_JVS, TARGET_H, coverage, partStatus, bufferStatus, linesideStatus, routeStatus,
+    createState, step, inject, MGMT_DEPTS, DEPT_IDS, mgmtView, funnel, bayGrid, resetDomain, SEQFLOWS, amrHealth, kanbanStatus, raiseAlert, clearAlert, pruneAlerts, reconcileAlerts, LEVELS, inventoryView, hourStatus, setPlant, lineSplit, DEFAULT_SLOTS, SLOT_BINDS, CARRIERS, DEFAULT_TERMS, DEFAULT_JVS, MAX_JVS, TARGET_H, coverage, partStatus, bufferStatus, linesideStatus, routeStatus,
     nextAction, fleetView, fmtClock, makeTrucks, SHOP_NAMES, RISK_MIN
   };
 });

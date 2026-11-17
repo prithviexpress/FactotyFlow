@@ -24,7 +24,7 @@ const ENT = {
   part: { list: (S) => S.parts.map((p) => p.id), find: (S, id) => { const p = S.parts.find((x) => x.id === id); return p ? { id, o: p } : null; }, create: true },
   truck: { list: (S) => S.trucks.map((t) => t.id), find: (S, id) => { const t = S.trucks.find((x) => x.id === id); return t ? { id, o: t } : null; }, create: true },
   bay: { list: (S) => (S.yard.bays || []).slice(), find: (S, id) => ((S.yard.bays || []).includes(id) || (S.yard.bayStatus && S.yard.bayStatus[id]) ? { id, o: { status: (S.yard.bayStatus && S.yard.bayStatus[id]) || 'available' } } : null), create: true },
-  dept: { list: (S) => Object.keys(S.mgmt.depts), find: (S, id) => (S.mgmt.depts[id] ? { id, o: S.mgmt.depts[id] } : null) },
+  dept: { list: (S) => Object.keys(S.production.depts), find: (S, id) => (S.production.depts[id] ? { id, o: S.production.depts[id] } : null) },
   amrUnit: { list: (S) => S.amr.amrs.map((a) => a.id), find: (S, id) => { const a = S.amr.amrs.find((x) => x.id === id); return a ? { id, o: a } : null; }, create: true },
   jvUnit: { list: (S) => S.jv.amrs.map((a) => a.id), find: (S, id) => { const a = S.jv.amrs.find((x) => x.id === id); return a ? { id, o: a } : null; }, create: true },
   flow: { list: (S) => Object.keys(S.seqflows), find: (S, id) => (S.seqflows[id] ? { id, o: S.seqflows[id] } : null) },
@@ -101,21 +101,41 @@ FL('active', 'Carriers (AMR / tow) in flight on the route', 'carriers', 1, { min
 FL('missions', 'Missions completed today on the route', 'missions', 46, cnt);
 FL('onTimePct', 'Missions on time on the route', '%', 96, pct);
 
-// -- management numbers (overall dashboard)
-const MG = 'Overall dashboard (management)';
-const DP = (k, label, unit, ex, o) => def(MG, 'mgmt', 'mgmt/depts/{dept}/' + k, label + ' (dept = press | weld | paint | engine | assembly | im | inspection)', unit, NUM, ex, Object.assign({ ent: 'dept', entName: 'department', get: (S, e) => e.o[k], set: (S, v, e) => { e.o[k] = v; } }, o));
-DP('plan', 'Department plan for the shift', 'units', 15000, pos); DP('actual', 'Department output so far', 'units', 14820, pos); DP('oee', 'Department OEE', '%', 93, pct);
-DP('energy', 'Energy used by the department so far', 'kWh', 12100, pos); DP('energyTarget', 'Energy target of the department for the shift', 'kWh', 14000, pos);
-for (const k of ['man', 'machine', 'material', 'method']) def(MG, 'mgmt', 'mgmt/fourM/' + k, '4M compliance: ' + k, '%', NUM, 98.2, field((S) => S.mgmt.fourM, k, pct));
-def(MG, 'mgmt', 'mgmt/fourM/target', '4M compliance target', '%', NUM, 98, field((S) => S.mgmt.fourM, 'target', pct));
-def(MG, 'mgmt', 'mgmt/safety/lti', 'Lost time injuries', 'cases', NUM, 0, field((S) => S.mgmt.safety, 'lti', cnt));
-def(MG, 'mgmt', 'mgmt/safety/trir', 'Total recordable incident rate', 'rate', NUM, 0.18, field((S) => S.mgmt.safety, 'trir', { min: 0, max: 100 }));
-def(MG, 'mgmt', 'mgmt/safety/trirTarget', 'TRIR target (at most)', 'rate', NUM, 0.3, field((S) => S.mgmt.safety, 'trirTarget', { min: 0, max: 100 }));
-def(MG, 'mgmt', 'mgmt/safety/compliance', 'Safety compliance', '%', NUM, 98.6, field((S) => S.mgmt.safety, 'compliance', pct));
-def(MG, 'mgmt', 'mgmt/safety/complianceTarget', 'Safety compliance target (at least)', '%', NUM, 98, field((S) => S.mgmt.safety, 'complianceTarget', pct));
-def(MG, 'mgmt', 'mgmt/targets/tat', 'Target: truck turnaround (at most)', 'min', NUM, 90, field((S) => S.mgmt.targets, 'tat', { min: 1, max: 1440 }));
-def(MG, 'mgmt', 'mgmt/targets/invAcc', 'Target: inventory accuracy (at least)', '%', NUM, 98, field((S) => S.mgmt.targets, 'invAcc', pct));
-def(MG, 'mgmt', 'mgmt/targets/rejection', 'Target: material rejection (at most)', '%', NUM, 2.5, field((S) => S.mgmt.targets, 'rejection', pct));
+// -- topic towers: production, utility, quality, safety (dept = press | weld | paint | engine | assembly | im | inspection)
+const DEPTS = ' (dept = press | weld | paint | engine | assembly | im | inspection)';
+const DV = (group, dom, base, k, label, unit, ex, o, get) => def(group, dom, base + '/depts/{dept}/' + k, label + DEPTS, unit, NUM, ex, Object.assign({ ent: 'dept', entName: 'department', get: (S, e) => get(S)[e.id][k], set: (S, v, e) => { get(S)[e.id][k] = v; } }, o));
+const PT = 'Production tower';
+DV(PT, 'production', 'production', 'plan', 'Department plan for the shift', 'units', 15000, pos, (S) => S.production.depts); DV(PT, 'production', 'production', 'actual', 'Department output so far', 'units', 14820, pos, (S) => S.production.depts);
+DV(PT, 'production', 'production', 'oee', 'Department OEE', '%', 93, pct, (S) => S.production.depts);
+for (const [k, l] of [['avail', 'availability'], ['perf', 'performance'], ['qual', 'quality rate']]) DV(PT, 'production', 'production', k, 'OEE part: ' + l, '%', 96, pct, (S) => S.production.depts);
+DV(PT, 'production', 'production', 'downMin', 'Downtime this shift', 'min', 34, pos, (S) => S.production.depts);
+const UT = 'Utility tower';
+DV(UT, 'utility', 'utility', 'energy', 'Energy used by the department so far', 'kWh', 12100, pos, (S) => S.utility.depts); DV(UT, 'utility', 'utility', 'energyTarget', 'Energy target of the department for the shift', 'kWh', 14000, pos, (S) => S.utility.depts);
+def(UT, 'utility', 'utility/power/kw', 'Plant power demand right now', 'kW', NUM, 4350, field((S) => S.utility.power, 'kw', pos));
+def(UT, 'utility', 'utility/power/peakKw', 'Peak demand this shift', 'kW', NUM, 4720, field((S) => S.utility.power, 'peakKw', pos));
+def(UT, 'utility', 'utility/power/contractKw', 'Contract demand (limit)', 'kW', NUM, 5200, field((S) => S.utility.power, 'contractKw', { min: 1 }));
+def(UT, 'utility', 'utility/water/m3', 'Water used this shift', 'm³', NUM, 410, field((S) => S.utility.water, 'm3', pos));
+def(UT, 'utility', 'utility/water/target', 'Water target for the shift', 'm³', NUM, 620, field((S) => S.utility.water, 'target', pos));
+def(UT, 'utility', 'utility/air/bar', 'Compressed air header pressure', 'bar', NUM, 6.8, field((S) => S.utility.air, 'bar', { min: 0, max: 20 }));
+def(UT, 'utility', 'utility/air/minBar', 'Compressed air: lowest acceptable pressure', 'bar', NUM, 6.2, field((S) => S.utility.air, 'minBar', { min: 0, max: 20 }));
+const QT = 'Quality tower';
+for (const k of ['man', 'machine', 'material', 'method']) def(QT, 'quality', 'quality/fourM/' + k, '4M compliance: ' + k, '%', NUM, 98.2, field((S) => S.quality.fourM, k, pct));
+def(QT, 'quality', 'quality/fourM/target', '4M compliance target', '%', NUM, 98, field((S) => S.quality.fourM, 'target', pct));
+def(QT, 'quality', 'quality/targets/rejection', 'Target: material rejection (at most)', '%', NUM, 2.5, field((S) => S.quality.targets, 'rejection', pct));
+def(QT, 'quality', 'quality/targets/invAcc', 'Target: inventory accuracy (at least)', '%', NUM, 98, field((S) => S.quality.targets, 'invAcc', pct));
+def(QT, 'quality', 'quality/targets/fpy', 'Target: first pass yield (at least)', '%', NUM, 96, field((S) => S.quality.targets, 'fpy', pct));
+DV(QT, 'quality', 'quality', 'inspected', 'Units inspected this shift', 'units', 14820, pos, (S) => S.quality.depts); DV(QT, 'quality', 'quality', 'defects', 'Units with a defect this shift (first pass yield = 1 − defects ÷ inspected)', 'units', 420, pos, (S) => S.quality.depts);
+const ST = 'Safety tower';
+def(ST, 'safety', 'safety/lti', 'Lost time injuries', 'cases', NUM, 0, field((S) => S.safety, 'lti', cnt));
+def(ST, 'safety', 'safety/daysSinceLti', 'Days since the last lost time injury', 'days', NUM, 412, field((S) => S.safety, 'daysSinceLti', cnt));
+def(ST, 'safety', 'safety/trir', 'Total recordable incident rate', 'rate', NUM, 0.18, field((S) => S.safety, 'trir', { min: 0, max: 100 }));
+def(ST, 'safety', 'safety/trirTarget', 'TRIR target (at most)', 'rate', NUM, 0.3, field((S) => S.safety, 'trirTarget', { min: 0, max: 100 }));
+def(ST, 'safety', 'safety/nearMiss', 'Near misses reported this month', 'cases', NUM, 3, field((S) => S.safety, 'nearMiss', cnt));
+def(ST, 'safety', 'safety/compliance', 'Safety compliance', '%', NUM, 98.6, field((S) => S.safety, 'compliance', pct));
+def(ST, 'safety', 'safety/complianceTarget', 'Safety compliance target (at least)', '%', NUM, 98, field((S) => S.safety, 'complianceTarget', pct));
+for (const g of ['observations', 'permits']) for (const f of ['open', 'overdue']) def(ST, 'safety', 'safety/' + g + '/' + f, (g === 'permits' ? 'Work permits ' : 'Unsafe observations ') + f, 'count', NUM, f === 'open' ? 5 : 0, field((S) => S.safety[g], f, cnt));
+def(ST, 'safety', 'safety/depts/{dept}/compliance', 'Safety compliance of one department' + DEPTS, '%', NUM, 98.4, Object.assign({ ent: 'dept', entName: 'department', get: (S, e) => S.safety.depts[e.id], set: (S, v, e) => { S.safety.depts[e.id] = v; } }, pct));
+def('Truck parking & bays', 'yard', 'yard/turnTarget', 'Target: truck turnaround (at most)', 'min', NUM, 90, field((S) => S.yard, 'turnTarget', { min: 1, max: 1440 }));
 
 // -- kanban pull signals (shown in the movement-health overlay on the plant map)
 def('Kanban', 'kanban', 'kanban/cards', 'Kanban cards / bins in the loop', 'cards', NUM, 120, field((S) => S.kanban, 'cards', { min: 1, int: true }));

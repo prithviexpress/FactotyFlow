@@ -51,7 +51,8 @@ node server.js            # http://localhost:8080  (server streams state over SS
 |---|---|
 | Today build / line stops | Vehicles build at line rate; a part reaching 0 stock stops the line until the truck arrives |
 | Line risk (right) | Parts ranked by coverage = usable stock ÷ consumption rate; next action/owner derived from coverage |
-| Overall dashboard (`#/overall`) | Management view: six topic tiles, plan vs actual by department, cumulative trend and run-rate forecast, energy, truck turnaround, 4M, material, safety, the live plant layout and links to the operator control towers (logistics is built; production, quality, utility, safety are placeholders). Fed by the `mgmt` data point |
+| Overall dashboard (`#/overall`) | Management view: six topic tiles, plan vs actual by department, cumulative trend and run-rate forecast, the plant layout in overall mode, and one row of key figures per control tower |
+| Topic control towers | Operator boards on one shared layout (KPI row, four boxes, actionable items): `#/production`, `#/quality`, `#/utility`, `#/safety`; the logistics tower is the home page. Each has its own data point (`production`, `utility`, `quality`, `safety`); every value is pushed once and reused wherever it is shown |
 | Actionable items | One panel next to the plant flow: line risks, truck delays, bay not available, AMR stoppages, JV / in-house supply, internal deliveries & kanban. Derived from the same data points; click an item to open its detail page |
 | Plant map | Buffer %, JV status, flows (red/amber when a route is delayed, paused when the line stops) |
 | Inbound / transfers / line-side / AMR / quality | Event-driven counters, rolling on-time windows, battery & charging model per AMR |

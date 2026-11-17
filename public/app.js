@@ -134,8 +134,9 @@
       : '<span class="badge live" data-href="#/sources"' + tipA('All domains are fed by real systems.') + '>LIVE</span>';
     if (stale) badge += '<span class="badge stale" data-href="#/sources"' + tipA('No recent data for: ' + S.stale.join(', ') + ' (showing last known values)') + '>STALE: ' + S.stale.join(', ') + '</span>';
     setHTML($('#hdr'),
-      logoHTML() + '<h1>' + (route() === 'overall' ? 'PLANT OVERALL DASHBOARD' : esc(T('title'))) + '</h1>' +
-      '<nav class="tnav"><a data-href="#/overall" class="' + (route() === 'overall' ? 'on' : '') + '"' + tipA('Overall dashboard for management') + '>OVERALL</a><a data-href="#/" class="' + (route() === '' ? 'on' : '') + '"' + tipA('Logistics control tower for operators') + '>LOGISTICS</a></nav>' +
+      logoHTML() + '<h1>' + (route() === 'overall' ? 'PLANT OVERALL DASHBOARD' : window.FFTowers && window.FFTowers.has(route()) ? window.FFTowers.title(route()) : esc(T('title'))) + '</h1>' +
+      '<nav class="tnav"><a data-href="#/overall" class="' + (route() === 'overall' ? 'on' : '') + '"' + tipA('Overall dashboard for management') + '>OVERALL</a><a data-href="#/" class="' + (route() === '' ? 'on' : '') + '"' + tipA('Logistics control tower for operators') + '>LOGISTICS</a>' +
+      ['production', 'quality', 'utility', 'safety'].map((t) => '<a data-href="#/' + t + '" class="' + (route() === t ? 'on' : '') + '"' + tipA(t[0].toUpperCase() + t.slice(1) + ' control tower for operators') + '>' + t.toUpperCase() + '</a>').join('') + '</nav>' +
       '<div class="meta"><span>' + S.plant + '</span><i></i><span>Shift ' + shift + '</span><i></i><span>' + Sim.fmtClock(S.clock) + ' IST</span><i></i></div>' +
       badge + '<span class="sp"></span>' +
       '<a class="more cfg" data-href="#/settings"' + tipA('Interfaces: endpoints, sources, alerts, plant setup, logo') + '>\u2699</a>' +
@@ -396,7 +397,9 @@
       renderFoot(); return;
     }
     $('#stage').classList.remove('ovmode');
-    const page = r ? window.FFPages.render(r, S, H, ui) : null;
+    const tower = window.FFTowers && window.FFTowers.has(r);
+    $('#stage').classList.toggle('ovmode', !!tower);
+    const page = tower ? window.FFTowers.render(r, S) : r ? window.FFPages.render(r, S, H, ui) : null;
     $('#stage').classList.toggle('paged', page !== null);
     renderHeader(); renderAlertBar();
     if (page !== null) {
