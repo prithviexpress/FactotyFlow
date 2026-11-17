@@ -937,3 +937,87 @@ svg.ch{flex:1;min-height:0;width:100%;display:block}
 .twr .dn svg{max-height:240px}
 .twr .dl{flex:0 0 240px;font-size:15px;gap:8px}
 .twr .dl small{font-size:11px}
+
+/* ================= minimalist pass: overall dashboard and topic towers =================
+   neutral surfaces and headers, one accent, colour only where a value is off target */
+.ov{grid-template-rows:98px minmax(0,1.08fr) minmax(0,1fr)}
+.ov-tiles{grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+.ov-mid{grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:10px}
+.ov-bot{grid-template-columns:minmax(0,60%) minmax(0,1fr);gap:10px}
+.ov-cards{grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr));gap:10px}
+.ov,.twr{gap:10px}
+.ov .vbox,.twr .vbox,.otile,.tkp{border:1px solid var(--line);border-radius:6px;box-shadow:none;animation:none}
+#p-map,#ov-mapbox{box-shadow:none}
+.ov .vh,.twr .vh{background:transparent;border-bottom:1px solid var(--line);min-height:30px;padding:5px 12px;gap:10px}
+.ov .vh h2,.twr .vh h2{font-size:12.5px;font-weight:700;letter-spacing:1.1px;color:var(--ink)}
+.ov .vsub,.twr .vsub{font-size:11.5px;color:var(--ink3)}
+.ov .vh .vb,.twr .vh .vb{display:none}
+.ov .vbody{padding:8px 12px}
+/* tower tiles */
+.otile{background:var(--panel);cursor:pointer}
+.otile:hover{border-color:var(--hl)}
+.otile.low{border-color:var(--low)}.otile.watch{border-color:var(--line)}
+.oth{background:none!important;color:var(--ink);padding:7px 12px 3px;font-size:13px;letter-spacing:1px;gap:8px}
+.oth b{font-weight:700}
+.oth em{font-style:normal;font-size:11.5px;letter-spacing:.2px;color:var(--ink3);text-transform:none;white-space:nowrap}
+.oth em.watch{color:var(--watch)}.oth em.low{color:var(--low)}
+.oth u{text-decoration:none;color:var(--ink3);font-size:16px;line-height:1}
+.oth .sd{background:var(--ink3);opacity:1;width:8px;height:8px;box-shadow:none}
+.oth .sd.watch{background:var(--watch)}.oth .sd.low{background:var(--low)}.oth .sd.ok{background:var(--ink3)}
+.otb{padding:0 12px 6px;text-align:left;gap:10px;align-items:end}
+.otb .kf small{font-size:10.5px;color:var(--ink3);letter-spacing:.3px}
+.otb .kf b{font-size:21px;font-weight:700;letter-spacing:-.2px;overflow:hidden;text-overflow:ellipsis}
+/* neutral "ok": values in normal ink, dots grey, bars in the single accent */
+.ov .ovt .ok,.twr .ovt .ok,.ov .kv .ok,.twr .kv .ok,.ov .sk .ok,.ov .dl .ok,.twr .dl .ok,.ov .foot3 .ok,.twr .foot3 .ok,.twr .tkp b.ok,.ov .kf .ok,.tlg .proj.ok b{color:var(--ink)}
+.ov .sd,.twr .sd{width:8px;height:8px;background:var(--ink3);box-shadow:none}
+.ov .sd.ok,.twr .sd.ok{background:var(--ink3);opacity:.55}
+.ov .sd.watch,.twr .sd.watch{background:var(--watch)}.ov .sd.low,.twr .sd.low{background:var(--low)}
+.ov .bg-ok,.twr .bg-ok,.twr .jb b.ok{background:var(--hl)}
+.ov .hb .tr i,.twr .hb .tr i{border:0;background:var(--track)}
+.ov .hb .tr u,.twr .hb .tr u,.ov .vbars .col u,.twr .vbars .col u{border-color:var(--ink2)}
+.ch .ac{stroke:var(--hl)}.ch .acd{fill:var(--hl)}.ch .ar{fill:var(--hl);fill-opacity:.12}
+.ch .fc{stroke:var(--hl);stroke-opacity:.7}.ch .fcd{fill:var(--hl)}
+.tlg i{border-top-color:var(--hl)}.tlg i.l-fc{border-top:2px dashed var(--hl)}
+/* tables */
+.ov .ovt,.twr .ovt{font-size:13.5px;line-height:1.2}
+.ov .ovt th,.twr .ovt th{background:transparent;border-bottom:1px solid var(--line);font-weight:600;color:var(--ink3);letter-spacing:.8px}
+.ov .ovt td,.twr .ovt td{padding:0 8px;font-weight:500}
+.ov .ovt td b,.twr .ovt td b{font-weight:600}
+.ov .ovt tr.tot td{background:transparent;border-top:1px solid var(--ink3);font-weight:700}
+/* figures beside the trend */
+.sk{background:transparent;border:0;border-left:2px solid var(--line);border-radius:0;padding:2px 0 2px 12px}
+.sk small{color:var(--ink3);letter-spacing:.8px}
+.sk b{font-size:22px;font-weight:700}
+.sk .watch,.sk .low{font-weight:700}
+/* small cards */
+.ov-cards .kv.big{font-size:12.5px}.ov-cards .kv.big b{font-size:20px;font-weight:700}
+.ov-cards .hb{grid-template-columns:48px minmax(0,1fr) 52px;font-size:11.5px}
+.ov-cards .dn svg{max-height:104px}.ov-cards .dl{font-size:11.5px;gap:2px}
+.dn .dv{font-size:14px;font-weight:700}
+.dl span{color:var(--ink2)}
+.foot3{border-top:1px solid var(--line)}
+.kv{border-bottom:1px solid var(--line)}
+/* towers */
+.tkp{padding:8px 14px}
+.tkp small{font-size:11px;font-weight:600;letter-spacing:1px;color:var(--ink3)}
+.tkp b{font-size:27px;font-weight:700}
+.tkp.low{border-color:var(--low)}.tkp.watch{border-color:var(--line)}
+.twr-a.problem{border-color:var(--line);animation:none}
+.twr .agrp{border-bottom:1px solid var(--line);border-left-width:3px}
+.twr .agrp.ok{border-left-color:var(--line)}
+.twr .cnt.ok{background:transparent;color:var(--ink3);border:1px solid var(--line)}
+.twr .agh b{font-size:12px;letter-spacing:1px;font-weight:700}
+.twr .agrp.ok .agh b{color:var(--ink2)}
+.twr .gn{background:transparent;border:1px solid var(--line);color:var(--ink2)}
+.twr .vr{font-size:12px}
+.otile.low,.otile.watch{color:var(--ink);border-color:var(--line)}
+.otile:hover{border-color:var(--hl)}
+.ov-cards .dl small{display:none}
+.ov-cards .dn{gap:10px}.ov-cards .dl{font-size:11.5px}
+.ov-cards .dl b{font-weight:600}
+.ov .foot3 .watch,.ov .foot3 .low{font-weight:600}
+.ov .trc svg.ch{max-height:100%}
+.otile.low,.otile.watch,.tkp.low,.tkp.watch{animation:none;border-color:var(--line);box-shadow:none}
+.ov-cards .dn svg{max-height:84px;max-width:84px}
+.ov-cards .dl>div{gap:6px;justify-content:space-between}
+.ov-cards .dl span{flex:0 1 auto}
