@@ -60,7 +60,7 @@
     /* one tile per control tower: its state, open items and three key figures (this replaces the separate KPI row and towers list) */
     const acts = ctx && ctx.actions ? ctx.actions() : null, y = S.yard, waiting = Math.max(0, y.arrived - y.docked), atRisk = S.parts.filter((q) => Sim.coverage(q) < Sim.RISK_MIN).length;
     const ts = (id) => { const x = id === 'logistics' ? acts : window.FFTowers ? window.FFTowers.summary(id, S) : null; return x ? { t: x.total ? x.total + ' open' : 'all clear', st: x.red ? 'low' : x.total ? 'watch' : 'ok' } : { t: '', st: 'ok' }; };
-    const kf = (lab, val, st) => '<div class="kf"><small>' + lab + '</small><b class="' + (st && st !== 'ok' && st !== 'mut' ? st : '') + '">' + val + '</b></div>';
+    const kf = (lab, val, st) => '<div class="kf"><small>' + lab + '</small><b class="' + (st && st !== 'mut' ? st : '') + '">' + val + '</b></div>';
     const tile = (id, name, href, figs, hint) => { const t = ts(id); return '<div class="otile ' + (t.st === 'ok' ? '' : t.st) + '" data-href="' + href + '"' + tip(hint) + '><div class="oth"><i class="sd ' + t.st + '"></i><b>' + name + '</b><em class="' + (t.st === 'ok' ? '' : t.st) + '">' + t.t + '</em><u>›</u></div><div class="otb">' + figs + '</div></div>'; };
     const tatVar = V.tat - T.tat;
     const load = (S.utility.power.kw / S.utility.power.contractKw) * 100, lowOee = Math.min.apply(null, V.rows.map((q) => q.oee));
