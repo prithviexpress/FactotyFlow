@@ -163,3 +163,25 @@ test('bay view inputs are prepared: assignedBay per truck, per-bay status, unloa
   V.apply(S, 'yard/unloadLimitMin', '60'); assert.equal(S.yard.unloadLimitMin, 60);
   assert.throws(() => V.apply(S, 'yard/unloadLimitMin', '0'), /out of range/);
 });
+
+test('overall dashboard numbers: simulated, pushable in part, validated before applying, forecast from run rate', () => {
+  const S = Sim.createState(); S.clock = 600;                                    // 10:00, shift 06:30 to 15:00
+  S.mgmt = JSON.parse(JSON.stringify(S.mgmt)); for (const k in S.mgmt.depts) S.mgmt.depts[k].actual = 0;
+  Ing.ingest(S, 'mgmt', { depts: { weld: { plan: 15000, actual: 6000, oee: 93 }, press: { plan: 73000, actual: 20000 } }, safety: { lti: 1 }, targets: { tat: 45 } });
+  assert.equal(S.live.mgmt, true); assert.equal(S.mgmt.depts.weld.actual, 6000); assert.equal(S.mgmt.safety.lti, 1); assert.equal(S.mgmt.targets.tat, 45);
+  assert.equal(S.mgmt.depts.paint.plan, 14000);                                   // not sent: unchanged
+  const v = Sim.mgmtView(S), weld = v.rows.find((r) => r.id === 'weld');
+  assert.equal(Math.round(weld.due), Math.round(15000 * (210 / 510)));            // plan to now = plan x elapsed share of the shift
+  assert.ok(Math.abs(weld.attain - (6000 / (15000 * 210 / 510)) * 100) < 0.01);
+  assert.equal(Math.round(v.forecast), Math.round((26000 / 210) * 510));           // run-rate forecast
+  assert.throws(() => Ing.ingest(S, 'mgmt', { depts: { weld: { actual: 7000 }, nope: { plan: 1 } } }), /unknown department "nope"/);
+  assert.equal(S.mgmt.depts.weld.actual, 6000);                                   // a bad post changes nothing
+  assert.throws(() => Ing.ingest(S, 'mgmt', { fourM: { man: 120 } }), /between 0 and 100/);
+  assert.throws(() => Ing.ingest(S, 'mgmt', { shift: { start: '15:00', end: '06:30' } }), /after shift.start/);
+  const V = require('../adapters/values.js');
+  V.apply(S, 'mgmt/depts/paint/actual', '5000'); assert.equal(S.mgmt.depts.paint.actual, 5000);
+  V.apply(S, 'mgmt/safety/trir', '0.25'); assert.equal(S.mgmt.safety.trir, 0.25);
+  assert.throws(() => V.apply(S, 'mgmt/depts/xx/plan', '1'), /unknown department/);
+  const before = S.mgmt.depts.weld.actual; for (let i = 0; i < 20; i++) Sim.step(S, 30);
+  assert.equal(S.mgmt.depts.weld.actual, before);                                 // live: the simulator leaves it alone
+});

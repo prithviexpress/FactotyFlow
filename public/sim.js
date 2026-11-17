@@ -151,6 +151,7 @@
       kpi: { jit: 98.4, stockAcc: 97.8 },
       deliveries: { total: 375, onTime: 345 },
       kanban: { cards: 120, open: 18, overdue: 2, avgWaitMin: 14, onTimePct: 94 },
+      mgmt: newMgmt(clock),
       seqflows: { jvB: { active: 1, missions: 46, onTimePct: 96 }, jvA: { active: 1, missions: 44, onTimePct: 95 }, jvWB: { active: 1, missions: 31, onTimePct: 97 }, jvWA: { active: 0, missions: 29, onTimePct: 96 },
         egB: { active: 1, missions: 52, onTimePct: 98 }, egA: { active: 1, missions: 50, onTimePct: 97 }, imB: { active: 0, missions: 37, onTimePct: 92 }, imA: { active: 1, missions: 35, onTimePct: 91 },
         prWB: { active: 1, missions: 88, onTimePct: 98 }, prWA: { active: 1, missions: 86, onTimePct: 97 } },
@@ -189,7 +190,7 @@
         ]
       }),
       parts: makeParts(clock),
-      hist: { t: [], g2d: [], turn: [], rej: [], spf: [] },
+      hist: { t: [], g2d: [], turn: [], rej: [], spf: [], rejPct: [] },
       sampleAcc: 0, rejMark: 16,
       live: {}, src: {}, sources: {}, trucks: [], setup: null, jvSites: [],
       alerts: [], alertLog: [], alertSrc: {}, weatherInfo: null, branding: { logo: false, ver: 0 },
@@ -200,6 +201,7 @@
     S.hist.g2d = seedSeries(32, 4, HIST);
     S.hist.turn = seedSeries(68, 6, HIST);
     S.hist.spf = seedSeries(91, 2, HIST);
+    S.hist.rejPct = seedSeries(2.0, 0.3, HIST).map((v) => Math.max(0, +v.toFixed(2)));
     S.hist.rej = seedSeries(1.6, 1.4, HIST).map((v) => Math.max(0, +v.toFixed(1)));
     S.lineside.forEach((l) => { l.max = Math.round(l.safety * 1.3); });
     const CAP = { press: 300, weldA: 120, weldB: 120, paintA: 100, paintB: 100, engine: 180, bumper: 160, ip: 140, tm: 110 };
@@ -267,6 +269,12 @@
     press: { label: 'PRESS A/B', carrier: 'tow' }, weldB: { label: 'WELD B' }, weldA: { label: 'WELD A' }, paintB: { label: 'PAINT B' }, paintA: { label: 'PAINT A' },
     asmB: { label: 'ASSEMBLY B' }, asmA: { label: 'ASSEMBLY A' }
   };
+  const MGMT_DEPTS = [
+    { id: 'press', name: 'Press Shop', plan: 73000, eff: 0.78, oee: 96, kwh: 21000 }, { id: 'weld', name: 'Weld Shop', plan: 15000, eff: 0.99, oee: 93, kwh: 14000 },
+    { id: 'paint', name: 'Paint Shop', plan: 14000, eff: 0.985, oee: 93, kwh: 19000 }, { id: 'engine', name: 'Engine Shop', plan: 13000, eff: 0.985, oee: 88, kwh: 9000 },
+    { id: 'assembly', name: 'Assembly', plan: 15000, eff: 0.995, oee: 94, kwh: 11000 }, { id: 'im', name: 'IM Shop', plan: 16000, eff: 0.955, oee: 93, kwh: 8000 },
+    { id: 'inspection', name: 'Vehicle Inspection', plan: 8000, eff: 0.82, oee: 93, kwh: 4000 }
+  ];
   const SLOT_BINDS = ['yard', 'motorpool', 'shipment', 'amr', 'kanban', 'none'], CARRIERS = ['amr', 'tow'];
   /** assembly line A / B counts: pushed per line when available, otherwise the total split in half */
   function lineSplit(S) {
@@ -623,6 +631,9 @@
       k.onTimePct = clamp(100 - (k.overdue / Math.max(1, k.open)) * 100 * 1.1, 40, 100);
     }
 
+    /* management numbers (overall dashboard): department output, energy, 4M, safety */
+    stepMgmt(S, m, tick, running);
+
     /* history samples */
     S.sampleAcc += m;
     while (S.sampleAcc >= SAMPLE_MIN) {
@@ -632,8 +643,51 @@
       pushH(h.t, S.clock); pushH(h.g2d, y.g2d); pushH(h.turn, y.turn); pushH(h.spf, S.quality.spf);
       pushH(h.rej, S.quality.rejected - S.rejMark); S.rejMark = S.quality.rejected;
       for (const k in S.shops) pushH(h.shops[k], S.shops[k].buf);
+      pushH(h.rejPct, S.build.actual > 0 ? (S.quality.rejected / S.build.actual) * 100 : 0);
+      sampleMgmt(S);
     }
     return S;
+  }
+
+  /* ---------- management numbers for the overall dashboard ---------- */
+  function newMgmt(clock) {
+    const M = { shift: { start: 390, end: 900 }, depts: {}, fourM: { man: 98.2, machine: 98.4, material: 99.3, method: 97.6, target: 98 },
+      safety: { lti: 0, trir: 0.18, trirTarget: 0.3, compliance: 98.6, complianceTarget: 98 }, targets: { tat: 90, invAcc: 98, rejection: 2.5 }, trend: [] };
+    const fr = clamp(((clock % 1440) - M.shift.start) / (M.shift.end - M.shift.start), 0, 1);
+    MGMT_DEPTS.forEach((d) => { M.depts[d.id] = { name: d.name, plan: d.plan, actual: Math.round(d.plan * fr * d.eff), oee: d.oee, energy: Math.round(d.kwh * fr * 0.98), energyTarget: d.kwh, _eff: d.eff }; });
+    const tot = MGMT_DEPTS.reduce((a, d) => a + M.depts[d.id].actual, 0), t0 = M.shift.start, t1 = clock % 1440;
+    if (fr > 0) for (let t = t0; t <= t1; t += 10) M.trend.push([t, Math.round((tot * (t - t0)) / Math.max(1, t1 - t0))]);
+    return M;
+  }
+  function stepMgmt(S, m, tick, running) {
+    const M = S.mgmt, L = S.live || {}, tod = S.clock % 1440, len = Math.max(1, M.shift.end - M.shift.start), inShift = tod >= M.shift.start && tod < M.shift.end;
+    if (L.mgmt) return;
+    if (M._tod !== undefined && M._tod < M.shift.start && tod >= M.shift.start) { for (const k in M.depts) { M.depts[k].actual = 0; M.depts[k].energy = 0; } M.trend = []; }   // new shift
+    M._tod = tod;
+    for (const k in M.depts) {
+      const d = M.depts[k];
+      d._eff = clamp((d._eff || 0.95) + (R() - 0.5) * 0.004 * tick, 0.7, 1.02);
+      if (inShift) { if (running || k !== 'assembly') d.actual = Math.min(d.plan, d.actual + (d.plan / len) * m * d._eff); d.energy += (d.energyTarget / len) * m * (0.96 + R() * 0.05); }
+      d.oee = clamp(d.oee + (R() - 0.5) * 0.25 * tick, 70, 99.5);
+    }
+    for (const k of ['man', 'machine', 'material', 'method']) M.fourM[k] = clamp(M.fourM[k] + (R() - 0.5) * 0.08 * tick, 92, 100);
+    M.safety.compliance = clamp(M.safety.compliance + (R() - 0.5) * 0.05 * tick, 94, 100);
+  }
+  function sampleMgmt(S) {
+    const M = S.mgmt, tod = S.clock % 1440, tot = Object.keys(M.depts).reduce((a, k) => a + M.depts[k].actual, 0), last = M.trend[M.trend.length - 1];
+    if (last && (tot < last[1] - 0.5 || tod < last[0])) M.trend = [];                 // counters went back to zero: a new shift started
+    if (tod >= M.shift.start && tod <= M.shift.end) { M.trend.push([+tod.toFixed(1), Math.round(tot)]); if (M.trend.length > 140) M.trend.shift(); }
+  }
+  /** totals, attainment, run-rate forecast and status for the overall dashboard */
+  function mgmtView(S) {
+    const M = S.mgmt, tod = S.clock % 1440, len = Math.max(1, M.shift.end - M.shift.start), el = clamp(tod - M.shift.start, 0, len);
+    const rows = Object.keys(M.depts).map((k) => { const d = M.depts[k], due = d.plan * (el / len); return { id: k, name: d.name, plan: d.plan, due, actual: d.actual, variance: d.actual - due, attain: due > 0 ? (d.actual / due) * 100 : null, oee: d.oee, energy: d.energy, energyTarget: d.energyTarget }; });
+    const plan = rows.reduce((a, r) => a + r.plan, 0), actual = rows.reduce((a, r) => a + r.actual, 0), energy = rows.reduce((a, r) => a + r.energy, 0), eTarget = rows.reduce((a, r) => a + r.energyTarget, 0);
+    const forecast = el >= 15 ? Math.min(plan * 1.2, (actual / el) * len) : null, eDue = eTarget * (el / len);
+    const fm = M.fourM, fmAvg = (fm.man + fm.machine + fm.material + fm.method) / 4, rej = S.build.actual > 0 ? (S.quality.rejected / S.build.actual) * 100 : 0;
+    const due = plan * (el / len);
+    return { rows, plan, due, actual, attain: due > 0 ? (actual / due) * 100 : null, forecast, elapsed: el, len, energy, eTarget, eDue, eVarPct: eDue > 0 ? ((energy - eDue) / eDue) * 100 : null,
+      tat: S.yard.turn, fmAvg, rej, invAcc: S.kpi.stockAcc };
   }
 
   /* ---------- movement health (overlay on the plant map) ---------- */
@@ -652,7 +706,7 @@
   /* ---------- hand a domain back to the simulator (fresh simulated data) ---------- */
   const DOMAIN_KEYS = {
     build: ['build'], line: ['line'], shops: ['shops'], parts: ['parts'], yard: ['yard', 'trucks'], trucks: ['trucks'],
-    transfers: ['transfers'], lineside: ['lineside'], amr: ['amr'], jv: ['jv'], kanban: ['kanban'], seqflows: ['seqflows'], jvstock: ['jvSites'], quality: ['quality'], kpi: ['kpi'],
+    transfers: ['transfers'], lineside: ['lineside'], amr: ['amr'], jv: ['jv'], kanban: ['kanban'], mgmt: ['mgmt'], seqflows: ['seqflows'], jvstock: ['jvSites'], quality: ['quality'], kpi: ['kpi'],
     finished: ['finished'], deliveries: ['deliveries']
   };
   function resetDomain(S, domain) {
@@ -720,7 +774,7 @@
   }
 
   return {
-    createState, step, inject, funnel, bayGrid, resetDomain, SEQFLOWS, amrHealth, kanbanStatus, raiseAlert, clearAlert, pruneAlerts, reconcileAlerts, LEVELS, inventoryView, hourStatus, setPlant, lineSplit, DEFAULT_SLOTS, SLOT_BINDS, CARRIERS, DEFAULT_TERMS, DEFAULT_JVS, MAX_JVS, TARGET_H, coverage, partStatus, bufferStatus, linesideStatus, routeStatus,
+    createState, step, inject, MGMT_DEPTS, mgmtView, funnel, bayGrid, resetDomain, SEQFLOWS, amrHealth, kanbanStatus, raiseAlert, clearAlert, pruneAlerts, reconcileAlerts, LEVELS, inventoryView, hourStatus, setPlant, lineSplit, DEFAULT_SLOTS, SLOT_BINDS, CARRIERS, DEFAULT_TERMS, DEFAULT_JVS, MAX_JVS, TARGET_H, coverage, partStatus, bufferStatus, linesideStatus, routeStatus,
     nextAction, fleetView, fmtClock, makeTrucks, SHOP_NAMES, RISK_MIN
   };
 });

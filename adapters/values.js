@@ -24,6 +24,7 @@ const ENT = {
   part: { list: (S) => S.parts.map((p) => p.id), find: (S, id) => { const p = S.parts.find((x) => x.id === id); return p ? { id, o: p } : null; }, create: true },
   truck: { list: (S) => S.trucks.map((t) => t.id), find: (S, id) => { const t = S.trucks.find((x) => x.id === id); return t ? { id, o: t } : null; }, create: true },
   bay: { list: (S) => (S.yard.bays || []).slice(), find: (S, id) => ((S.yard.bays || []).includes(id) || (S.yard.bayStatus && S.yard.bayStatus[id]) ? { id, o: { status: (S.yard.bayStatus && S.yard.bayStatus[id]) || 'available' } } : null), create: true },
+  dept: { list: (S) => Object.keys(S.mgmt.depts), find: (S, id) => (S.mgmt.depts[id] ? { id, o: S.mgmt.depts[id] } : null) },
   amrUnit: { list: (S) => S.amr.amrs.map((a) => a.id), find: (S, id) => { const a = S.amr.amrs.find((x) => x.id === id); return a ? { id, o: a } : null; }, create: true },
   jvUnit: { list: (S) => S.jv.amrs.map((a) => a.id), find: (S, id) => { const a = S.jv.amrs.find((x) => x.id === id); return a ? { id, o: a } : null; }, create: true },
   flow: { list: (S) => Object.keys(S.seqflows), find: (S, id) => (S.seqflows[id] ? { id, o: S.seqflows[id] } : null) },
@@ -99,6 +100,22 @@ const FL = (k, label, unit, ex, o) => def('Sequenced flows', 'seqflows', 'seqflo
 FL('active', 'Carriers (AMR / tow) in flight on the route', 'carriers', 1, { min: 0, max: 20, int: true });
 FL('missions', 'Missions completed today on the route', 'missions', 46, cnt);
 FL('onTimePct', 'Missions on time on the route', '%', 96, pct);
+
+// -- management numbers (overall dashboard)
+const MG = 'Overall dashboard (management)';
+const DP = (k, label, unit, ex, o) => def(MG, 'mgmt', 'mgmt/depts/{dept}/' + k, label + ' (dept = press | weld | paint | engine | assembly | im | inspection)', unit, NUM, ex, Object.assign({ ent: 'dept', entName: 'department', get: (S, e) => e.o[k], set: (S, v, e) => { e.o[k] = v; } }, o));
+DP('plan', 'Department plan for the shift', 'units', 15000, pos); DP('actual', 'Department output so far', 'units', 14820, pos); DP('oee', 'Department OEE', '%', 93, pct);
+DP('energy', 'Energy used by the department so far', 'kWh', 12100, pos); DP('energyTarget', 'Energy target of the department for the shift', 'kWh', 14000, pos);
+for (const k of ['man', 'machine', 'material', 'method']) def(MG, 'mgmt', 'mgmt/fourM/' + k, '4M compliance: ' + k, '%', NUM, 98.2, field((S) => S.mgmt.fourM, k, pct));
+def(MG, 'mgmt', 'mgmt/fourM/target', '4M compliance target', '%', NUM, 98, field((S) => S.mgmt.fourM, 'target', pct));
+def(MG, 'mgmt', 'mgmt/safety/lti', 'Lost time injuries', 'cases', NUM, 0, field((S) => S.mgmt.safety, 'lti', cnt));
+def(MG, 'mgmt', 'mgmt/safety/trir', 'Total recordable incident rate', 'rate', NUM, 0.18, field((S) => S.mgmt.safety, 'trir', { min: 0, max: 100 }));
+def(MG, 'mgmt', 'mgmt/safety/trirTarget', 'TRIR target (at most)', 'rate', NUM, 0.3, field((S) => S.mgmt.safety, 'trirTarget', { min: 0, max: 100 }));
+def(MG, 'mgmt', 'mgmt/safety/compliance', 'Safety compliance', '%', NUM, 98.6, field((S) => S.mgmt.safety, 'compliance', pct));
+def(MG, 'mgmt', 'mgmt/safety/complianceTarget', 'Safety compliance target (at least)', '%', NUM, 98, field((S) => S.mgmt.safety, 'complianceTarget', pct));
+def(MG, 'mgmt', 'mgmt/targets/tat', 'Target: truck turnaround (at most)', 'min', NUM, 90, field((S) => S.mgmt.targets, 'tat', { min: 1, max: 1440 }));
+def(MG, 'mgmt', 'mgmt/targets/invAcc', 'Target: inventory accuracy (at least)', '%', NUM, 98, field((S) => S.mgmt.targets, 'invAcc', pct));
+def(MG, 'mgmt', 'mgmt/targets/rejection', 'Target: material rejection (at most)', '%', NUM, 2.5, field((S) => S.mgmt.targets, 'rejection', pct));
 
 // -- kanban pull signals (shown in the movement-health overlay on the plant map)
 def('Kanban', 'kanban', 'kanban/cards', 'Kanban cards / bins in the loop', 'cards', NUM, 120, field((S) => S.kanban, 'cards', { min: 1, int: true }));

@@ -134,7 +134,8 @@
       : '<span class="badge live" data-href="#/sources"' + tipA('All domains are fed by real systems.') + '>LIVE</span>';
     if (stale) badge += '<span class="badge stale" data-href="#/sources"' + tipA('No recent data for: ' + S.stale.join(', ') + ' (showing last known values)') + '>STALE: ' + S.stale.join(', ') + '</span>';
     setHTML($('#hdr'),
-      logoHTML() + '<h1>' + esc(T('title')) + '</h1>' +
+      logoHTML() + '<h1>' + (route() === 'overall' ? 'PLANT OVERALL DASHBOARD' : esc(T('title'))) + '</h1>' +
+      '<nav class="tnav"><a data-href="#/overall" class="' + (route() === 'overall' ? 'on' : '') + '"' + tipA('Overall dashboard for management') + '>OVERALL</a><a data-href="#/" class="' + (route() === '' ? 'on' : '') + '"' + tipA('Logistics control tower for operators') + '>LOGISTICS</a></nav>' +
       '<div class="meta"><span>' + S.plant + '</span><i></i><span>Shift ' + shift + '</span><i></i><span>' + Sim.fmtClock(S.clock) + ' IST</span><i></i></div>' +
       badge + '<span class="sp"></span>' +
       '<a class="more cfg" data-href="#/settings"' + tipA('Interfaces: endpoints, sources, alerts, plant setup, logo') + '>\u2699</a>' +
@@ -386,14 +387,15 @@
   function render() {
     if (!S) return;
     const r = route();
-    const FORM = { settings: window.FFSettings, datapoints: window.FFDatapoints };
+    const FORM = { settings: window.FFSettings, datapoints: window.FFDatapoints, overall: window.FFOverall };
     if (lastRoute && FORM[lastRoute] && lastRoute !== r && FORM[lastRoute].unmount) FORM[lastRoute].unmount();
     if (FORM[r]) {                                // form pages: mounted once, only status cells update (never re-rendered, or typing would be lost)
-      $('#stage').classList.add('paged'); renderHeader(); renderAlertBar();
-      if (lastRoute !== r) { cache.delete($('#page')); $('#page').scrollTop = 0; lastRoute = r; FORM[r].mount($('#page'), S, { server: SERVER }); }
+      $('#stage').classList.add('paged'); $('#stage').classList.toggle('ovmode', r === 'overall'); renderHeader(); renderAlertBar();
+      if (lastRoute !== r) { cache.delete($('#page')); $('#page').scrollTop = 0; lastRoute = r; FORM[r].mount($('#page'), S, { server: SERVER, renderMap, actions: () => { const gs = actionGroups(); return { total: gs.reduce((a, g) => a + g.items.length, 0), red: gs.some((g) => g.items.some((i) => i.st === 'low')) }; } }); }
       else FORM[r].update(S);
       renderFoot(); return;
     }
+    $('#stage').classList.remove('ovmode');
     const page = r ? window.FFPages.render(r, S, H, ui) : null;
     $('#stage').classList.toggle('paged', page !== null);
     renderHeader(); renderAlertBar();

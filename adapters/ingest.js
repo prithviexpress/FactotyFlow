@@ -5,7 +5,7 @@
  * (see `L = S.live` guards in public/sim.js). Domains with no feed keep simulating (MIXED mode).
  * Payload shapes are documented in docs/DATA-CONTRACT.md.
  */
-const DOMAINS = ['build', 'line', 'shops', 'parts', 'yard', 'trucks', 'transfers', 'lineside', 'amr', 'jv', 'jvstock', 'quality', 'kpi', 'finished', 'deliveries', 'kanban', 'seqflows'];
+const DOMAINS = ['build', 'line', 'shops', 'parts', 'yard', 'trucks', 'transfers', 'lineside', 'amr', 'jv', 'jvstock', 'quality', 'kpi', 'finished', 'deliveries', 'kanban', 'seqflows', 'mgmt'];
 const SHOP_KEYS = ['press', 'weld', 'paint', 'engine', 'bumper', 'assembly'];
 const BUFFER_KEYS = ['press', 'weldA', 'weldB', 'paintA', 'paintB', 'engine', 'bumper', 'ip', 'tm'];
 const BUFFER_ALIAS = { weld: ['weldA', 'weldB'], paint: ['paintA', 'paintB'] };   // older feeds send one buffer for both lines
@@ -211,6 +211,37 @@ const APPLY = {
   },
   finished(S, p) { asObj(p, 'finished'); for (const k of ['onTime', 'shipOnTime', 'units', 'shipRate']) if (p[k] !== undefined) S.finished[k] = need(p[k], k); },
   deliveries(S, p) { asObj(p, 'deliveries'); for (const k of ['total', 'onTime']) if (p[k] !== undefined) S.deliveries[k] = need(p[k], k); },
+  /* management numbers of the overall dashboard: partial posts change only what they carry; everything is validated before anything is applied */
+  mgmt(S, p) {
+    asObj(p, 'mgmt');
+    const M = JSON.parse(JSON.stringify(S.mgmt)), pc = (v, n) => { const x = need(v, n); if (x < 0 || x > 100) throw new IngestError(n + ' must be between 0 and 100'); return x; },
+      nn = (v, n) => { const x = need(v, n); if (x < 0) throw new IngestError(n + ' must be 0 or more'); return x; };
+    if (p.depts !== undefined) {
+      asObj(p.depts, 'mgmt.depts');
+      for (const k of Object.keys(p.depts)) {
+        if (!M.depts[k]) throw new IngestError('unknown department "' + k + '". Valid: ' + Object.keys(M.depts).join(', '));
+        const o = p.depts[k]; asObj(o, 'mgmt.depts.' + k);
+        for (const f of ['plan', 'actual', 'energy', 'energyTarget']) if (o[f] !== undefined) M.depts[k][f] = nn(o[f], k + '.' + f);
+        if (o.oee !== undefined) M.depts[k].oee = pc(o.oee, k + '.oee');
+        if (o.name !== undefined) { const nm = String(o.name).trim(); if (!nm || nm.length > 24) throw new IngestError(k + '.name: 1 to 24 characters'); M.depts[k].name = nm; }
+      }
+    }
+    if (p.fourM !== undefined) { asObj(p.fourM, 'mgmt.fourM'); for (const f of ['man', 'machine', 'material', 'method', 'target']) if (p.fourM[f] !== undefined) M.fourM[f] = pc(p.fourM[f], 'fourM.' + f); }
+    if (p.safety !== undefined) {
+      asObj(p.safety, 'mgmt.safety');
+      for (const f of ['lti', 'trir', 'trirTarget']) if (p.safety[f] !== undefined) M.safety[f] = nn(p.safety[f], 'safety.' + f);
+      for (const f of ['compliance', 'complianceTarget']) if (p.safety[f] !== undefined) M.safety[f] = pc(p.safety[f], 'safety.' + f);
+    }
+    if (p.targets !== undefined) { asObj(p.targets, 'mgmt.targets'); for (const f of ['tat', 'invAcc', 'rejection']) if (p.targets[f] !== undefined) M.targets[f] = nn(p.targets[f], 'targets.' + f); }
+    if (p.shift !== undefined) {
+      asObj(p.shift, 'mgmt.shift');
+      const hm = (v, n) => { const m = /^(\d{1,2}):(\d{2})$/.exec(String(v).trim()); if (!m || +m[1] > 23 || +m[2] > 59) throw new IngestError(n + ' must be HH:MM'); return +m[1] * 60 + +m[2]; };
+      if (p.shift.start !== undefined) M.shift.start = hm(p.shift.start, 'shift.start');
+      if (p.shift.end !== undefined) M.shift.end = hm(p.shift.end, 'shift.end');
+      if (!(M.shift.end > M.shift.start)) throw new IngestError('shift.end must be after shift.start');
+    }
+    S.mgmt = M;
+  },
   kanban(S, p) {
     asObj(p, 'kanban');
     const v = {};
