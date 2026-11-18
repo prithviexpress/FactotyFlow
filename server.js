@@ -80,9 +80,28 @@ function createApp(opts) {
     }
     Sim.step(state, state.speed);
     Ing.health(state, manager.config.staleSec || 60);
-    const msg = 'data: ' + JSON.stringify(state) + '\n\n';
-    for (const res of clients) res.write(msg);
+    pushState();
   }, opts.tickMs || 1000);
+
+  /* Every message is a full snapshot, so a viewer that cannot keep up needs no backlog: it is simply skipped until it has read what it
+   * was sent, and dropped if it stays stuck. Without this a sleeping laptop or a stalled connection makes Node buffer every snapshot
+   * for it, until the server runs out of memory. */
+  const MAX_PENDING = opts.maxPendingBytes || 2 * 1024 * 1024, STUCK_MS = opts.stuckMs || 60000;
+  const stats = { sent: 0, skipped: 0, dropped: 0 };
+  function pushState() {
+    if (!clients.size) return;                        // nobody is watching: nothing is serialised
+    const msg = 'data: ' + JSON.stringify(state) + '\n\n', now = Date.now();
+    for (const res of clients) {
+      if (res.destroyed || res.writableEnded) { clients.delete(res); continue; }
+      if (res.writableLength > 0 && (res.writableLength + msg.length > MAX_PENDING || res._ffBusy)) {      // still holding an earlier snapshot
+        stats.skipped++;
+        if (now - (res._ffLastOk || now) > STUCK_MS) { stats.dropped++; clients.delete(res); res.destroy(); }   // the browser reconnects by itself when it is back
+        continue;
+      }
+      res._ffBusy = !res.write(msg); res._ffLastOk = now; stats.sent++;
+      if (res._ffBusy) res.once('drain', () => { res._ffBusy = false; });
+    }
+  }
 
   const send = (res, code, body) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)); };
 
@@ -92,7 +111,8 @@ function createApp(opts) {
     if (url.pathname === '/events') {
       res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
       res.write('data: ' + JSON.stringify(state) + '\n\n');
-      clients.add(res); req.on('close', () => clients.delete(res));
+      res._ffLastOk = Date.now();
+      clients.add(res); const gone = () => clients.delete(res); req.on('close', gone); res.on('close', gone); res.on('error', gone);
       return;
     }
     if (url.pathname === '/api/state') return send(res, 200, state);
@@ -292,6 +312,7 @@ function createApp(opts) {
   return {
     server, state,
     listen: (port) => new Promise((r) => server.listen(port, () => r(server.address().port))),
+    viewers: () => ({ count: clients.size, pending: [...clients].map((c) => c.writableLength), sent: stats.sent, skipped: stats.skipped, dropped: stats.dropped }),
     close: () => { clearInterval(timer); stops.forEach((s) => s && s()); for (const c of clients) c.end(); return new Promise((r) => server.close(r)); }
   };
 }

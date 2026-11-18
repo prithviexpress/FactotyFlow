@@ -117,3 +117,23 @@ test('dashboard heading is configurable and defaults to MATERIAL FLOW CONTROL TO
   assert.deepEqual(Cfg.validate(Cfg.normalize({ plant: { terms: { title: 'PLANT 01 MATERIAL FLOW TOWER' } } })), []);
   assert.ok(Cfg.validate(Cfg.normalize({ plant: { terms: { title: 'x'.repeat(49) } } })).some((e) => /title.*48/.test(e)));
 });
+
+test('a viewer that stops reading is skipped and then dropped: the server does not buffer snapshots for it', async () => {
+  const net = require('node:net');
+  const app = createApp({ configFile: '', log() {}, tickMs: 10, maxPendingBytes: 256 * 1024, stuckMs: 400 });
+  const port = await app.listen(0);
+  const trucks = Array.from({ length: 900 }, (_, i) => ({ id: 'HR38AB' + String(i).padStart(7, '0'), supplier: 'Supplier ' + i, material: 'Material ' + i, status: 'arrived' }));
+  await fetch('http://127.0.0.1:' + port + '/api/ingest/trucks', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(trucks) });
+  const stuck = net.connect(port, '127.0.0.1'); stuck.pause();                       // connects, asks for the stream, never reads it
+  await new Promise((r) => stuck.once('connect', r));
+  stuck.write('GET /events HTTP/1.1\r\nHost: x\r\n\r\n');
+  const reader = await fetch('http://127.0.0.1:' + port + '/events'), rd = reader.body.getReader(); let got = 0;
+  const pump = (async () => { for (;;) { const { done, value } = await rd.read(); if (done) break; got += value.length; } })().catch(() => {});
+  let worst = 0;
+  for (let i = 0; i < 150; i++) { await new Promise((r) => setTimeout(r, 10)); for (const n of app.viewers().pending) worst = Math.max(worst, n); }
+  const v = app.viewers();
+  assert.ok(worst < 2 * 1024 * 1024, 'pending bytes stayed bounded, worst ' + worst);   // unbounded, this would be well over 100 snapshots
+  assert.ok(v.skipped > 0 && v.dropped === 1 && v.count === 1, JSON.stringify(v));      // the stuck one was dropped, the reading one stays
+  assert.ok(got > 1024 * 1024);                                                         // and the healthy viewer kept receiving
+  stuck.destroy(); await rd.cancel().catch(() => {}); await pump; await app.close();
+});
