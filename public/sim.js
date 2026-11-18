@@ -338,12 +338,13 @@
     const received = Math.max(0, y.received), docked = Math.max(received, y.docked), arrived = Math.max(docked, y.arrived), expected = Math.max(arrived, y.expected);
     return { expected, notYet: expected - arrived, waiting: arrived - docked, atBayNow: docked - received, received };
   }
-  /** Trucks standing in a bay with no trip matched to them, longest standing first: {bay, truck, why, label, min}. */
+  /** Trucks standing in a bay with no trip matched to them: {bay, truck, why, label, min}. Trucks with a known plate come first (on the plan, then not on the plan), unidentified ones last; longest standing first within each group. */
   const NO_TRIP_WHY = { unidentified: 'unidentified truck', notOnPlan: 'not on today\'s plan', noStopMatched: 'on plan, visit matches no stop' };
+  const RANK = { noStopMatched: 0, notOnPlan: 1, unidentified: 2 };
   function noTripTrucks(S) {
     const y = S.yard, list = y.noTripTrucks && y.noTripTrucks.length ? y.noTripTrucks : (y.noTripBays || []).map((b) => ({ bay: b, truck: null, why: 'unidentified', since: null }));
     return list.map((x) => ({ bay: x.bay, truck: x.truck, why: x.why, label: NO_TRIP_WHY[x.why] || x.why, min: x.since === null || x.since === undefined ? null : Math.max(0, ((S.clock - x.since) % 1440 + 1440) % 1440) }))
-      .sort((a, b) => (b.min === null ? -1 : b.min) - (a.min === null ? -1 : a.min));
+      .sort((a, b) => (RANK[a.why] === undefined ? 1 : RANK[a.why]) - (RANK[b.why] === undefined ? 1 : RANK[b.why]) || (b.min === null ? -1 : b.min) - (a.min === null ? -1 : a.min));   // known trucks first, unidentified last; longest standing first within each
   }
   /** The ids of the bays the grid shows, and which of them have a truck at them. */
   function bayGrid(S) {
