@@ -195,3 +195,20 @@ test('topic data (production, utility, quality, safety): simulated, pushable in 
   const before = S.production.depts.weld.actual, e0 = S.utility.depts.paint.energy; for (let i = 0; i < 20; i++) Sim.step(S, 30);
   assert.equal(S.production.depts.weld.actual, before); assert.equal(S.utility.depts.paint.energy, e0);     // live: the simulator leaves them alone
 });
+
+test('yard.explain: every waiting trip and occupied bay is accounted for, and what the feed leaves out is shown as a gap', () => {
+  const S = Sim.createState();
+  Ing.ingest(S, 'yard', { expected: 887, arrived: 329, docked: 115, received: 65, occupied: 117, docks: 281,
+    explain: { trips: { parking: 120, toBay: 30, returning: 10, openNoExit: 50 }, bays: { unloading: 50, unloaded: 40, notOnPlan: 20, unidentified: 7 } } });
+  const e = Sim.explainYard(S);
+  assert.equal(e.waiting.total, 214); assert.equal(e.waiting.gap, 4);            // 210 of the 214 are explained: 4 are not, and that is said
+  assert.equal(e.bays.total, 117); assert.equal(e.bays.gap, 0);                  // 50 + 40 + 20 + 7
+  assert.deepEqual(e.bays.rows.map((r) => r.key), ['unloading', 'unloaded', 'notOnPlan', 'unidentified']);
+  assert.throws(() => Ing.ingest(S, 'yard', { explain: { bays: { parked: 3 } } }), /not known/);
+  assert.throws(() => Ing.ingest(S, 'yard', { explain: { trips: { parking: -1 } } }), /0 or more/);
+  assert.equal(Sim.explainYard(Sim.createState()), null);                        // no explanation sent: nothing is invented
+  Ing.ingest(S, 'trucks.item', { id: 'XX00ZZ0001', status: 'docked', dock: 'AA-06', planned: false, place: 'at_bay' });
+  const t = S.trucks.find((x) => x.id === 'XX00ZZ0001'); assert.equal(t.planned, false); assert.equal(t.place, 'at_bay');
+  Ing.ingest(S, 'trucks.item', { id: 'XX00ZZ0001', supplier: 'V9' }); assert.equal(S.trucks.find((x) => x.id === 'XX00ZZ0001').planned, false);   // kept on a partial update
+  Ing.ingest(S, 'trucks.item', { id: 'XX00ZZ0002', status: 'arrived' }); assert.equal(S.trucks.find((x) => x.id === 'XX00ZZ0002').planned, true);
+});

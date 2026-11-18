@@ -224,6 +224,9 @@
     const cell = (lab, val, sub) => '<div class="vc"><small>' + lab + '</small><b>' + val + '</b>' + (sub ? '<i>' + sub + '</i>' : '') + '</div>';
     const fn = Sim.funnel(y), pc = (n) => f0((n / Math.max(1, fn.expected)) * 100) + '%';
     const mini = (lab, val, key, arr) => '<div class="vm"><div class="vt"><small>' + lab + '</small><b>' + f0(val) + ' min</b></div>' + spark(key, arr, { color: 'var(--cyan)', unit: ' min', h: 30 }) + '</div>';
+    const EX = Sim.explainYard(S);
+    const exLine = (title, part, unit) => '<div class="vex' + (part.gap !== 0 ? ' gap' : '') + '"' + tipA(title + ' ' + part.total + ' = ' + (part.rows.map((r) => r.n + ' ' + r.label).join(' + ') || 'nothing reported') + (part.gap !== 0 ? ' · ' + Math.abs(part.gap) + ' ' + unit + (part.gap > 0 ? ' not explained by the feed' : ' more than the headline figure') : '')) + '><b>' + title + ' ' + part.total + '</b>' +
+      part.rows.map((r) => '<span class="' + (r.key === 'notOnPlan' || r.key === 'unidentified' || r.key === 'openNoExit' || r.key === 'notHere' ? 'warn' : '') + '"><i>' + r.n + '</i> ' + r.label + '</span>').join('') + (part.gap !== 0 ? '<span class="bad"><i>' + Math.abs(part.gap) + '</i> ' + (part.gap > 0 ? 'unexplained' : 'over') + '</span>' : '') + '</div>';
     const next = S.trucks.filter((t) => t.status === 'docked' || t.status === 'arrived').slice(0, 2).concat(S.trucks.filter((t) => t.status === 'scheduled').slice(0, 2)).slice(0, 4);
     const chip = (t) => t.status === 'docked' ? '<span class="chip cy">' + esc(T('atBay').toUpperCase()) + (t.dock ? ' ' + t.dock : '') + '</span>' : t.status === 'arrived' ? '<span class="chip watch">WAITING</span>' : '<span class="chip mut">ETA ' + (t.sched !== null && t.sched !== undefined ? clockOf(t.sched) : '—') + '</span>';
     setHTML($('#v-a'),
@@ -232,7 +235,7 @@
       '<div class="vcs">' + cell('Expected', fn.expected) + cell('Not yet here', fn.notYet, pc(fn.notYet)) + cell('Waiting', fn.waiting, pc(fn.waiting)) + cell(T('atBay') + ' now', fn.atBayNow, pc(fn.atBayNow)) + cell('Received', fn.received, pc(fn.received)) + '</div>' +
       '<div class="vbays"' + tipA(y.occupied + ' of ' + y.docks + ' ' + esc(T('bays').toLowerCase()) + ' in use') + '><span><b>' + y.occupied + ' / ' + y.docks + '</b> ' + esc(T('bays').toLowerCase()) + ' in use</span><div class="vbar"><b class="' + st + '" style="width:' + Math.min(100, (y.occupied / Math.max(1, y.docks)) * 100).toFixed(0) + '%"></b></div></div>' +
       '<div class="vms">' + mini('Gate → ' + esc(T('bay').toLowerCase()), y.g2d, 'g2d', h.g2d) + mini('Truck turnaround', y.turn, 'turn', h.turn) + '</div>' +
-      '<div class="vtl">' + next.map((t) => '<div class="vtr"><b' + tipA(esc(t.id) + ' · ' + esc(t.sup) + ' · ' + esc(t.mat)) + '>' + esc(t.id) + '</b><span>' + esc(t.sup) + '</span><span class="mut">' + esc(t.mat) + '</span>' + chip(t) + '</div>').join('') + '</div></div>');
+      (EX ? exLine('Waiting', EX.waiting, 'trips') + exLine(esc(T('bays')) + ' in use', EX.bays, esc(T('bays').toLowerCase())) : '<div class="vtl">' + next.map((t) => '<div class="vtr"><b' + tipA(esc(t.id) + ' · ' + esc(t.sup) + ' · ' + esc(t.mat)) + '>' + esc(t.id) + '</b><span>' + esc(t.sup) + '</span><span class="mut">' + esc(t.mat) + '</span>' + chip(t) + '</div>').join('') + '</div>') + '</div>');
     $('#v-a').dataset.href = '#/inbound';
   }
   const fitStr = (s, n) => (String(s).length > n ? String(s).slice(0, n - 1) + '…' : String(s));

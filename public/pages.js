@@ -109,9 +109,13 @@
       const late = t.arrivedAt !== null && t.sched !== null && t.arrivedAt - t.sched > 20 ? '<small class="watch">late +' + H.f0(t.arrivedAt - t.sched) + ' min</small>' : '';
       const dwell = t.arrivedAt !== null && t.status !== 'received' && t.status !== 'scheduled' ? H.f0(S.clock - t.arrivedAt) + ' min' : t.doneAt && t.arrivedAt ? H.f0(t.doneAt - t.arrivedAt) + ' min' : '—';
       const overdue = t.status === 'scheduled' && t.sched !== null && S.clock - t.sched > 15 ? '<small class="low">overdue ' + H.f0(S.clock - t.sched) + ' min</small>' : '';
-      return '<tr><td><b>' + t.id + '</b></td><td>' + t.sup + '</td><td>' + t.mat + '</td><td><span class="chip ' + st + '">' + (t.status === 'docked' ? atBay : t.status).toUpperCase() + '</span></td><td>' + (t.dock || '—') + '</td>' +
+      const np = t.planned === false ? ' <span class="chip low">NOT ON PLAN</span>' : '', pl = t.place && t.status === 'arrived' ? '<small class="mut"> ' + String(t.place).replace(/_/g, ' ') + '</small>' : '';
+      return '<tr><td><b>' + t.id + '</b>' + np + '</td><td>' + t.sup + '</td><td>' + t.mat + '</td><td><span class="chip ' + st + '">' + (t.status === 'docked' ? atBay : t.status).toUpperCase() + '</span>' + pl + '</td><td>' + (t.dock || '—') + '</td>' +
         '<td>' + clk(t.sched) + overdue + '</td><td>' + clk(t.arrivedAt) + late + '</td><td>' + dwell + '</td></tr>';
     });
+    const EX = window.FactorySim.explainYard(S);
+    const exRow = (title, part, unit) => '<div class="exrow"><div class="exh"><b>' + title + '</b><em>' + part.total + '</em></div>' + part.rows.map((r) => '<div class="exc' + (['notOnPlan', 'unidentified', 'openNoExit', 'notHere'].indexOf(r.key) >= 0 ? ' warn' : '') + '"><b>' + r.n + '</b><small>' + r.label + '</small></div>').join('') +
+      (part.gap !== 0 ? '<div class="exc bad"><b>' + Math.abs(part.gap) + '</b><small>' + (part.gap > 0 ? unit + ' not explained by the feed' : 'more than the headline figure') + '</small></div>' : '<div class="exc okc"><b>✓</b><small>all accounted for</small></div>') + '</div>';
     const fn = window.FactorySim.funnel(y), pctOf = (n) => H.f0((n / Math.max(1, fn.expected)) * 100) + '%';
     const grid = window.FactorySim.bayGrid(S).map((b) => '<span class="dk ' + (b.busy ? 'busy' : '') + '" data-tip="' + bay + ' ' + b.id + (b.busy ? ' — occupied' : ' — free') + '">' + b.id + '</span>').join('');
     return frame('inbound', 'Inbound Truck Flow — ' + TM(S, 'parking'), 'Gate → ' + bay.toLowerCase() + ' → received · today',
@@ -120,6 +124,7 @@
         card('Gate → ' + bay.toLowerCase() + ' (avg)', H.f0(y.g2d) + ' min', y.g2d > 45 ? 'watch' : ''), card('Truck turnaround (avg)', H.f0(y.turn) + ' min', y.turn > 90 ? 'watch' : '')]) +
       '<div class="two">' + sect('Gate to ' + bay.toLowerCase() + ' time', big(H, 'g2d', S.hist.g2d, S.hist.t, { color: 'var(--cyan)', unit: ' min' })) +
       sect('Truck turnaround time', big(H, 'turn', S.hist.turn, S.hist.t, { color: 'var(--cyan)', unit: ' min' })) + '</div>' +
+      (EX ? sect('Every waiting trip and every occupied ' + bay.toLowerCase() + ', explained', exRow('Waiting', EX.waiting, 'trips') + exRow(TM(S, 'bays') + ' in use', EX.bays, TM(S, 'bays').toLowerCase())) : '') +
       sect(bay + ' occupancy — ' + y.occupied + ' / ' + y.docks, '<div class="dockgrid">' + grid + '</div>') +
       sect('Trucks (' + S.trucks.length + ')', tbl(['Truck', 'Supplier', 'Material', 'Status', bay, 'Scheduled', 'Arrived', 'Dwell'], rows)));
   }

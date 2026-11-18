@@ -5,6 +5,7 @@
  * (see `L = S.live` guards in public/sim.js). Domains with no feed keep simulating (MIXED mode).
  * Payload shapes are documented in docs/DATA-CONTRACT.md.
  */
+const Sim = require('../public/sim.js');
 const DOMAINS = ['build', 'line', 'shops', 'parts', 'yard', 'trucks', 'transfers', 'lineside', 'amr', 'jv', 'jvstock', 'quality', 'kpi', 'finished', 'deliveries', 'kanban', 'seqflows', 'production', 'utility', 'safety'];
 const SHOP_KEYS = ['press', 'weld', 'paint', 'engine', 'bumper', 'assembly'];
 const BUFFER_KEYS = ['press', 'weldA', 'weldB', 'paintA', 'paintB', 'engine', 'bumper', 'ip', 'tm'];
@@ -141,6 +142,19 @@ const APPLY = {
     asObj(p, 'yard');
     for (const k of ['expected', 'arrived', 'docked', 'received', 'occupied', 'docks', 'g2d', 'turn', 'unloadLimitMin', 'turnTarget']) if (p[k] !== undefined) S.yard[k] = need(p[k], k);
     if (p.unloadLimitMin !== undefined && !(S.yard.unloadLimitMin > 0)) throw new IngestError('yard.unloadLimitMin must be greater than 0');
+    if (p.explain !== undefined) {     // where every waiting trip and every occupied bay is: { trips: {parking, toBay, ...}, bays: {unloading, unloaded, notOnPlan, unidentified} }
+      asObj(p.explain, 'yard.explain');
+      const ex = {};
+      for (const [g, keys] of [['trips', Sim.EXPLAIN_TRIPS], ['bays', Sim.EXPLAIN_BAYS]]) {
+        if (p.explain[g] === undefined) continue;
+        asObj(p.explain[g], 'yard.explain.' + g); ex[g] = {};
+        for (const k of Object.keys(p.explain[g])) {
+          if (!keys.some((d) => d[0] === k)) throw new IngestError('yard.explain.' + g + '.' + k + ' is not known. Valid: ' + keys.map((d) => d[0]).join(', '));
+          ex[g][k] = nn(p.explain[g][k], 'explain.' + g + '.' + k);
+        }
+      }
+      S.yard.explain = ex;
+    }
     if (p.bayStatus !== undefined) {   // { "AB-14": "blocked", ... }: only the bays you send change; send "available" to clear one
       asObj(p.bayStatus, 'yard.bayStatus');
       const next = Object.assign({}, S.yard.bayStatus || {});
@@ -168,7 +182,7 @@ const APPLY = {
         const sent = (...ks) => ks.some((k) => x[k] !== undefined);
         const o = S.trucks[i];
         if (!sent('supplier', 'sup')) t.sup = o.sup; if (!sent('material', 'mat')) t.mat = o.mat; if (!sent('status')) t.status = o.status;
-        if (!sent('assignedBay')) t.assignedBay = o.assignedBay;
+        if (!sent('assignedBay')) t.assignedBay = o.assignedBay; if (!sent('planned')) t.planned = o.planned !== false; if (!sent('place')) t.place = o.place === undefined ? null : o.place;
         if (!sent('dock')) t.dock = o.dock; if (!sent('schedAt', 'sched')) t.sched = o.sched; if (!sent('arrivedAt')) t.arrivedAt = o.arrivedAt;
         if (!sent('dockedAt')) t.dockedAt = o.dockedAt; if (!sent('doneAt')) t.doneAt = o.doneAt;
         S.trucks[i] = t;
@@ -316,7 +330,7 @@ function normTruck(t) {
   const status = ['scheduled', 'arrived', 'docked', 'received'].includes(t.status) ? t.status : 'scheduled';
   return {
     id: String(t.id), sup: str(t.supplier !== undefined ? t.supplier : t.sup, '—'), mat: str(t.material !== undefined ? t.material : t.mat, '—'),
-    status, dock: normDock(t.dock), assignedBay: normDock(t.assignedBay),
+    status, dock: normDock(t.dock), assignedBay: normDock(t.assignedBay), planned: !(t.planned === false || t.planned === 'false' || t.planned === 0), place: t.place === undefined || t.place === null ? null : String(t.place).trim().slice(0, 24),
     sched: clockOf(t.schedAt !== undefined ? t.schedAt : t.sched), arrivedAt: clockOf(t.arrivedAt), dockedAt: clockOf(t.dockedAt), doneAt: clockOf(t.doneAt)
   };
 }

@@ -337,6 +337,16 @@
     const received = Math.max(0, y.received), docked = Math.max(received, y.docked), arrived = Math.max(docked, y.arrived), expected = Math.max(arrived, y.expected);
     return { expected, notYet: expected - arrived, waiting: arrived - docked, atBayNow: docked - received, received };
   }
+  /** Where every waiting trip and every occupied bay is, when the feed explains them (yard.explain). The parts are checked against the
+   *  headline figures: whatever they do not cover is returned as `gap`, so nothing is left unexplained without it being said. */
+  const EXPLAIN_TRIPS = [['parking', 'in parking'], ['toBay', 'on the way to a bay'], ['otherBay', 'at a bay for another trip'], ['returning', 'returning to parking'], ['onRoad', 'on the road, no bay'], ['notHere', 'reported not here'], ['openNoExit', 'finished, exit not read']];
+  const EXPLAIN_BAYS = [['unloading', 'unloading'], ['unloaded', 'unloaded, still at the bay'], ['notOnPlan', 'truck not on today\'s plan'], ['unidentified', 'unidentified truck']];
+  function explainYard(S) {
+    const y = S.yard, e = y.explain;
+    if (!e) return null;
+    const part = (defs, src, total) => { const rows = defs.map((d) => ({ key: d[0], label: d[1], n: Math.max(0, Number((src || {})[d[0]]) || 0) })).filter((r) => r.n > 0), sum = rows.reduce((a, r) => a + r.n, 0); return { rows, total, gap: total - sum }; };
+    return { waiting: part(EXPLAIN_TRIPS, e.trips, funnel(y).waiting), bays: part(EXPLAIN_BAYS, e.bays, Math.max(0, y.occupied)) };
+  }
   /** The ids of the bays the grid shows, and which of them have a truck at them. */
   function bayGrid(S) {
     const y = S.yard, ids = y.bays && y.bays.length ? y.bays.slice() : Array.from({ length: Math.max(0, y.docks) }, (_, i) => String(i + 1));
@@ -805,7 +815,7 @@
   }
 
   return {
-    createState, step, inject, MGMT_DEPTS, DEPT_IDS, mgmtView, funnel, bayGrid, resetDomain, SEQFLOWS, amrHealth, kanbanStatus, raiseAlert, clearAlert, pruneAlerts, reconcileAlerts, LEVELS, inventoryView, hourStatus, setPlant, lineSplit, DEFAULT_SLOTS, SLOT_BINDS, CARRIERS, DEFAULT_TERMS, DEFAULT_JVS, MAX_JVS, TARGET_H, coverage, partStatus, bufferStatus, linesideStatus, routeStatus,
+    createState, step, inject, explainYard, EXPLAIN_TRIPS, EXPLAIN_BAYS, MGMT_DEPTS, DEPT_IDS, mgmtView, funnel, bayGrid, resetDomain, SEQFLOWS, amrHealth, kanbanStatus, raiseAlert, clearAlert, pruneAlerts, reconcileAlerts, LEVELS, inventoryView, hourStatus, setPlant, lineSplit, DEFAULT_SLOTS, SLOT_BINDS, CARRIERS, DEFAULT_TERMS, DEFAULT_JVS, MAX_JVS, TARGET_H, coverage, partStatus, bufferStatus, linesideStatus, routeStatus,
     nextAction, fleetView, fmtClock, makeTrucks, SHOP_NAMES, RISK_MIN
   };
 });
