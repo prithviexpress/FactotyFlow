@@ -116,7 +116,7 @@ test('yard bays: the grid shows the bays\' own ids, and a truck at "AA-02" light
   assert.equal(S.yard.docks, 3, 'docks follows the list when it is not sent');
   Ing.ingest(S, 'trucks', [{ id: 'T1', status: 'docked', dock: 'AA-02' }, { id: 'T2', status: 'docked', dock: 'bb-01' }, { id: 'T3', status: 'received', dock: 'AA-01' }]);
   assert.equal(S.trucks[0].dock, 'AA-02');
-  assert.deepEqual(Sim.bayGrid(S), [{ id: 'AA-01', busy: false }, { id: 'AA-02', busy: true }, { id: 'BB-01', busy: false }]);  // case matters; a received truck holds no bay
+  assert.deepEqual(Sim.bayGrid(S).map((b) => ({ id: b.id, busy: b.busy })), [{ id: 'AA-01', busy: false }, { id: 'AA-02', busy: true }, { id: 'BB-01', busy: false }]);  // case matters; a received truck holds no bay
 });
 
 test('yard bays: without the list the grid is 1..docks and numeric docks still work', () => {
@@ -196,19 +196,19 @@ test('topic data (production, utility, quality, safety): simulated, pushable in 
   assert.equal(S.production.depts.weld.actual, before); assert.equal(S.utility.depts.paint.energy, e0);     // live: the simulator leaves them alone
 });
 
-test('yard.explain: every waiting trip and occupied bay is accounted for, and what the feed leaves out is shown as a gap', () => {
+test('yard: bays with no trip matched, stay in parking, trucks marked as having no trip', () => {
   const S = Sim.createState();
-  Ing.ingest(S, 'yard', { expected: 887, arrived: 329, docked: 115, received: 65, occupied: 117, docks: 281,
-    explain: { trips: { parking: 120, toBay: 30, returning: 10, openNoExit: 50 }, bays: { unloading: 50, unloaded: 40, notOnPlan: 20, unidentified: 7 } } });
-  const e = Sim.explainYard(S);
-  assert.equal(e.waiting.total, 214); assert.equal(e.waiting.gap, 4);            // 210 of the 214 are explained: 4 are not, and that is said
-  assert.equal(e.bays.total, 117); assert.equal(e.bays.gap, 0);                  // 50 + 40 + 20 + 7
-  assert.deepEqual(e.bays.rows.map((r) => r.key), ['unloading', 'unloaded', 'notOnPlan', 'unidentified']);
-  assert.throws(() => Ing.ingest(S, 'yard', { explain: { bays: { parked: 3 } } }), /not known/);
-  assert.throws(() => Ing.ingest(S, 'yard', { explain: { trips: { parking: -1 } } }), /0 or more/);
-  assert.equal(Sim.explainYard(Sim.createState()), null);                        // no explanation sent: nothing is invented
-  Ing.ingest(S, 'trucks.item', { id: 'XX00ZZ0001', status: 'docked', dock: 'AA-06', planned: false, place: 'at_bay' });
-  const t = S.trucks.find((x) => x.id === 'XX00ZZ0001'); assert.equal(t.planned, false); assert.equal(t.place, 'at_bay');
-  Ing.ingest(S, 'trucks.item', { id: 'XX00ZZ0001', supplier: 'V9' }); assert.equal(S.trucks.find((x) => x.id === 'XX00ZZ0001').planned, false);   // kept on a partial update
-  Ing.ingest(S, 'trucks.item', { id: 'XX00ZZ0002', status: 'arrived' }); assert.equal(S.trucks.find((x) => x.id === 'XX00ZZ0002').planned, true);
+  Ing.ingest(S, 'yard', { expected: 887, arrived: 180, docked: 115, received: 65, occupied: 117, docks: 4, bays: ['AA-01', 'AA-02', 'AA-03', 'AA-04'],
+    bayStatus: { 'AA-01': 'occupied', 'AA-02': 'occupied', 'AA-03': 'blocked' }, noTripBays: ['AA-02'], parkStay: 37, turn: 102 });
+  assert.equal(S.yard.noTrip, 1); assert.equal(S.yard.parkStay, 37);
+  assert.equal(Sim.funnel(S.yard).waiting, 65);                                   // arrived - docked: a truck in a bay is not in it
+  const g = Sim.bayGrid(S), by = {}; g.forEach((b) => { by[b.id] = b; });
+  assert.ok(by['AA-01'].busy && !by['AA-01'].noTrip); assert.ok(by['AA-02'].busy && by['AA-02'].noTrip); assert.ok(by['AA-03'].blocked && !by['AA-03'].busy); assert.ok(!by['AA-04'].busy);
+  assert.throws(() => Ing.ingest(S, 'yard', { noTripBays: 'AA-02' }));
+  Ing.ingest(S, 'trucks.item', { id: '? AA-02', status: 'docked', dock: 'AA-02', planned: false, place: 'at_bay' });
+  const t = S.trucks.find((x) => x.id === '? AA-02'); assert.equal(t.planned, false); assert.equal(t.place, 'at_bay');
+  Ing.ingest(S, 'trucks.item', { id: '? AA-02', supplier: 'V9' }); assert.equal(S.trucks.find((x) => x.id === '? AA-02').planned, false);   // kept on a partial update
+  const V = require('../adapters/values.js'); V.apply(S, 'yard/parkStay', '41'); assert.equal(S.yard.parkStay, 41);
+  for (let i = 0; i < 12; i++) Sim.step(S, 300);
+  assert.ok(S.hist.park.length > 0 && S.hist.park[S.hist.park.length - 1] === 41);   // live: the pushed value is what is charted
 });

@@ -180,7 +180,7 @@
       kpi('warn', COL.watch, 'LINE RUN', '(no components)', '<span class="' + (S.line.runWithoutMin > 0 ? 'watch' : 'ok') + '">' + f0(S.line.runWithoutMin) + '</span><small>min</small>',
         '<div class="sub' + (S.line.missing ? ' watch' : '') + '">' + (S.line.missing ? S.line.missing + ' component' + (S.line.missing === 1 ? '' : 's') + ' missing now' : 'none missing now') + '</div>',
         { alert: PROB.run, href: '#/parts', tip: 'Minutes the line kept building while a non-critical component was missing, today (vehicles are completed later). Missing now: ' + S.line.missing }),
-      kpi('clock', COL.cy, T('bay').toUpperCase() + ' TURNAROUND', '(avg. truck)', f0(y.g2d) + '<small>min</small>', '', { alert: PROB.bay, href: '#/inbound', tip: 'Average gate-to-' + T('bay').toLowerCase() + ' time per truck.' }),
+      kpi('clock', COL.cy, 'TRUCK TURNAROUND', '(gate in → gate out)', f0(y.turn) + '<small>min</small>', '<div class="sub">per visit to the plant</div>', { alert: PROB.turn, href: '#/inbound', tip: 'Average time from gate-in to gate-out of one visit of a truck to the plant. Per visit, not per bay and not per supply trip.' }),
       kpi('db', COL.cy, 'STOCK ACCURACY', '(cycle count)', '<span class="' + sc + '">' + f1(S.kpi.stockAcc) + '%</span>', '', { alert: PROB.stock, href: '#/lineside', tip: 'Cycle-count accuracy of system vs physical stock.' })
     ].join('');
     setHTML($('#kpis'), html);
@@ -224,18 +224,15 @@
     const cell = (lab, val, sub) => '<div class="vc"><small>' + lab + '</small><b>' + val + '</b>' + (sub ? '<i>' + sub + '</i>' : '') + '</div>';
     const fn = Sim.funnel(y), pc = (n) => f0((n / Math.max(1, fn.expected)) * 100) + '%';
     const mini = (lab, val, key, arr) => '<div class="vm"><div class="vt"><small>' + lab + '</small><b>' + f0(val) + ' min</b></div>' + spark(key, arr, { color: 'var(--cyan)', unit: ' min', h: 30 }) + '</div>';
-    const EX = Sim.explainYard(S);
-    const exLine = (title, part, unit) => '<div class="vex' + (part.gap !== 0 ? ' gap' : '') + '"' + tipA(title + ' ' + part.total + ' = ' + (part.rows.map((r) => r.n + ' ' + r.label).join(' + ') || 'nothing reported') + (part.gap !== 0 ? ' · ' + Math.abs(part.gap) + ' ' + unit + (part.gap > 0 ? ' not explained by the feed' : ' more than the headline figure') : '')) + '><b>' + title + ' ' + part.total + '</b>' +
-      part.rows.map((r) => '<span class="' + (r.key === 'notOnPlan' || r.key === 'unidentified' || r.key === 'openNoExit' || r.key === 'notHere' ? 'warn' : '') + '"><i>' + r.n + '</i> ' + r.label + '</span>').join('') + (part.gap !== 0 ? '<span class="bad"><i>' + Math.abs(part.gap) + '</i> ' + (part.gap > 0 ? 'unexplained' : 'over') + '</span>' : '') + '</div>';
     const next = S.trucks.filter((t) => t.status === 'docked' || t.status === 'arrived').slice(0, 2).concat(S.trucks.filter((t) => t.status === 'scheduled').slice(0, 2)).slice(0, 4);
     const chip = (t) => t.status === 'docked' ? '<span class="chip cy">' + esc(T('atBay').toUpperCase()) + (t.dock ? ' ' + t.dock : '') + '</span>' : t.status === 'arrived' ? '<span class="chip watch">WAITING</span>' : '<span class="chip mut">ETA ' + (t.sched !== null && t.sched !== undefined ? clockOf(t.sched) : '—') + '</span>';
     setHTML($('#v-a'),
       vband('A', 'INBOUND TRUCKS', waiting + ' waiting', waiting >= 6 ? 'low' : waiting >= 3 ? 'watch' : 'ok') +
       '<div class="vbody">' +
       '<div class="vcs">' + cell('Expected', fn.expected) + cell('Not yet here', fn.notYet, pc(fn.notYet)) + cell('Waiting', fn.waiting, pc(fn.waiting)) + cell(T('atBay') + ' now', fn.atBayNow, pc(fn.atBayNow)) + cell('Received', fn.received, pc(fn.received)) + '</div>' +
-      '<div class="vbays"' + tipA(y.occupied + ' of ' + y.docks + ' ' + esc(T('bays').toLowerCase()) + ' in use') + '><span><b>' + y.occupied + ' / ' + y.docks + '</b> ' + esc(T('bays').toLowerCase()) + ' in use</span><div class="vbar"><b class="' + st + '" style="width:' + Math.min(100, (y.occupied / Math.max(1, y.docks)) * 100).toFixed(0) + '%"></b></div></div>' +
-      '<div class="vms">' + mini('Gate → ' + esc(T('bay').toLowerCase()), y.g2d, 'g2d', h.g2d) + mini('Truck turnaround', y.turn, 'turn', h.turn) + '</div>' +
-      (EX ? exLine('Waiting', EX.waiting, 'trips') + exLine(esc(T('bays')) + ' in use', EX.bays, esc(T('bays').toLowerCase())) : '<div class="vtl">' + next.map((t) => '<div class="vtr"><b' + tipA(esc(t.id) + ' · ' + esc(t.sup) + ' · ' + esc(t.mat)) + '>' + esc(t.id) + '</b><span>' + esc(t.sup) + '</span><span class="mut">' + esc(t.mat) + '</span>' + chip(t) + '</div>').join('') + '</div>') + '</div>');
+      '<div class="vbays"' + tipA(y.occupied + ' of ' + y.docks + ' ' + esc(T('bays').toLowerCase()) + ' in use') + '><span><b>' + y.occupied + ' / ' + y.docks + '</b> ' + esc(T('bays').toLowerCase()) + ' in use' + ((y.noTrip || 0) > 0 ? ' · <em class="nt">' + y.noTrip + ' no trip</em>' : '') + '</span><div class="vbar"><b class="' + st + '" style="width:' + Math.min(100, (y.occupied / Math.max(1, y.docks)) * 100).toFixed(0) + '%"></b></div></div>' +
+      '<div class="vms">' + mini('Stay in ' + esc(T('parking').toLowerCase()), y.parkStay || 0, 'park', h.park || []) + mini('Turnaround · gate in → out', y.turn, 'turn', h.turn) + '</div>' +
+      ('<div class="vtl">' + next.map((t) => '<div class="vtr"><b' + tipA(esc(t.id) + ' · ' + esc(t.sup) + ' · ' + esc(t.mat)) + '>' + esc(t.id) + '</b><span>' + esc(t.sup) + '</span><span class="mut">' + esc(t.mat) + '</span>' + chip(t) + '</div>').join('') + '</div>') + '</div>');
     $('#v-a').dataset.href = '#/inbound';
   }
   const fitStr = (s, n) => (String(s).length > n ? String(s).slice(0, n - 1) + '…' : String(s));
@@ -306,7 +303,8 @@
     const waiting = Math.max(0, y.arrived - y.docked), free = Math.max(0, y.docks - y.occupied), B = [];
     if (free === 0) B.push(it('low', 'No ' + bay + ' free · all ' + y.docks + ' ' + bays + ' occupied', waiting + ' truck' + (waiting === 1 ? '' : 's') + ' waiting at the gate · release a ' + bay, '#/inbound'));
     else if (free <= Math.max(1, Math.round(y.docks * 0.08))) B.push(it('watch', 'Only ' + free + ' ' + (free === 1 ? bay : bays) + ' free', waiting + ' waiting · ' + y.occupied + ' / ' + y.docks + ' in use', '#/inbound'));
-    if (y.g2d > 45) B.push(it(y.g2d > 60 ? 'low' : 'watch', 'Gate-to-' + bay + ' ' + f0(y.g2d) + ' min', 'above the 45 min target', '#/inbound'));
+    if ((y.parkStay || 0) > 45) B.push(it(y.parkStay > 60 ? 'low' : 'watch', 'Stay in parking ' + f0(y.parkStay) + ' min', 'above 45 min · trucks are held before a ' + bay, '#/inbound'));
+    if ((y.noTrip || 0) > 0) B.push(it('watch', y.noTrip + ' ' + (y.noTrip === 1 ? bay : bays) + ' occupied with no trip matched', 'identify the truck or match it to a trip', '#/inbound'));
     G.push({ n: 3, title: (T('bay') + ' NOT AVAILABLE').toUpperCase(), empty: free + ' ' + (free === 1 ? bay : bays) + ' free', items: B });
     /* 4 AMR stoppages */
     const A = [], H = Sim.amrHealth(S), nm = { amr: 'Indoor AMR', jv: 'JV AMR' };
@@ -370,7 +368,8 @@
     const dp = (S.deliveries.onTime / Math.max(1, S.deliveries.total)) * 100;
     P.deliveries = dp < 85 ? 'On-time rate ' + f0(dp) + '% (below 85%)' : null;
     P.jit = S.kpi.jit < 95 ? T('jit') + ' ' + f1(S.kpi.jit) + '% (below 95%)' : null;
-    P.bay = y.g2d > 45 ? 'Gate-to-' + T('bay').toLowerCase() + ' time ' + f0(y.g2d) + ' min (above 45)' : null;
+    P.bay = (y.parkStay || 0) > 45 ? 'Stay in parking ' + f0(y.parkStay) + ' min (above 45)' : null;
+    P.turn = y.turn > (y.turnTarget || 90) ? 'Truck turnaround ' + f0(y.turn) + ' min (above ' + (y.turnTarget || 90) + ')' : null;
     P.stock = S.kpi.stockAcc < 95 ? 'Stock accuracy ' + f1(S.kpi.stockAcc) + '% (below 95%)' : null;
     P.inbound = P.trucks || P.bay || (y.turn > 90 ? 'Truck turnaround ' + f0(y.turn) + ' min (above 90)' : null);
     const late = S.transfers.filter((t) => (t.q.reduce((a, c) => a + c, 0) / t.q.length) * 100 < 78).map((t) => t.name);

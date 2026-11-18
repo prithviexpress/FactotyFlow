@@ -73,7 +73,7 @@ const Y = (k, label, unit, ex, o) => def('Truck parking & bays', 'yard', 'yard/'
 Y('expected', 'Trucks expected today', 'trucks', 34, cnt); Y('arrived', 'Trucks arrived at the gate', 'trucks', 26, cnt);
 Y('docked', 'Trucks currently or already at a bay', 'trucks', 21, cnt); Y('received', 'Trucks received (unloaded & closed)', 'trucks', 18, cnt);
 Y('occupied', 'Bays occupied right now', 'bays', 21, cnt); Y('docks', 'Total bays', 'bays', 28, { min: 1, int: true });
-Y('g2d', 'Average gate-to-bay time', 'min', 32, { min: 0, max: 1440 }); Y('turn', 'Average truck turnaround', 'min', 68, { min: 0, max: 2880 });
+Y('g2d', 'Average gate-to-bay time (accepted, no longer shown)', 'min', 32, { min: 0, max: 1440 }); Y('parkStay', 'Average stay in the parking before leaving it', 'min', 24, { min: 0, max: 1440 }); Y('noTrip', 'Occupied bays whose truck no trip is matched to', 'bays', 3, cnt); Y('turn', 'Average truck turnaround', 'min', 68, { min: 0, max: 2880 });
 def('Truck parking & bays', 'trucks', 'trucks/{truck}/status', 'Status of one truck', 'scheduled | arrived | docked | received', 'enum', 'docked', { ent: 'truck', enum: ['scheduled', 'arrived', 'docked', 'received'],
   get: (S, e) => e.o.status, set: (S, v, e) => Ing.ingest(S, 'trucks.item', { id: e.id, status: v }), viaIngest: true });
 def('Truck parking & bays', 'trucks', 'trucks/{truck}/dock', 'Bay number a truck is at', 'bay no.', NUM, 4, { ent: 'truck', min: 1, int: true, get: (S, e) => e.o.dock, set: (S, v, e) => Ing.ingest(S, 'trucks.item', { id: e.id, dock: v }), viaIngest: true });
@@ -199,7 +199,7 @@ const DERIVED = [
   ['On-site trucks', 'yard/arrived − yard/received'],
   ['"(n expected)" under on-site trucks', 'min(4, yard/expected − yard/arrived)'],
   ['Internal deliveries on-time %', 'deliveries/onTime ÷ deliveries/total'],
-  ['Bay turnaround KPI', 'yard/g2d'],
+  ['Truck turnaround KPI', 'yard/turn (gate in to gate out, per visit to the plant)'],
   ['Funnel percentages (arrived / at bay / received)', 'each count ÷ yard/expected'],
   ['Transfer route %, ON TIME / DELAYED', 'transfers/{route}/onTime ÷ total; DELAYED below 78%'],
   ['Line-side status LOW / WATCH / OK', 'usable ÷ safety: <50% LOW, <75% WATCH'],

@@ -145,7 +145,7 @@
       },
       yard: {
         expected: 34, arrived: 26, docked: 21, received: 18, occupied: 21, docks: 28, unloadLimitMin: 45,
-        g2d: 32, turn: 68
+        g2d: 32, turn: 68, parkStay: 24, noTrip: 0
       },
       finished: { onTime: 92, shipOnTime: 92, units: 176, shipRate: 1.8 },
       kpi: { jit: 98.4, stockAcc: 97.8 },
@@ -189,7 +189,7 @@
         ]
       }),
       parts: makeParts(clock),
-      hist: { t: [], g2d: [], turn: [], rej: [], spf: [], rejPct: [] },
+      hist: { t: [], g2d: [], turn: [], park: [], rej: [], spf: [], rejPct: [] },
       sampleAcc: 0, rejMark: 16,
       live: {}, src: {}, sources: {}, trucks: [], setup: null, jvSites: [],
       alerts: [], alertLog: [], alertSrc: {}, weatherInfo: null, branding: { logo: false, ver: 0 },
@@ -199,6 +199,7 @@
     for (let i = 0; i < HIST; i++) S.hist.t.push(+(clock - (HIST - 1 - i) * SAMPLE_MIN).toFixed(2));
     S.hist.g2d = seedSeries(32, 4, HIST);
     S.hist.turn = seedSeries(68, 6, HIST);
+    S.hist.park = seedSeries(24, 4, HIST);
     S.hist.spf = seedSeries(91, 2, HIST);
     S.hist.rejPct = seedSeries(2.0, 0.3, HIST).map((v) => Math.max(0, +v.toFixed(2)));
     seedTopics(S, clock);
@@ -337,21 +338,12 @@
     const received = Math.max(0, y.received), docked = Math.max(received, y.docked), arrived = Math.max(docked, y.arrived), expected = Math.max(arrived, y.expected);
     return { expected, notYet: expected - arrived, waiting: arrived - docked, atBayNow: docked - received, received };
   }
-  /** Where every waiting trip and every occupied bay is, when the feed explains them (yard.explain). The parts are checked against the
-   *  headline figures: whatever they do not cover is returned as `gap`, so nothing is left unexplained without it being said. */
-  const EXPLAIN_TRIPS = [['parking', 'in parking'], ['toBay', 'on the way to a bay'], ['otherBay', 'at a bay for another trip'], ['returning', 'returning to parking'], ['onRoad', 'on the road, no bay'], ['notHere', 'reported not here'], ['openNoExit', 'finished, exit not read']];
-  const EXPLAIN_BAYS = [['unloading', 'unloading'], ['unloaded', 'unloaded, still at the bay'], ['notOnPlan', 'truck not on today\'s plan'], ['unidentified', 'unidentified truck']];
-  function explainYard(S) {
-    const y = S.yard, e = y.explain;
-    if (!e) return null;
-    const part = (defs, src, total) => { const rows = defs.map((d) => ({ key: d[0], label: d[1], n: Math.max(0, Number((src || {})[d[0]]) || 0) })).filter((r) => r.n > 0), sum = rows.reduce((a, r) => a + r.n, 0); return { rows, total, gap: total - sum }; };
-    return { waiting: part(EXPLAIN_TRIPS, e.trips, funnel(y).waiting), bays: part(EXPLAIN_BAYS, e.bays, Math.max(0, y.occupied)) };
-  }
   /** The ids of the bays the grid shows, and which of them have a truck at them. */
   function bayGrid(S) {
     const y = S.yard, ids = y.bays && y.bays.length ? y.bays.slice() : Array.from({ length: Math.max(0, y.docks) }, (_, i) => String(i + 1));
     const busy = new Set(S.trucks.filter((t) => t.status === 'docked' && t.dock !== null && t.dock !== undefined && t.dock !== '').map((t) => String(t.dock)));
-    return ids.map((id) => ({ id, busy: busy.has(id) }));
+    const st = y.bayStatus || {}, none = new Set((y.noTripBays || []).map(String));
+    return ids.map((id) => ({ id, busy: busy.has(id) || st[id] === 'occupied' || none.has(id), noTrip: none.has(id), blocked: st[id] === 'blocked' || st[id] === 'outOfService' }));
   }
   function inventoryView(S) {
     const T = S.setup.terms;
@@ -562,6 +554,7 @@
     if (y.arrived > y.docked && y.occupied < y.docks && R() < 0.12 * m) {
       y.docked++; y.occupied++; moveTruck(S, 'arrived', 'docked');
       y.g2d = clamp(y.g2d * 0.9 + rnd(20, 48) * 0.1, 15, 90);
+      y.parkStay = clamp(y.g2d * 0.75 + rnd(-2, 2), 5, 80);
     }
     if (y.docked > y.received && R() < 0.1 * m) {
       y.received++; y.occupied = Math.max(2, y.occupied - 1); moveTruck(S, 'docked', 'received');
@@ -650,7 +643,7 @@
       S.sampleAcc -= SAMPLE_MIN;
       const h = S.hist;
       const pushH = (a, v) => { a.push(+v.toFixed(2)); if (a.length > HIST) a.shift(); };
-      pushH(h.t, S.clock); pushH(h.g2d, y.g2d); pushH(h.turn, y.turn); pushH(h.spf, S.quality.spf);
+      pushH(h.t, S.clock); pushH(h.g2d, y.g2d); pushH(h.turn, y.turn); if (!h.park) h.park = []; pushH(h.park, y.parkStay === undefined ? 0 : y.parkStay); pushH(h.spf, S.quality.spf);
       pushH(h.rej, S.quality.rejected - S.rejMark); S.rejMark = S.quality.rejected;
       for (const k in S.shops) pushH(h.shops[k], S.shops[k].buf);
       pushH(h.rejPct, S.build.actual > 0 ? (S.quality.rejected / S.build.actual) * 100 : 0);
@@ -815,7 +808,7 @@
   }
 
   return {
-    createState, step, inject, explainYard, EXPLAIN_TRIPS, EXPLAIN_BAYS, MGMT_DEPTS, DEPT_IDS, mgmtView, funnel, bayGrid, resetDomain, SEQFLOWS, amrHealth, kanbanStatus, raiseAlert, clearAlert, pruneAlerts, reconcileAlerts, LEVELS, inventoryView, hourStatus, setPlant, lineSplit, DEFAULT_SLOTS, SLOT_BINDS, CARRIERS, DEFAULT_TERMS, DEFAULT_JVS, MAX_JVS, TARGET_H, coverage, partStatus, bufferStatus, linesideStatus, routeStatus,
+    createState, step, inject, MGMT_DEPTS, DEPT_IDS, mgmtView, funnel, bayGrid, resetDomain, SEQFLOWS, amrHealth, kanbanStatus, raiseAlert, clearAlert, pruneAlerts, reconcileAlerts, LEVELS, inventoryView, hourStatus, setPlant, lineSplit, DEFAULT_SLOTS, SLOT_BINDS, CARRIERS, DEFAULT_TERMS, DEFAULT_JVS, MAX_JVS, TARGET_H, coverage, partStatus, bufferStatus, linesideStatus, routeStatus,
     nextAction, fleetView, fmtClock, makeTrucks, SHOP_NAMES, RISK_MIN
   };
 });

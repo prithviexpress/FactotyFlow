@@ -140,20 +140,13 @@ const APPLY = {
   },
   yard(S, p) {
     asObj(p, 'yard');
-    for (const k of ['expected', 'arrived', 'docked', 'received', 'occupied', 'docks', 'g2d', 'turn', 'unloadLimitMin', 'turnTarget']) if (p[k] !== undefined) S.yard[k] = need(p[k], k);
+    for (const k of ['expected', 'arrived', 'docked', 'received', 'occupied', 'docks', 'g2d', 'turn', 'unloadLimitMin', 'turnTarget', 'parkStay', 'noTrip']) if (p[k] !== undefined) S.yard[k] = need(p[k], k);
     if (p.unloadLimitMin !== undefined && !(S.yard.unloadLimitMin > 0)) throw new IngestError('yard.unloadLimitMin must be greater than 0');
-    if (p.explain !== undefined) {     // where every waiting trip and every occupied bay is: { trips: {parking, toBay, ...}, bays: {unloading, unloaded, notOnPlan, unidentified} }
-      asObj(p.explain, 'yard.explain');
-      const ex = {};
-      for (const [g, keys] of [['trips', Sim.EXPLAIN_TRIPS], ['bays', Sim.EXPLAIN_BAYS]]) {
-        if (p.explain[g] === undefined) continue;
-        asObj(p.explain[g], 'yard.explain.' + g); ex[g] = {};
-        for (const k of Object.keys(p.explain[g])) {
-          if (!keys.some((d) => d[0] === k)) throw new IngestError('yard.explain.' + g + '.' + k + ' is not known. Valid: ' + keys.map((d) => d[0]).join(', '));
-          ex[g][k] = nn(p.explain[g][k], 'explain.' + g + '.' + k);
-        }
-      }
-      S.yard.explain = ex;
+    if (p.noTripBays !== undefined) {   // occupied bays whose truck no trip is matched to
+      const ids = asArray(p.noTripBays, 'yard.noTripBays').map((b) => String(b).trim());
+      if (ids.length > 2000 || ids.some((b) => !b || b.length > 24)) throw new IngestError('yard.noTripBays: up to 2000 ids, each 1 to 24 characters');
+      S.yard.noTripBays = ids;
+      if (p.noTrip === undefined) S.yard.noTrip = ids.length;
     }
     if (p.bayStatus !== undefined) {   // { "AB-14": "blocked", ... }: only the bays you send change; send "available" to clear one
       asObj(p.bayStatus, 'yard.bayStatus');

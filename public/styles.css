@@ -1094,17 +1094,6 @@ svg.ch{flex:1;min-height:0;width:100%;display:block}
 .ov{grid-template-rows:88px minmax(0,1fr) auto}
 .ov-map{aspect-ratio:1152/322}
 
-/* every waiting trip and occupied bay explained (yard.explain) */
-.vex{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px;font-size:12px;color:var(--ink2);border-top:1px solid var(--line);padding-top:3px;line-height:1.25}
-.vex>b{color:var(--ink);font-size:12.5px;white-space:nowrap}
-.vex span{white-space:nowrap}.vex span i{font-style:normal;font-weight:800;color:var(--ink)}
-.vex span.warn i,.vex span.warn{color:var(--watch)}
-.vex span.bad,.vex span.bad i{color:var(--low);font-weight:800}
-.exrow{display:flex;flex-wrap:wrap;gap:8px;align-items:stretch;margin-bottom:8px}
-.exh{min-width:150px;display:flex;flex-direction:column;justify-content:center}
-.exh b{font-size:13px;color:var(--ink2)}.exh em{font-style:normal;font-size:26px;font-weight:800}
-.exc{border:1px solid var(--line);border-radius:5px;background:var(--panel2);padding:4px 12px;min-width:110px}
-.exc b{display:block;font-size:22px;font-weight:800}.exc small{font-size:12px;color:var(--ink2)}
-.exc.warn{border-color:var(--watch)}.exc.warn b{color:var(--watch)}
-.exc.bad{border-color:var(--low)}.exc.bad b{color:var(--low)}
-.exc.okc b{color:var(--ok)}
+.vbays em.nt{font-style:normal;font-weight:800;color:var(--watch)}
+.dk.notrip{background:var(--watch);border-color:var(--watch);color:#201600;font-weight:700}
+.dk.blk{background:repeating-linear-gradient(45deg,var(--panel2),var(--panel2) 4px,var(--line) 4px,var(--line) 8px);color:var(--ink2)}

@@ -145,7 +145,7 @@
         for (let i = 0; i < y.docks; i++) { const cc = i % 7, cr = Math.floor(i / 7); cells += '<rect x="' + (cx0 + cc * 15) + '" y="' + (cy0 + cr * 14) + '" width="12" height="11" rx="3" style="fill:' + (i < y.occupied ? 'var(--cyan)' : 'var(--track)') + '"/>'; }
         return { st, inner: tx(g.x + 14, g.y + 22, fit(title, g.w - 98, 8.4), 'bt') + pill(g.x + g.w - 10, g.y + 7, waiting + ' waiting', wst, 'end') +
           rows.map((r, i) => tx(g.x + 16, g.y + 48 + i * 19, r[1], 'bn2') + tx(g.x + 54, g.y + 48 + i * 19, r[0], 'sm')).join('') + cells + tx(cx0, cy0 + 4 * 14 + 12, bays, 'bn2') +
-          tx(g.x + 16, g.y + g.h - 9, 'gate → ' + T('bay').toLowerCase() + ' ' + f0(y.g2d) + ' min', 'sm') };
+          tx(g.x + 16, g.y + g.h - 9, 'parking stay ' + f0(y.parkStay || 0) + ' min', 'sm') };
       }
       if (k === 'tall') {
         return { st, inner: tx(g.x + 12, g.y + 22, fit(title, g.w - 20, 8.4), 'bt') + pill(g.x + 12, g.y + 30, waiting + ' waiting', wst) +
