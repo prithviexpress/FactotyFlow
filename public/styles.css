@@ -1097,8 +1097,3 @@ svg.ch{flex:1;min-height:0;width:100%;display:block}
 .vbays em.nt{font-style:normal;font-weight:800;color:var(--watch)}
 .dk.notrip{background:var(--watch);border-color:var(--watch);color:#201600;font-weight:700}
 .dk.blk{background:repeating-linear-gradient(45deg,var(--panel2),var(--panel2) 4px,var(--line) 4px,var(--line) 8px);color:var(--ink2)}
-.vnt{display:flex;align-items:baseline;gap:8px;border-top:1px solid var(--line);padding-top:3px;font-size:12.5px}
-.vnt b{color:var(--watch);font-weight:800;letter-spacing:.3px;text-transform:uppercase;font-size:12px}
-.vnt span{color:var(--ink2);font-size:11px}
-.vtr.nt{cursor:pointer}.vtr.nt>b{color:var(--ink)}
-.vtr.nt{grid-template-columns:minmax(110px,auto) minmax(0,auto) minmax(0,1fr) auto}
