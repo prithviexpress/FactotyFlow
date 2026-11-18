@@ -212,3 +212,17 @@ test('yard: bays with no trip matched, stay in parking, trucks marked as having 
   for (let i = 0; i < 12; i++) Sim.step(S, 300);
   assert.ok(S.hist.park.length > 0 && S.hist.park[S.hist.park.length - 1] === 41);   // live: the pushed value is what is charted
 });
+
+test('trucks with no matching trip are named: the bay, the plate when known, why, and how long they have stood there', () => {
+  const S = Sim.createState(); S.clock = 600;
+  Ing.ingest(S, 'yard', { occupied: 3, docks: 4, bays: ['AA-01', 'AA-02', 'AA-03', 'AA-04'],
+    noTripTrucks: [{ bay: 'AA-02', why: 'unidentified', since: 570 }, { bay: 'AA-03', truck: 'HR38AB0266', why: 'notOnPlan', since: 480 }, { bay: 'AA-04', truck: 'DL01LA3437', why: 'noStopMatched' }] });
+  assert.equal(S.yard.noTrip, 3); assert.deepEqual(S.yard.noTripBays, ['AA-02', 'AA-03', 'AA-04']);
+  const nt = Sim.noTripTrucks(S);
+  assert.deepEqual(nt.map((x) => [x.bay, x.truck, x.min]), [['AA-03', 'HR38AB0266', 120], ['AA-02', null, 30], ['AA-04', 'DL01LA3437', null]]);   // longest standing first
+  assert.equal(nt[0].label, "not on today's plan"); assert.ok(Sim.bayGrid(S).find((b) => b.id === 'AA-03').noTrip);
+  assert.throws(() => Ing.ingest(S, 'yard', { noTripTrucks: [{ truck: 'X' }] }), /needs a bay/);
+  assert.throws(() => Ing.ingest(S, 'yard', { noTripTrucks: [{ bay: 'AA-01', why: 'lost' }] }), /must be one of/);
+  Ing.ingest(S, 'yard', { noTripTrucks: [] }); assert.equal(Sim.noTripTrucks(S).length, 0); assert.equal(S.yard.noTrip, 0);   // cleared when none are left
+  Ing.ingest(S, 'yard', { noTripBays: ['AA-01'] }); assert.equal(Sim.noTripTrucks(S)[0].why, 'unidentified');                 // only the bays sent: still listed
+});

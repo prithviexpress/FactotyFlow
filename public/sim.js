@@ -338,6 +338,13 @@
     const received = Math.max(0, y.received), docked = Math.max(received, y.docked), arrived = Math.max(docked, y.arrived), expected = Math.max(arrived, y.expected);
     return { expected, notYet: expected - arrived, waiting: arrived - docked, atBayNow: docked - received, received };
   }
+  /** Trucks standing in a bay with no trip matched to them, longest standing first: {bay, truck, why, label, min}. */
+  const NO_TRIP_WHY = { unidentified: 'unidentified truck', notOnPlan: 'not on today\'s plan', noStopMatched: 'on plan, visit matches no stop' };
+  function noTripTrucks(S) {
+    const y = S.yard, list = y.noTripTrucks && y.noTripTrucks.length ? y.noTripTrucks : (y.noTripBays || []).map((b) => ({ bay: b, truck: null, why: 'unidentified', since: null }));
+    return list.map((x) => ({ bay: x.bay, truck: x.truck, why: x.why, label: NO_TRIP_WHY[x.why] || x.why, min: x.since === null || x.since === undefined ? null : Math.max(0, ((S.clock - x.since) % 1440 + 1440) % 1440) }))
+      .sort((a, b) => (b.min === null ? -1 : b.min) - (a.min === null ? -1 : a.min));
+  }
   /** The ids of the bays the grid shows, and which of them have a truck at them. */
   function bayGrid(S) {
     const y = S.yard, ids = y.bays && y.bays.length ? y.bays.slice() : Array.from({ length: Math.max(0, y.docks) }, (_, i) => String(i + 1));
@@ -808,7 +815,7 @@
   }
 
   return {
-    createState, step, inject, MGMT_DEPTS, DEPT_IDS, mgmtView, funnel, bayGrid, resetDomain, SEQFLOWS, amrHealth, kanbanStatus, raiseAlert, clearAlert, pruneAlerts, reconcileAlerts, LEVELS, inventoryView, hourStatus, setPlant, lineSplit, DEFAULT_SLOTS, SLOT_BINDS, CARRIERS, DEFAULT_TERMS, DEFAULT_JVS, MAX_JVS, TARGET_H, coverage, partStatus, bufferStatus, linesideStatus, routeStatus,
+    createState, step, inject, noTripTrucks, MGMT_DEPTS, DEPT_IDS, mgmtView, funnel, bayGrid, resetDomain, SEQFLOWS, amrHealth, kanbanStatus, raiseAlert, clearAlert, pruneAlerts, reconcileAlerts, LEVELS, inventoryView, hourStatus, setPlant, lineSplit, DEFAULT_SLOTS, SLOT_BINDS, CARRIERS, DEFAULT_TERMS, DEFAULT_JVS, MAX_JVS, TARGET_H, coverage, partStatus, bufferStatus, linesideStatus, routeStatus,
     nextAction, fleetView, fmtClock, makeTrucks, SHOP_NAMES, RISK_MIN
   };
 });

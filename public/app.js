@@ -224,6 +224,7 @@
     const cell = (lab, val, sub) => '<div class="vc"><small>' + lab + '</small><b>' + val + '</b>' + (sub ? '<i>' + sub + '</i>' : '') + '</div>';
     const fn = Sim.funnel(y), pc = (n) => f0((n / Math.max(1, fn.expected)) * 100) + '%';
     const mini = (lab, val, key, arr) => '<div class="vm"><div class="vt"><small>' + lab + '</small><b>' + f0(val) + ' min</b></div>' + spark(key, arr, { color: 'var(--cyan)', unit: ' min', h: 30 }) + '</div>';
+    const NT = Sim.noTripTrucks(S);
     const next = S.trucks.filter((t) => t.status === 'docked' || t.status === 'arrived').slice(0, 2).concat(S.trucks.filter((t) => t.status === 'scheduled').slice(0, 2)).slice(0, 4);
     const chip = (t) => t.status === 'docked' ? '<span class="chip cy">' + esc(T('atBay').toUpperCase()) + (t.dock ? ' ' + t.dock : '') + '</span>' : t.status === 'arrived' ? '<span class="chip watch">WAITING</span>' : '<span class="chip mut">ETA ' + (t.sched !== null && t.sched !== undefined ? clockOf(t.sched) : '—') + '</span>';
     setHTML($('#v-a'),
@@ -232,7 +233,7 @@
       '<div class="vcs">' + cell('Expected', fn.expected) + cell('Not yet here', fn.notYet, pc(fn.notYet)) + cell('Waiting', fn.waiting, pc(fn.waiting)) + cell(T('atBay') + ' now', fn.atBayNow, pc(fn.atBayNow)) + cell('Received', fn.received, pc(fn.received)) + '</div>' +
       '<div class="vbays"' + tipA(y.occupied + ' of ' + y.docks + ' ' + esc(T('bays').toLowerCase()) + ' in use') + '><span><b>' + y.occupied + ' / ' + y.docks + '</b> ' + esc(T('bays').toLowerCase()) + ' in use' + ((y.noTrip || 0) > 0 ? ' · <em class="nt">' + y.noTrip + ' no trip</em>' : '') + '</span><div class="vbar"><b class="' + st + '" style="width:' + Math.min(100, (y.occupied / Math.max(1, y.docks)) * 100).toFixed(0) + '%"></b></div></div>' +
       '<div class="vms">' + mini('Stay in ' + esc(T('parking').toLowerCase()), y.parkStay || 0, 'park', h.park || []) + mini('Turnaround · gate in → out', y.turn, 'turn', h.turn) + '</div>' +
-      ('<div class="vtl">' + next.map((t) => '<div class="vtr"><b' + tipA(esc(t.id) + ' · ' + esc(t.sup) + ' · ' + esc(t.mat)) + '>' + esc(t.id) + '</b><span>' + esc(t.sup) + '</span><span class="mut">' + esc(t.mat) + '</span>' + chip(t) + '</div>').join('') + '</div>') + '</div>');
+      (NT.length ? '<div class="vnt"><b>No matching trip · ' + NT.length + '</b><span>longest standing first</span></div><div class="vtl">' + NT.slice(0, 3).map((x) => '<div class="vtr nt" data-href="#/inbound"' + tipA((x.truck ? esc(x.truck) : 'Unidentified truck') + ' at ' + esc(T('bay').toLowerCase()) + ' ' + esc(x.bay) + ' · ' + x.label + (x.min !== null ? ' · standing ' + f0(x.min) + ' min' : '')) + '><b>' + (x.truck ? esc(x.truck) : 'Unidentified') + '</b><span>' + esc(T('bay')) + ' ' + esc(x.bay) + '</span><span class="mut">' + ({ unidentified: 'plate unknown', notOnPlan: 'not on plan', noStopMatched: 'no stop matched' }[x.why] || x.label) + '</span><span class="chip watch">' + (x.min !== null ? f0(x.min) + ' min' : 'NO TRIP') + '</span></div>').join('') + '</div>' : '<div class="vtl">' + next.map((t) => '<div class="vtr"><b' + tipA(esc(t.id) + ' · ' + esc(t.sup) + ' · ' + esc(t.mat)) + '>' + esc(t.id) + '</b><span>' + esc(t.sup) + '</span><span class="mut">' + esc(t.mat) + '</span>' + chip(t) + '</div>').join('') + '</div>') + '</div>');
     $('#v-a').dataset.href = '#/inbound';
   }
   const fitStr = (s, n) => (String(s).length > n ? String(s).slice(0, n - 1) + '…' : String(s));
@@ -304,7 +305,8 @@
     if (free === 0) B.push(it('low', 'No ' + bay + ' free · all ' + y.docks + ' ' + bays + ' occupied', waiting + ' truck' + (waiting === 1 ? '' : 's') + ' waiting at the gate · release a ' + bay, '#/inbound'));
     else if (free <= Math.max(1, Math.round(y.docks * 0.08))) B.push(it('watch', 'Only ' + free + ' ' + (free === 1 ? bay : bays) + ' free', waiting + ' waiting · ' + y.occupied + ' / ' + y.docks + ' in use', '#/inbound'));
     if ((y.parkStay || 0) > 45) B.push(it(y.parkStay > 60 ? 'low' : 'watch', 'Stay in parking ' + f0(y.parkStay) + ' min', 'above 45 min · trucks are held before a ' + bay, '#/inbound'));
-    if ((y.noTrip || 0) > 0) B.push(it('watch', y.noTrip + ' ' + (y.noTrip === 1 ? bay : bays) + ' occupied with no trip matched', 'identify the truck or match it to a trip', '#/inbound'));
+    Sim.noTripTrucks(S).forEach((x) => B.push(it(x.min !== null && x.min >= 60 ? 'low' : 'watch', (x.truck || 'Unidentified truck') + ' · ' + bay + ' ' + x.bay + ' · no matching trip', x.label + (x.min !== null ? ' · standing ' + f0(x.min) + ' min' : ''), '#/inbound')));
+    if ((y.noTrip || 0) > 0 && !Sim.noTripTrucks(S).length) B.push(it('watch', y.noTrip + ' ' + (y.noTrip === 1 ? bay : bays) + ' occupied with no trip matched', 'identify the truck or match it to a trip', '#/inbound'));
     G.push({ n: 3, title: (T('bay') + ' NOT AVAILABLE').toUpperCase(), empty: free + ' ' + (free === 1 ? bay : bays) + ' free', items: B });
     /* 4 AMR stoppages */
     const A = [], H = Sim.amrHealth(S), nm = { amr: 'Indoor AMR', jv: 'JV AMR' };

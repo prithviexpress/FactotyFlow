@@ -142,6 +142,21 @@ const APPLY = {
     asObj(p, 'yard');
     for (const k of ['expected', 'arrived', 'docked', 'received', 'occupied', 'docks', 'g2d', 'turn', 'unloadLimitMin', 'turnTarget', 'parkStay', 'noTrip']) if (p[k] !== undefined) S.yard[k] = need(p[k], k);
     if (p.unloadLimitMin !== undefined && !(S.yard.unloadLimitMin > 0)) throw new IngestError('yard.unloadLimitMin must be greater than 0');
+    if (p.noTripTrucks !== undefined) {   // each truck standing in a bay with no trip matched: {bay, truck?, why, since?}
+      const WHY = ['unidentified', 'notOnPlan', 'noStopMatched'];
+      const list = asArray(p.noTripTrucks, 'yard.noTripTrucks').map((x) => {
+        asObj(x, 'yard.noTripTrucks item');
+        const bay = String(x.bay === undefined || x.bay === null ? '' : x.bay).trim(), truck = x.truck === undefined || x.truck === null ? null : String(x.truck).trim().slice(0, 24);
+        if (!bay || bay.length > 24) throw new IngestError('yard.noTripTrucks: each item needs a bay id of 1 to 24 characters');
+        const why = x.why === undefined ? (truck ? 'notOnPlan' : 'unidentified') : String(x.why);
+        if (!WHY.includes(why)) throw new IngestError('yard.noTripTrucks.why must be one of: ' + WHY.join(', '));
+        return { bay, truck: truck || null, why, since: x.since === undefined || x.since === null ? null : clockOf(x.since) };
+      });
+      if (list.length > 2000) throw new IngestError('yard.noTripTrucks: at most 2000 items');
+      S.yard.noTripTrucks = list;
+      if (p.noTripBays === undefined) S.yard.noTripBays = list.map((x) => x.bay);
+      if (p.noTrip === undefined && p.noTripBays === undefined) S.yard.noTrip = list.length;
+    }
     if (p.noTripBays !== undefined) {   // occupied bays whose truck no trip is matched to
       const ids = asArray(p.noTripBays, 'yard.noTripBays').map((b) => String(b).trim());
       if (ids.length > 2000 || ids.some((b) => !b || b.length > 24)) throw new IngestError('yard.noTripBays: up to 2000 ids, each 1 to 24 characters');
