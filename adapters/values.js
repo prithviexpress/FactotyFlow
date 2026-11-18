@@ -22,7 +22,7 @@ const ENT = {
   transfer: { list: (S) => S.transfers.map((t) => t.id), find: (S, id) => { const t = S.transfers.find((x) => x.id === id); return t ? { id, o: t } : null; } },
   lineside: { list: (S) => S.lineside.map((l) => slug(l.name)), find: (S, id) => { const l = S.lineside.find((x) => same(x.name, id)); return l ? { id: slug(l.name), o: l } : null; }, create: true },
   part: { list: (S) => S.parts.map((p) => p.id), find: (S, id) => { const p = S.parts.find((x) => x.id === id); return p ? { id, o: p } : null; }, create: true },
-  truck: { list: (S) => S.trucks.map((t) => t.id), find: (S, id) => { const t = S.trucks.find((x) => x.id === id); return t ? { id, o: t } : null; }, create: true },
+  truck: { list: (S) => S.trucks.filter((t) => t.planned !== false).map((t) => t.id), find: (S, id) => { const t = S.trucks.find((x) => x.id === id); return t ? { id, o: t } : null; }, create: true },
   bay: { list: (S) => (S.yard.bays || []).slice(), find: (S, id) => ((S.yard.bays || []).includes(id) || (S.yard.bayStatus && S.yard.bayStatus[id]) ? { id, o: { status: (S.yard.bayStatus && S.yard.bayStatus[id]) || 'available' } } : null), create: true },
   dept: { list: (S) => Object.keys(S.production.depts), find: (S, id) => (S.production.depts[id] ? { id, o: S.production.depts[id] } : null) },
   amrUnit: { list: (S) => S.amr.amrs.map((a) => a.id), find: (S, id) => { const a = S.amr.amrs.find((x) => x.id === id); return a ? { id, o: a } : null; }, create: true },
